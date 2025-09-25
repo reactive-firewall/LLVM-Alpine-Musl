@@ -1,0 +1,368 @@
+---
+name: Build and Push Docker Image
+run-name: Build ${{ github.ref_name }}
+#
+# "Continuous Integration workflow for building, the project."
+#
+# Jobs included:
+# - build: building the image
+#
+# Required Secrets:
+# NONE
+
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches: ["**"]  # matches any branch
+    tags: ["v*"]
+  pull_request:
+    branches: ["**"]
+
+# Declare default permissions as none.
+permissions: {}
+
+env:
+  USE_SWAP: false
+
+jobs:
+  seed:
+    permissions:
+      actions: read
+      contents: read
+      packages: none
+      pull-requests: read
+    runs-on: ubuntu-latest
+    outputs:
+      timestamp: ${{ steps.output_time.outputs.bootstrap-timestamp }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          submodules: false
+      - id: output_time
+        name: Get Git commit timestamps
+        shell: bash
+        run: |
+          printf "%s\n" "::group::llvm-alpine-musl-env"
+          printf "bootstrap-timestamp=%s\n" $(git log -1 --pretty=%ct) >> "$GITHUB_OUTPUT"
+          printf "TIMESTAMP=%s\n" $(git log -1 --pretty=%ct) >> "$GITHUB_ENV"
+          printf "%s %s\n" "llvm-alpine-musl will be synced at time of:" $(git log -1 --pretty=%ct)
+          printf "%s\n" "::endgroup::"
+
+  build:
+    permissions:
+      actions: read
+      contents: read
+      statuses: write
+      packages: write
+      pull-requests: read
+      security-events: none
+    needs: seed
+    strategy:
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-latest
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+          - architecture: arm
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          submodules: false
+
+      - name: Prepare
+        id: prep_output
+        run: |
+          platform=linux/${{ matrix.architecture }}
+          echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
+          if [ "${{ matrix.architecture }}" == "amd64" ]; then
+            echo "TARGET_TRIPLE=x86_64-none-musl" >> $GITHUB_ENV
+            echo "target-triple=x86_64-none-musl" >> "$GITHUB_OUTPUT"
+            echo "HOST_TRIPLE=x86_64-alpine-linux-musl" >> $GITHUB_ENV
+            echo "host-triple=x86_64-alpine-linux-musl" >> "$GITHUB_OUTPUT"
+          elif [ "${{ matrix.architecture }}" == "arm64" ]; then
+            echo "TARGET_TRIPLE=aarch64-none-musl" >> $GITHUB_ENV
+            echo "target-triple=aarch64-none-musl" >> "$GITHUB_OUTPUT"
+            echo "HOST_TRIPLE=aarch64-alpine-linux-musl" >> $GITHUB_ENV
+            echo "host-triple=aarch64-alpine-linux-musl" >> "$GITHUB_OUTPUT"
+          elif [ "${{ matrix.architecture }}" == "arm" ]; then
+            echo "TARGET_TRIPLE=arm-none-musleabi" >> $GITHUB_ENV
+            echo "target-triple=arm-none-musleabi" >> "$GITHUB_OUTPUT"
+            echo "HOST_TRIPLE=arm-alpine-linux-musl" >> $GITHUB_ENV
+            echo "host-triple=arm-alpine-linux-musl" >> "$GITHUB_OUTPUT"
+          else
+            echo "Unsupported architecture: ${{ matrix.architecture }}"
+            exit 1
+          fi
+
+      - name: Create swap
+        id: swap_8g_on
+        if: ${{ (env.USE_SWAP == 'true') && !cancelled() }}
+        run: |
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          sudo -k 2>/dev/null ;
+
+        # QEMU setup only for armv7 emulation
+      - name: Set up QEMU (for armv7)
+        if: ${{ matrix.architecture == 'arm' }}
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+        with:
+          platforms: linux/${{ matrix.architecture }}
+          cleanup: true
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
+        with:
+          context: git
+          images: ghcr.io/reactive-firewall/mitl-bsdtar-lite
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+          logout: true
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          file: dockerfile
+          labels: ${{ steps.meta.outputs.labels }}
+          tags: ghcr.io/reactive-firewall/mitl-bsdtar-lite
+          platforms: linux/${{ matrix.architecture }}
+          build-args: |
+            LIBEXECINFO_VERSION=1.3
+            LLVM_VERSION=21.1.1
+            ZLIB_VERSION=1.3.1
+            MUSL_VERSION=1.2.5
+            TARGETARCH=${{ matrix.architecture }}
+            TARGET_TRIPLE=${{ steps.prep_output.outputs.target-triple }}
+            HOST_TRIPLE=${{ steps.prep_output.outputs.host-triple }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+          attests: |
+            type=sbom
+            type=provenance
+          sbom: true
+          provenance: mode=max
+          push: true
+          annotations: |
+            index.org.opencontainers.image.title=llvm-alpine-musl
+            index.org.opencontainers.image.authors=reactive-firewall@users.noreply.github.com
+            index.org.opencontainers.image.description='Pre-Stage llvm-alpine-musl build image'
+            index.org.opencontainers.image.vendor=individual
+            org.opencontainers.image.title=llvm-alpine-musl
+            org.opencontainers.image.authors=reactive-firewall@users.noreply.github.com
+            org.opencontainers.image.description='Pre-Stage llvm-alpine-musl build image'
+            org.opencontainers.image.vendor=individual
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true,annotation-index.org.opencontainers.image.description='Pre-Stage llvm-alpine-musl build image ${{ matrix.architecture }}'
+        env:
+          TARGET_TRIPLE: ${{ steps.prep_output.outputs.target-triple }}
+          HOST_TRIPLE: ${{ steps.prep_output.outputs.host-triple }}
+          SOURCE_DATE_EPOCH: ${{ needs.seed.outputs.timestamp }}
+          LIBEXECINFO_VERSION: "1.3"
+          LLVM_VERSION: "21.1.1"
+          ZLIB_VERSION: "1.3.1"
+          MUSL_VERSION: "1.2.5"
+          TARGETARCH: ${{ matrix.architecture }}
+      - name: Export digest
+        run: |
+          mkdir -p ${{ runner.temp }}/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
+      - name: Logout from Docker Hub
+        if: ${{ always() }}
+        run: docker logout
+
+      - name: Remove swap
+        id: swap_8g_off
+        if: ${{ (env.USE_SWAP == 'true') && always() }}
+        run: |
+          sudo swapoff /swapfile
+          sudo dd if=/dev/zero of=/swapfile bs=1M status=progress count=8192 || sudo sh -c 'cat /dev/zero > /swapfile'
+          sudo sync ;
+          sudo rm /swapfile ;
+          sudo sync ;
+          sudo -k 2>/dev/null ;
+
+      - name: Upload digest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ !cancelled() }}
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    permissions:
+      actions: read
+      contents: read
+      statuses: write
+      packages: write
+      pull-requests: read
+      security-events: none
+    runs-on: ubuntu-latest
+    needs: build
+    outputs:
+      merge_version: ${{ steps.meta.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          submodules: false
+
+      - name: Download digests
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+          logout: true
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
+        with:
+          context: git
+          images: ghcr.io/reactive-firewall/mitl-bsdtar-lite
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+        env:
+          SOURCE_DATE_EPOCH: ${{ needs.seed.outputs.timestamp }}
+
+      - name: Create manifest list and push
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          SOURCE_DATE_EPOCH: ${{ needs.seed.outputs.timestamp }}
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf 'ghcr.io/reactive-firewall/llvm-alpine-musl@sha256:%s ' *)
+
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect ghcr.io/reactive-firewall/llvm-alpine-musl:${{ steps.meta.outputs.version }}
+
+      - name: Ensure image is pullable locally
+        run: |
+          # ensure the platform-specific image manifest is present locally for Syft/Grype
+          docker pull ghcr.io/reactive-firewall/llvm-alpine-musl:${{ steps.meta.outputs.version }}
+
+      - name: Pull Syft and Grype images
+        run: |
+          # ensure the Syft and Grype images are available
+          docker pull anchore/syft:v1.31.0
+          docker pull anchore/grype:v0.98.0
+
+      - name: Generate SBOM (Syft) for this architecture
+        env:
+          IMAGE: ghcr.io/reactive-firewall/mitl-bootstrap:${{ steps.meta.outputs.version }}
+        run: |
+          SYFT_IMG=anchore/syft:v1.31.0  # adjust version if desired
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            $SYFT_IMG ${IMAGE} -o spdx-json > sbom.json
+
+      - name: Scan image with Grype (vulnerability) and export results
+        env:
+          IMAGE: ghcr.io/reactive-firewall/mitl-bootstrap:${{ steps.meta.outputs.version }}
+        run: |
+          GRYPE_IMG=anchore/grype:v0.98.0
+          # run grype against the image and produce JSON output
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            $GRYPE_IMG ${IMAGE} -o json > grype.json || true
+          # (grype exits non-zero on findings; keep the job green by allowing non-zero)
+
+      - name: Upload per-arch SBOM and Grype report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sbom-and-scan
+          path: |
+            sbom.json
+
+      - name: Logout from Docker Hub
+        run: docker logout
+
+  test:
+    permissions:
+      actions: read
+      contents: read
+      statuses: write
+      packages: read
+      pull-requests: read
+      security-events: none
+    needs: merge
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          submodules: false
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+          logout: true
+      - name: Pull local copy for test
+        run: |
+          docker pull ghcr.io/reactive-firewall/llvm-alpine-musl:${{ needs.merge.outputs.merge_version }}
+      - name: Run Docker test container
+        id: run_container
+        shell: bash
+        run: |
+          docker run -d --name test-container ghcr.io/reactive-firewall/llvm-alpine-musl:${{ needs.merge.outputs.merge_version }} /bin/bash -c "/usr/bin/clang --version"
+      - name: Clean up
+        run: |
+          docker stop test-container || true ;
+          docker rm -f test-container
+      - name: Logout from Docker Hub
+        run: docker logout
