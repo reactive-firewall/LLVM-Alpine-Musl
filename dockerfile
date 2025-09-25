@@ -246,7 +246,7 @@ RUN cmake -S /build/llvmorg/llvm -B /build/llvm-build -G Ninja \
     -DTARGET_TRIPLE=${TARGET_TRIPLE} \
     -DHOST_TRIPLE=${HOST_TRIPLE} \
     -DSYSROOT=/sysroot \
-    -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind" && \
+    -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind" \
     -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=1" && \
     cmake --build /build/llvm-build --target install-runtimes -j$(nproc)
 
