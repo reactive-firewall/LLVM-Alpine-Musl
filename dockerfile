@@ -121,7 +121,7 @@ ARG TARGET_TRIPLE
 ENV TARGET_TRIPLE=${TARGET_TRIPLE}
 ARG HOST_TRIPLE
 ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
-ENV MUSL_PREFIX="/usr/local/musl-llvm-staging"
+ENV MUSL_PREFIX="/staging"
 
 RUN set -eux \
     && apk add --no-cache \
@@ -179,6 +179,7 @@ ARG TARGET_TRIPLE
 ENV TARGET_TRIPLE=${TARGET_TRIPLE}
 ARG HOST_TRIPLE
 ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
+ENV MUSL_PREFIX="/staging"
 WORKDIR /build
 # install build deps (no gcc)
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
