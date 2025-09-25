@@ -267,7 +267,7 @@ RUN /home/builder/llvm/bin/clang -target ${TARGET_TRIPLE} -o /tests/test_s
 # Final artifact stage: copy llvm-alpine-musl
 FROM scratch AS llvm-alpine-musl
 
-LABEL version="20250925"
+LABEL version="20250924"
 LABEL org.opencontainers.image.title="llvm-alpine-musl"
 LABEL org.opencontainers.image.description="Hermetically built llvm-alpine-musl."
 LABEL org.opencontainers.image.vendor="individual"
@@ -282,6 +282,4 @@ ENV TARGET_TRIPLE=${TARGET_TRIPLE}
 ARG HOST_TRIPLE
 ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
 
-COPY --from=pre-bsdtar-builder /home/builder/libarchive/build/bsdtar /usr/bin/bsdtar
-# If statically linked, bsdtar will be portable; else ensure required runtime libs present
-ENTRYPOINT ["/usr/bin/clang"]
+COPY --from=runtimes-build /sysroot /
