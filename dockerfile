@@ -174,7 +174,7 @@ RUN ls -l ${MUSL_PREFIX}/lib || true \
 #    && touch -d ${SOME_DATE_EPOCH} ${MUSL_PREFIX}/include/* || true
 
 # Stage 3: build full LLVM runtimes using bootstrap compiler and toolchain file
-FROM --platform=linux/${TARGETARCH} alpine:${ALPINE_TAG} AS runtimes-build
+FROM --platform=linux/${TARGETARCH} alpine:latest AS runtimes-build
 ARG TARGET_TRIPLE
 ENV TARGET_TRIPLE=${TARGET_TRIPLE}
 ARG HOST_TRIPLE
