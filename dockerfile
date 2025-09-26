@@ -234,9 +234,7 @@ ENV PATH=/opt/llvm-bootstrap/bin:$PATH
 RUN ls -lap /opt/llvm-bootstrap/bin && \
     ls -lap /opt/llvm-bootstrap/include && \
     ls -lap /sysroot/lib && \
-    ls -lap /sysroot/usr/include && \
-    ls -lap /sysroot/opt/llvm-final/llvm/bin && \
-    ls -lap /sysroot/opt/llvm-final/llvm
+    ls -lap /sysroot/usr/include
 
 ## END DEBUG CODE A
 
