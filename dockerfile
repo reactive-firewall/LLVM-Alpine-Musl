@@ -13,6 +13,9 @@ ENV LIBEXECINFO_URL="https://github.com/reactive-firewall/libexecinfo/raw/refs/t
 ARG LLVM_VERSION=${LLVM_VERSION:-"21.1.1"}
 ENV LLVM_VERSION=${LLVM_VERSION}
 ENV LLVM_URL="https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-${LLVM_VERSION}.tar.gz"
+ARG MUSL_VERSION=${MUSL_VERSION:-"1.2.5"}
+ENV MUSL_VERSION=${MUSL_VERSION}
+ENV MUSL_URL="https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz"
 WORKDIR /fetch
 ENV CC=clang
 ENV CXX=clang++
@@ -40,6 +43,12 @@ RUN mkdir -p /fetch
 WORKDIR /fetch
 
 # Fetch the signed release tarballs (or supply via build-args)
+# Download musl
+RUN curl -fsSLo musl-${MUSL_VERSION}.tar.gz \
+    --url "https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz" && \
+    bsdtar -xzf musl-${MUSL_VERSION}.tar.gz && \
+    rm musl-${MUSL_VERSION}.tar.gz && \
+    mv /fetch/musl-${MUSL_VERSION} /fetch/musl
 RUN curl -fsSLo libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2 \
     --url "$LIBEXECINFO_URL" && \
     bsdtar -xzf libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2 && \
@@ -115,8 +124,9 @@ FROM --platform="linux/${TARGETARCH}" alpine:latest AS sysroot
 
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG MUSL_VER=${MUSL_VER:-"1.2.5"}
-ENV MUSL_VER=${MUSL_VER}
+ARG MUSL_VERSION=${MUSL_VERSION:-"1.2.5"}
+ENV MUSL_VERSION=${MUSL_VERSION}
+ENV MUSL_URL="https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz"
 ARG TARGET_TRIPLE
 ENV TARGET_TRIPLE=${TARGET_TRIPLE}
 ARG HOST_TRIPLE
@@ -151,12 +161,8 @@ ENV LDFLAGS="-fuse-ld=lld"
 #ARG SOME_DATE_EPOCH
 #ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
 
-# Download musl
-RUN curl -fsSL \
-    --url "https://musl.libc.org/releases/musl-${MUSL_VER}.tar.gz" \
-    -o musl-${MUSL_VER}.tar.gz && \
-    bsdtar xf musl-${MUSL_VER}.tar.gz && \
-    mv musl-${MUSL_VER} musl
+# copy sources
+COPY --from=fetcher /fetch/musl /build/musl
 
 WORKDIR /build/musl
 
@@ -170,6 +176,10 @@ RUN mkdir -p ${MUSL_PREFIX} && \
 RUN ls -l ${MUSL_PREFIX}/lib || true \
     && file ${MUSL_PREFIX}/lib/* || true
 
+# Ensure we have the dynamic loader and libs present (example paths)
+RUN ls -l ${MUSL_PREFIX}/include || true \
+    && file ${MUSL_PREFIX}/include/* || true
+
 #RUN touch -d ${SOME_DATE_EPOCH} ${MUSL_PREFIX}/lib/* || true \
 #    && touch -d ${SOME_DATE_EPOCH} ${MUSL_PREFIX}/include/* || true
 
@@ -179,7 +189,11 @@ ARG TARGET_TRIPLE
 ENV TARGET_TRIPLE=${TARGET_TRIPLE}
 ARG HOST_TRIPLE
 ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
+ARG MUSL_VERSION=${MUSL_VERSION:-"1.2.5"}
+ENV MUSL_VERSION=${MUSL_VERSION}
+ENV MUSL_URL="https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz"
 ENV MUSL_PREFIX="/staging"
+
 WORKDIR /build
 # install build deps (no gcc)
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
@@ -193,6 +207,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     pkgconf \
     zlib-dev \
     cmd:lld
+
 # Copy bootstrap compiler and sources
 COPY --from=bootstrap /opt/llvm-bootstrap /opt/llvm-bootstrap
 COPY --from=fetcher /fetch/llvmorg /build/llvmorg
@@ -208,6 +223,23 @@ COPY --from=sysroot ${MUSL_PREFIX}/include /sysroot/usr/include
 
 # Copy the toolchain file into the image
 COPY llvm-musl-toolchain.cmake /build/llvm-musl-toolchain.cmake
+
+ENV BOOTSTRAP_CLANG=/opt/llvm-bootstrap/bin/clang
+ENV BOOTSTRAP_CLANGXX=/opt/llvm-bootstrap/bin/clang++
+ENV PATH=/opt/llvm-bootstrap/bin:$PATH
+
+## DEBUG CODE A
+
+# CHECK toolchain paths
+RUN ls -lap /opt/llvm-bootstrap/bin && \
+    ls -lap /opt/llvm-bootstrap/include && \
+    ls -lap /sysroot/lib && \
+    ls -lap /sysroot/usr/include && \
+    ls -lap /sysroot/opt/llvm-final/llvm/bin && \
+    ls -lap /sysroot/opt/llvm-final/llvm
+
+## END DEBUG CODE A
+
 # Build runtimes using the toolchain file
 RUN cmake -S /build/llvmorg/llvm -B /build/llvm-build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
@@ -219,7 +251,7 @@ RUN cmake -S /build/llvmorg/llvm -B /build/llvm-build -G Ninja \
     -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind" && \
     cmake --build /build/llvm-build --target install-runtimes -j$(nproc)
 
-## DEBUG CODE
+## DEBUG CODE B
 
 # CHECK toolchain paths
 RUN ls -lap /sysroot/bin && \
@@ -262,7 +294,7 @@ RUN echo '#include <stdio.h>\n#include <pthread.h>\nvoid* print_message(void* pt
 # Compile and run tests
 RUN /home/builder/llvm/bin/clang -target ${TARGET_TRIPLE} -o /tests/test_s
 
-## END DEBUG CODE
+## END DEBUG CODE B
 
 # ---- final stage: artifact only ----
 # Final artifact stage: copy llvm-alpine-musl
