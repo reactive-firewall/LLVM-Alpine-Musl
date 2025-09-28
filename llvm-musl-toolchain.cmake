@@ -1,10 +1,12 @@
 # llvm-musl-toolchain.cmake
 # Usage: cmake -DCMAKE_TOOLCHAIN_FILE=llvm-musl-toolchain.cmake -DTARGET_TRIPLE=... -DSYSROOT=/path/to/sysroot ...
 
+message(STATUS "TARGET_TRIPLE from CMake: ${TARGET_TRIPLE}")
 if(NOT DEFINED TARGET_TRIPLE)
   message(FATAL_ERROR "TARGET_TRIPLE must be defined (e.g. x86_64-unknown-none-musl)")
 endif()
 
+message(STATUS "SYSROOT from CMake: ${SYSROOT}")
 if(NOT DEFINED SYSROOT)
   message(FATAL_ERROR "SYSROOT must be defined and point to a musl sysroot with headers and libraries")
 endif()

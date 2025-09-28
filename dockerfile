@@ -236,6 +236,11 @@ RUN ls -lap /opt/llvm-bootstrap/bin && \
     ls -lap /sysroot/lib && \
     ls -lap /sysroot/usr/include
 
+RUN printf "%s\n" "TARGET_TRIPLE is set to: $TARGET_TRIPLE" && \
+    printf "%s\n" "HOST_TRIPLE is set to: $HOST_TRIPLE" && \
+    printf "%s\n" "BOOTSTRAP_CLANG is set to: $BOOTSTRAP_CLANGXX" && \
+    printf "%s\n" "BOOTSTRAP_CLANGXX is set to: $BOOTSTRAP_CLANGXX"
+
 ## END DEBUG CODE A
 
 # Build runtimes using the toolchain file
