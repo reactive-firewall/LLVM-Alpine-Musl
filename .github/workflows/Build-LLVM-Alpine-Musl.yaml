@@ -96,8 +96,8 @@ jobs:
           elif [ "${{ matrix.architecture }}" == "arm" ]; then
             echo "TARGET_TRIPLE=arm-none-musleabi" >> $GITHUB_ENV
             echo "target-triple=arm-none-musleabi" >> "$GITHUB_OUTPUT"
-            echo "HOST_TRIPLE=arm-alpine-linux-musl" >> $GITHUB_ENV
-            echo "host-triple=arm-alpine-linux-musl" >> "$GITHUB_OUTPUT"
+            echo "HOST_TRIPLE=arm-alpine-linux-musleabi" >> $GITHUB_ENV
+            echo "host-triple=arm-alpine-linux-musleabi" >> "$GITHUB_OUTPUT"
           else
             echo "Unsupported architecture: ${{ matrix.architecture }}"
             exit 1

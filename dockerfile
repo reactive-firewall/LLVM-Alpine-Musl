@@ -220,6 +220,13 @@ COPY --from=sysroot ${MUSL_PREFIX}/lib/ld-musl-*.so.* /sysroot/lib/
 COPY --from=sysroot ${MUSL_PREFIX}/lib/crt*.o /sysroot/lib/
 COPY --from=sysroot ${MUSL_PREFIX}/lib/libc.so* /sysroot/usr/lib/
 COPY --from=sysroot ${MUSL_PREFIX}/include /sysroot/usr/include
+# map clang bootstrap to sysroot headers
+RUN ln -sf /opt/llvm-bootstrap/include/clang /sysroot/usr/include/clang && \
+    ln -sf /opt/llvm-bootstrap/include/clang-c /sysroot/usr/include/clang-c && \
+    ln -sf /opt/llvm-bootstrap/include/lld /sysroot/usr/include/lld && \
+    ln -sf /opt/llvm-bootstrap/include/llvm /sysroot/usr/include/llvm && \
+    ln -sf /opt/llvm-bootstrap/include/llvm-c /sysroot/usr/include/llvm-c && \
+
 
 # Copy the toolchain file into the image
 COPY llvm-musl-toolchain.cmake /build/llvm-musl-toolchain.cmake
@@ -235,6 +242,8 @@ RUN ls -lap /opt/llvm-bootstrap/bin && \
     ls -lap /opt/llvm-bootstrap/include && \
     ls -lap /sysroot/lib && \
     ls -lap /sysroot/usr/include
+
+RUN ls -lap /opt/llvm-bootstrap/lib || true ;
 
 RUN printf "%s\n" "TARGET_TRIPLE is set to: $TARGET_TRIPLE" && \
     printf "%s\n" "HOST_TRIPLE is set to: $HOST_TRIPLE" && \
