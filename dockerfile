@@ -206,7 +206,14 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     musl-dev \
     pkgconf \
     zlib-dev \
-    cmd:lld
+    perl \
+    cmd:lld \
+    cmd:bash \
+    build-base \
+    cmd:dash \
+    lld \
+    llvm \
+    llvm-dev
 
 # Copy bootstrap compiler and sources
 COPY --from=bootstrap /opt/llvm-bootstrap /opt/llvm-bootstrap
@@ -253,15 +260,15 @@ RUN printf "%s\n" "TARGET_TRIPLE is set to: $TARGET_TRIPLE" && \
 ## END DEBUG CODE A
 
 # Build runtimes using the toolchain file
-RUN cmake -S /build/llvmorg/llvm -B /build/llvm-build -G Ninja \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX=/opt/llvm-final \
-    -DCMAKE_TOOLCHAIN_FILE=/build/llvm-musl-toolchain.cmake \
-    -DTARGET_TRIPLE=${TARGET_TRIPLE} \
-    -DHOST_TRIPLE=${HOST_TRIPLE} \
-    -DSYSROOT=/sysroot \
-    -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind" \
-    -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=1" && \
+RUN mkdir -p /build/llvm-build && cd /build/llvmorg/llvm && \
+    cmake -S . -B /build/llvm-build -G Ninja \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_INSTALL_PREFIX=/opt/llvm-final \
+      -DCMAKE_TOOLCHAIN_FILE=/build/llvm-musl-toolchain.cmake \
+      -DTARGET_TRIPLE=${TARGET_TRIPLE} \
+      -DHOST_TRIPLE=${HOST_TRIPLE} \
+      -DSYSROOT=/sysroot \
+      -DLLVM_ENABLE_RUNTIMES="libunwind;libcxx;libcxxabi" && \
     cmake --build /build/llvm-build --target install-runtimes -j$(nproc)
 
 ## DEBUG CODE B
