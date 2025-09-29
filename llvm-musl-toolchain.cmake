@@ -12,9 +12,17 @@ if(NOT DEFINED SYSROOT)
 endif()
 
 # Minimal variables consumed by LLVM build for cross-target runtimes
-set(CMAKE_SYSTEM_NAME Linux CACHE STRING "Target system")
-set(CMAKE_SYSTEM_PROCESSOR ${TARGET_TRIPLE} CACHE STRING "Target triple (for informational use)")
+set(CMAKE_SYSTEM_NAME Generic CACHE STRING "Target system")
+string(REGEX MATCH "^[^-]+" TARGET_ARCH ${TARGET_TRIPLE})
+set(CMAKE_SYSTEM_PROCESSOR ${TARGET_ARCH} CACHE STRING "Target architecture")
 set(CMAKE_SYSROOT ${SYSROOT} CACHE PATH "Target sysroot")
+message(STATUS "CMAKE_SYSTEM_PROCESSOR from CMake: ${CMAKE_SYSTEM_PROCESSOR}")
+
+if(NOT DEFINED CMAKE_INSTALL_LIBDIR)
+  set(CMAKE_INSTALL_LIBDIR lib CACHE PATH "Library")
+endif()
+message(STATUS "CMAKE_INSTALL_LIBDIR from CMake: ${CMAKE_INSTALL_LIBDIR}")
+
 
 # Use explicit compiler wrappers that add --target and --sysroot flags.
 # Expect BOOTSTRAP_CLANG and BOOTSTRAP_CLANGXX either set externally or fallback to clang/clang++.

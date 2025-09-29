@@ -254,7 +254,7 @@ RUN ls -lap /opt/llvm-bootstrap/lib || true ;
 
 RUN printf "%s\n" "TARGET_TRIPLE is set to: $TARGET_TRIPLE" && \
     printf "%s\n" "HOST_TRIPLE is set to: $HOST_TRIPLE" && \
-    printf "%s\n" "BOOTSTRAP_CLANG is set to: $BOOTSTRAP_CLANGXX" && \
+    printf "%s\n" "BOOTSTRAP_CLANG is set to: $BOOTSTRAP_CLANG" && \
     printf "%s\n" "BOOTSTRAP_CLANGXX is set to: $BOOTSTRAP_CLANGXX"
 
 ## END DEBUG CODE A
@@ -268,6 +268,8 @@ RUN mkdir -p /build/llvm-build && cd /build/llvmorg/llvm && \
       -DTARGET_TRIPLE=${TARGET_TRIPLE} \
       -DHOST_TRIPLE=${HOST_TRIPLE} \
       -DSYSROOT=/sysroot \
+      -DBOOTSTRAP_CLANG="${BOOTSTRAP_CLANG}" \
+      -DBOOTSTRAP_CLANGXX="${BOOTSTRAP_CLANGXX}" \
       -DLLVM_ENABLE_RUNTIMES="libunwind;libcxx;libcxxabi" && \
     cmake --build /build/llvm-build --target install-runtimes -j$(nproc)
 
