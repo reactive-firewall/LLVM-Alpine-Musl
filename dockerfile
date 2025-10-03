@@ -264,12 +264,12 @@ RUN mkdir -p /build/llvm-build && cd /build/llvmorg/llvm && \
     cmake -S . -B /build/llvm-build -G Ninja \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_INSTALL_PREFIX=/opt/llvm-final \
-      -DCMAKE_TOOLCHAIN_FILE=/build/llvm-musl-toolchain.cmake \
       -DTARGET_TRIPLE=${TARGET_TRIPLE} \
       -DHOST_TRIPLE=${HOST_TRIPLE} \
       -DSYSROOT=/sysroot \
       -DBOOTSTRAP_CLANG="${BOOTSTRAP_CLANG}" \
       -DBOOTSTRAP_CLANGXX="${BOOTSTRAP_CLANGXX}" \
+      -DCMAKE_TOOLCHAIN_FILE=/build/llvm-musl-toolchain.cmake \
       -DLLVM_ENABLE_RUNTIMES="libunwind;libcxx;libcxxabi" && \
     cmake --build /build/llvm-build --target install-runtimes -j$(nproc)
 
