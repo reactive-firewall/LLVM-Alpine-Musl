@@ -84,10 +84,12 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:dash \
     clang20 \
     cmd:clang \
+    libc++ \
     lld \
     llvm \
     cmd:lld \
     llvm-dev \
+    libc++-dev \
     cmake \
     python3 \
     ninja-build \
@@ -213,10 +215,14 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:dash \
     lld \
     llvm \
-    llvm-dev
+    llvm-dev \
+    libc++-dev
 
 # Copy bootstrap compiler and sources
 COPY --from=bootstrap /opt/llvm-bootstrap /opt/llvm-bootstrap
+COPY --from=bootstrap /opt/llvm-bootstrap/bin/* /sysroot/bin/
+COPY --from=bootstrap /opt/llvm-bootstrap/lib/* /sysroot/lib/
+COPY --from=bootstrap /opt/llvm-bootstrap/libexec/* /sysroot/libexec/
 COPY --from=fetcher /fetch/llvmorg /build/llvmorg
 # Copy musl runtime artifacts from builder:
 # - dynamic loader (ld-musl-*.so.1)
@@ -227,6 +233,7 @@ COPY --from=sysroot ${MUSL_PREFIX}/lib/ld-musl-*.so.* /sysroot/lib/
 COPY --from=sysroot ${MUSL_PREFIX}/lib/crt*.o /sysroot/lib/
 COPY --from=sysroot ${MUSL_PREFIX}/lib/libc.so* /sysroot/usr/lib/
 COPY --from=sysroot ${MUSL_PREFIX}/include /sysroot/usr/include
+COPY --from=bootstrap /opt/llvm-bootstrap/include/* /sysroot/usr/include/
 # map clang bootstrap to sysroot headers
 RUN ln -sf /opt/llvm-bootstrap/include/clang /sysroot/usr/include/clang && \
     ln -sf /opt/llvm-bootstrap/include/clang-c /sysroot/usr/include/clang-c && \
