@@ -111,7 +111,8 @@ RUN mkdir -p /bootstrap/llvm-build && cd /bootstrap/llvmorg/llvm && \
     cmake -S . -B /bootstrap/llvm-build -G Ninja \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_INSTALL_PREFIX=/opt/llvm-bootstrap \
-      -DLLVM_ENABLE_PROJECTS="clang;lld" \
+      -DLLVM_ENABLE_PROJECTS="clang;lld;llvm;" \
+      -DLLVM_ENABLE_RUNTIMES="libunwind;libcxx;libcxxabi" \
       -DBUILD_SHARED_LIBS=OFF \
       -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" && \
     cmake --build /bootstrap/llvm-build --target install -j$(nproc)
@@ -269,6 +270,7 @@ RUN printf "%s\n" "TARGET_TRIPLE is set to: $TARGET_TRIPLE" && \
 # Build runtimes using the toolchain file
 RUN mkdir -p /build/llvm-build && cd /build/llvmorg/llvm && \
     cmake -S . -B /build/llvm-build -G Ninja \
+      -DCMAKE_TOOLCHAIN_FILE=/build/llvm-musl-toolchain.cmake \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_INSTALL_PREFIX=/opt/llvm-final \
       -DTARGET_TRIPLE=${TARGET_TRIPLE} \
@@ -276,7 +278,6 @@ RUN mkdir -p /build/llvm-build && cd /build/llvmorg/llvm && \
       -DSYSROOT=/sysroot \
       -DBOOTSTRAP_CLANG="${BOOTSTRAP_CLANG}" \
       -DBOOTSTRAP_CLANGXX="${BOOTSTRAP_CLANGXX}" \
-      -DCMAKE_TOOLCHAIN_FILE=/build/llvm-musl-toolchain.cmake \
       -DLLVM_ENABLE_RUNTIMES="libunwind;libcxx;libcxxabi" && \
     cmake --build /build/llvm-build --target install-runtimes -j$(nproc)
 
