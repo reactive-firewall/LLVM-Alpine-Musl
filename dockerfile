@@ -112,7 +112,6 @@ RUN mkdir -p /bootstrap/llvm-build && cd /bootstrap/llvmorg/llvm && \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_INSTALL_PREFIX=/opt/llvm-bootstrap \
       -DLLVM_ENABLE_PROJECTS="clang;lld;llvm;" \
-      -DLLVM_ENABLE_RUNTIMES="libunwind;libcxx;libcxxabi" \
       -DBUILD_SHARED_LIBS=OFF \
       -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" && \
     cmake --build /bootstrap/llvm-build --target install -j$(nproc)
