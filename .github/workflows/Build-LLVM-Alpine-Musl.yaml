@@ -30,9 +30,10 @@ jobs:
       contents: read
       packages: none
       pull-requests: read
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     outputs:
       timestamp: ${{ steps.output_time.outputs.bootstrap-timestamp }}
+      src-timestamp: ${{ steps.output_time.outputs.src-timestamp }}
     steps:
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -47,6 +48,7 @@ jobs:
           printf "%s\n" "::group::llvm-alpine-musl-env"
           printf "bootstrap-timestamp=%s\n" $(git log -1 --pretty=%ct) >> "$GITHUB_OUTPUT"
           printf "TIMESTAMP=%s\n" $(git log -1 --pretty=%ct) >> "$GITHUB_ENV"
+          printf "src-timestamp=%s %s\n" $(date -j -f "%s" "$(git log -1 --pretty=%ct)" "+%C%y-%d-%m %H:%M:%S") >> "$GITHUB_OUTPUT"
           printf "%s %s\n" "llvm-alpine-musl will be synced at time of:" $(git log -1 --pretty=%ct)
           printf "%s\n" "::endgroup::"
 
@@ -88,16 +90,40 @@ jobs:
             echo "target-triple=x86_64-generic-none-musl" >> "$GITHUB_OUTPUT"
             echo "HOST_TRIPLE=x86_64-alpine-linux-musl" >> $GITHUB_ENV
             echo "host-triple=x86_64-alpine-linux-musl" >> "$GITHUB_OUTPUT"
+            echo "MUSL_LDLIB=ld-musl-x86_64.so.1" >> $GITHUB_ENV
+            echo "musl-ldlib=ld-musl-x86_64.so.1" >> "$GITHUB_OUTPUT"
+            echo "LLVM_RTLIB=libclang_rt.builtins-x86_64.a" >> $GITHUB_ENV
+            echo "llvm-rtlib=libclang_rt.builtins-x86_64.a" >> "$GITHUB_OUTPUT"
+            echo "TARGET_FOR_LLVM=X86" >> $GITHUB_ENV
+            echo "target-for-llvm=X86" >> "$GITHUB_OUTPUT"
+            echo TARGET_BUILD_SANITIZERS=ON >> $GITHUB_ENV
+            echo "target-build-sanitizers=ON" >> "$GITHUB_OUTPUT"
           elif [ "${{ matrix.architecture }}" == "arm64" ]; then
             echo "TARGET_TRIPLE=aarch64-generic-none-musl" >> $GITHUB_ENV
             echo "target-triple=aarch64-generic-none-musl" >> "$GITHUB_OUTPUT"
             echo "HOST_TRIPLE=aarch64-alpine-linux-musl" >> $GITHUB_ENV
             echo "host-triple=aarch64-alpine-linux-musl" >> "$GITHUB_OUTPUT"
+            echo "MUSL_LDLIB=ld-musl-aarch64.so.1" >> $GITHUB_ENV
+            echo "musl-ldlib=ld-musl-aarch64.so.1" >> "$GITHUB_OUTPUT"
+            echo "LLVM_RTLIB=libclang_rt.builtins-aarch64.a" >> $GITHUB_ENV
+            echo "llvm-rtlib=libclang_rt.builtins-aarch64.a" >> "$GITHUB_OUTPUT"
+            echo "TARGET_FOR_LLVM=AArch64" >> $GITHUB_ENV
+            echo "target-for-llvm=AArch64" >> "$GITHUB_OUTPUT"
+            echo TARGET_BUILD_SANITIZERS=ON >> $GITHUB_ENV
+            echo "target-build-sanitizers=ON" >> "$GITHUB_OUTPUT"
           elif [ "${{ matrix.architecture }}" == "arm" ]; then
-            echo "TARGET_TRIPLE=arm-generic-none-musleabi" >> $GITHUB_ENV
-            echo "target-triple=arm-generic-none-musleabi" >> "$GITHUB_OUTPUT"
-            echo "HOST_TRIPLE=arm-alpine-linux-musleabi" >> $GITHUB_ENV
-            echo "host-triple=arm-alpine-linux-musleabi" >> "$GITHUB_OUTPUT"
+            echo "TARGET_TRIPLE=armv7-generic-none-musleabi" >> $GITHUB_ENV
+            echo "target-triple=armv7-generic-none-musleabi" >> "$GITHUB_OUTPUT"
+            echo "HOST_TRIPLE=armv7-alpine-linux-musleabi" >> $GITHUB_ENV
+            echo "host-triple=armv7-alpine-linux-musleabi" >> "$GITHUB_OUTPUT"
+            echo "MUSL_LDLIB=ld-musl-armhf.so.1" >> $GITHUB_ENV
+            echo "musl-ldlib=ld-musl-armhf.so.1" >> "$GITHUB_OUTPUT"
+            echo "LLVM_RTLIB=libclang_rt.builtins-arm.a" >> $GITHUB_ENV
+            echo "llvm-rtlib=libclang_rt.builtins-arm.a" >> "$GITHUB_OUTPUT"
+            echo "TARGET_FOR_LLVM=ARM" >> $GITHUB_ENV
+            echo "target-for-llvm=ARM" >> "$GITHUB_OUTPUT"
+            echo TARGET_BUILD_SANITIZERS=OFF >> $GITHUB_ENV
+            echo "target-build-sanitizers=OFF" >> "$GITHUB_OUTPUT"
           else
             echo "Unsupported architecture: ${{ matrix.architecture }}"
             exit 1
@@ -156,12 +182,18 @@ jobs:
           platforms: linux/${{ matrix.architecture }}
           build-args: |
             LIBEXECINFO_VERSION=1.3
-            LLVM_VERSION=21.1.3
+            LLVM_VERSION=21.1.7
+            LLVM_RTLIB=${{ steps.prep_output.outputs.llvm-rtlib }}
             ZLIB_VERSION=1.3.1
             MUSL_VERSION=1.2.5
+            MUSL_LDLIB=${{ steps.prep_output.outputs.musl-ldlib }}
+            HOST_HEADERS_VERSION=17.2
             TARGETARCH=${{ matrix.architecture }}
+            TARGET_FOR_LLVM=${{ steps.prep_output.outputs.target-for-llvm }}
             TARGET_TRIPLE=${{ steps.prep_output.outputs.target-triple }}
             HOST_TRIPLE=${{ steps.prep_output.outputs.host-triple }}
+            TARGET_BUILD_SANITIZERS=${{ steps.prep_output.outputs.target-build-sanitizers }}
+            SOME_DATE_EPOCH=${{ needs.seed.outputs.src-timestamp }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
           attests: |
@@ -184,11 +216,17 @@ jobs:
           TARGET_TRIPLE: ${{ steps.prep_output.outputs.target-triple }}
           HOST_TRIPLE: ${{ steps.prep_output.outputs.host-triple }}
           SOURCE_DATE_EPOCH: ${{ needs.seed.outputs.timestamp }}
+          SOME_DATE_EPOCH: ${{ needs.seed.outputs.src-timestamp }}
           LIBEXECINFO_VERSION: "1.3"
-          LLVM_VERSION: "21.1.3"
+          LLVM_VERSION: "21.1.7"
+          LLVM_RTLIB: ${{ steps.prep_output.outputs.llvm-rtlib }}
           ZLIB_VERSION: "1.3.1"
           MUSL_VERSION: "1.2.5"
+          MUSL_LDLIB: ${{ steps.prep_output.outputs.musl-ldlib }}
+          HOST_HEADERS_VERSION: "17.2"
           TARGETARCH: ${{ matrix.architecture }}
+          TARGET_FOR_LLVM: ${{ steps.prep_output.outputs.target-for-llvm }}
+          TARGET_BUILD_SANITIZERS: ${{ steps.prep_output.outputs.target-build-sanitizers }}
       - name: Export digest
         run: |
           mkdir -p ${{ runner.temp }}/digests
