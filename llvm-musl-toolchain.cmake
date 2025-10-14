@@ -3,6 +3,11 @@
 
 include(Platform/Generic)
 
+set(LIBCXX_INCLUDE_DIR "${CMAKE_SYSROOT}/usr/include/c++/v1")
+if(EXISTS "${LIBCXX_INCLUDE_DIR}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${LIBCXX_INCLUDE_DIR}" CACHE STRING "" FORCE)
+endif()
+
 message(STATUS "TARGET_TRIPLE from CMake: ${TARGET_TRIPLE}")
 if(NOT DEFINED TARGET_TRIPLE)
   message(FATAL_ERROR "TARGET_TRIPLE must be defined (e.g. x86_64-unknown-none-musl)")

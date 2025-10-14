@@ -10,7 +10,7 @@ FROM --platform="linux/${TARGETARCH}" alpine:latest AS fetcher
 ARG LIBEXECINFO_VERSION=${LIBEXECINFO_VERSION:-"1.3"}
 ENV LIBEXECINFO_VERSION=${LIBEXECINFO_VERSION}
 ENV LIBEXECINFO_URL="https://github.com/reactive-firewall/libexecinfo/raw/refs/tags/v${LIBEXECINFO_VERSION}/libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2"
-ARG LLVM_VERSION=${LLVM_VERSION:-"21.1.1"}
+ARG LLVM_VERSION=${LLVM_VERSION:-"21.1.3"}
 ENV LLVM_VERSION=${LLVM_VERSION}
 ENV LLVM_URL="https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-${LLVM_VERSION}.tar.gz"
 ARG MUSL_VERSION=${MUSL_VERSION:-"1.2.5"}
@@ -113,6 +113,8 @@ RUN mkdir -p /bootstrap/llvm-build && cd /bootstrap/llvmorg/llvm && \
       -DCMAKE_INSTALL_PREFIX=/opt/llvm-bootstrap \
       -DLLVM_ENABLE_PROJECTS="clang;lld;llvm;" \
       -DBUILD_SHARED_LIBS=OFF \
+      -DTARGET_TRIPLE=${TARGET_TRIPLE} \
+      -DHOST_TRIPLE=${HOST_TRIPLE} \
       -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" && \
     cmake --build /bootstrap/llvm-build --target install -j$(nproc)
 
@@ -216,7 +218,8 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     lld \
     llvm \
     llvm-dev \
-    libc++-dev
+    libc++-dev \
+    cmd:find
 
 # Copy bootstrap compiler and sources
 COPY --from=bootstrap /opt/llvm-bootstrap /opt/llvm-bootstrap
@@ -241,6 +244,8 @@ RUN ln -sf /opt/llvm-bootstrap/include/clang /sysroot/usr/include/clang && \
     ln -sf /opt/llvm-bootstrap/include/llvm /sysroot/usr/include/llvm && \
     ln -sf /opt/llvm-bootstrap/include/llvm-c /sysroot/usr/include/llvm-c
 
+COPY --from=bootstrap /opt/llvm-bootstrap/include/'c++'/ /sysroot/usr/include/'c++'/
+
 
 # Copy the toolchain file into the image
 COPY llvm-musl-toolchain.cmake /build/llvm-musl-toolchain.cmake
@@ -258,6 +263,8 @@ RUN ls -lap /opt/llvm-bootstrap/bin && \
     ls -lap /sysroot/usr/include
 
 RUN ls -lap /opt/llvm-bootstrap/lib || true ;
+
+RUN find /sysroot/ -type d -iname "*c++" 2>/dev/null || true ;
 
 RUN printf "%s\n" "TARGET_TRIPLE is set to: $TARGET_TRIPLE" && \
     printf "%s\n" "HOST_TRIPLE is set to: $HOST_TRIPLE" && \
