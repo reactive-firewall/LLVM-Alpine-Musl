@@ -135,7 +135,8 @@ ARG TARGET_TRIPLE
 ENV TARGET_TRIPLE=${TARGET_TRIPLE}
 ARG HOST_TRIPLE
 ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
-ENV MUSL_PREFIX="/staging"
+ENV SYSROOT="/staging"
+ENV MUSL_PREFIX="/usr"
 
 RUN set -eux \
     && apk add --no-cache \
@@ -152,7 +153,31 @@ RUN set -eux \
         gzip \
         perl \
         paxctl \
-    && mkdir -p /build
+    && mkdir -pv /build && mkdir -pv "${SYSROOT}"
+
+WORKDIR /staging
+
+RUN mkdir -pv ${MUSL_PREFIX} && \
+    mkdir -pv "${SYSROOT}"/dev && \
+    mkdir -pv "${SYSROOT}"/proc && \
+    mkdir -pv "${SYSROOT}"/run && \
+    mkdir -pv "${SYSROOT}"/sys && \
+    mkdir -pv "${SYSROOT}"/tmp && \
+    mkdir -pv "${SYSROOT}/usr/include" && \
+    mkdir -pv "${SYSROOT}/usr/lib" && \
+    mkdir -pv "${SYSROOT}/usr/libexec" && \
+    mkdir -pv "${SYSROOT}/usr/bin" && \
+    ln -sfv usr/bin "${SYSROOT}/bin" && \
+    ln -sfv usr/bin "${SYSROOT}/sbin" && \
+    ln -sfv usr/lib "${SYSROOT}/lib" && \
+    ln -sfv usr/lib "${SYSROOT}/libexec" && \
+    ln -sfv usr/lib "${SYSROOT}/lib64" && \
+    ln -sfv bin "${SYSROOT}/usr/sbin" && \
+    ln -sfv lib "${SYSROOT}/usr/lib64"
+
+## DEBUG CODE PRE
+RUN ls -lap "${SYSROOT}" && ls -lap "${SYSROOT}/lib" && ls -lap "${SYSROOT}/lib/" && \
+    ls -lap "${SYSROOT}/usr"
 
 WORKDIR /build
 ENV CC=clang
@@ -171,21 +196,21 @@ COPY --from=fetcher /fetch/musl /build/musl
 WORKDIR /build/musl
 
 # Configure, build, and install musl with shared enabled (default) using LLVM tools
-RUN mkdir -p ${MUSL_PREFIX} && \
-    ./configure --prefix=${MUSL_PREFIX} && \
+RUN ./configure --prefix=${MUSL_PREFIX} --target=${HOST_TRIPLE} && \
     make CC=clang CFLAGS="${CFLAGS} -fno-math-errno -fPIC -fno-common" AR=llvm-ar LDFLAGS="${LDFLAGS}" -j"$(nproc)" && \
-    make install
+    make install && \
+    DESTDIR="${SYSROOT}" make install-headers
 
-# Ensure we have the dynamic loader and libs present (example paths)
-RUN ls -l ${MUSL_PREFIX}/lib || true \
-    && file ${MUSL_PREFIX}/lib/* || true
+# Ensure we have the dynamic loader and libs present (sysroot paths)
+RUN ls -l ${SYSROOT}${MUSL_PREFIX}/lib || true \
+    && file ${SYSROOT}${MUSL_PREFIX}/lib/* || true
 
-# Ensure we have the dynamic loader and libs present (example paths)
-RUN ls -l ${MUSL_PREFIX}/include || true \
-    && file ${MUSL_PREFIX}/include/* || true
+# Ensure we have the dynamic loader and libs present (sysroot paths)
+RUN ls -l ${SYSROOT}${MUSL_PREFIX}/include || true \
+    && file ${SYSROOT}${MUSL_PREFIX}/include/* || true
 
-#RUN touch -d ${SOME_DATE_EPOCH} ${MUSL_PREFIX}/lib/* || true \
-#    && touch -d ${SOME_DATE_EPOCH} ${MUSL_PREFIX}/include/* || true
+#RUN touch -d ${SOME_DATE_EPOCH} ${SYSROOT}${MUSL_PREFIX}/lib/* || true \
+#    && touch -d ${SOME_DATE_EPOCH} ${SYSROOT}${MUSL_PREFIX}/include/* || true
 
 # Stage 3: build full LLVM runtimes using bootstrap compiler and toolchain file
 FROM --platform=linux/${TARGETARCH} alpine:latest AS runtimes-build
@@ -196,7 +221,7 @@ ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
 ARG MUSL_VERSION=${MUSL_VERSION:-"1.2.5"}
 ENV MUSL_VERSION=${MUSL_VERSION}
 ENV MUSL_URL="https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz"
-ENV MUSL_PREFIX="/staging"
+ENV MUSL_PREFIX="/staging/usr/"
 
 WORKDIR /build
 # install build deps (no gcc)
@@ -211,6 +236,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     pkgconf \
     zlib-dev \
     perl \
+    libc++ \
     cmd:lld \
     cmd:bash \
     build-base \
@@ -234,7 +260,7 @@ COPY --from=fetcher /fetch/llvmorg /build/llvmorg
 # - headers
 COPY --from=sysroot ${MUSL_PREFIX}/lib/ld-musl-*.so.* /sysroot/lib/
 COPY --from=sysroot ${MUSL_PREFIX}/lib/crt*.o /sysroot/lib/
-COPY --from=sysroot ${MUSL_PREFIX}/lib/libc.so* /sysroot/usr/lib/
+COPY --from=sysroot ${MUSL_PREFIX}/lib/libc.so* /sysroot/lib/
 COPY --from=sysroot ${MUSL_PREFIX}/include /sysroot/usr/include
 COPY --from=bootstrap /opt/llvm-bootstrap/include/* /sysroot/usr/include/
 # map clang bootstrap to sysroot headers
@@ -242,9 +268,8 @@ RUN ln -sf /opt/llvm-bootstrap/include/clang /sysroot/usr/include/clang && \
     ln -sf /opt/llvm-bootstrap/include/clang-c /sysroot/usr/include/clang-c && \
     ln -sf /opt/llvm-bootstrap/include/lld /sysroot/usr/include/lld && \
     ln -sf /opt/llvm-bootstrap/include/llvm /sysroot/usr/include/llvm && \
-    ln -sf /opt/llvm-bootstrap/include/llvm-c /sysroot/usr/include/llvm-c
-
-COPY --from=bootstrap /opt/llvm-bootstrap/include/'c++'/ /sysroot/usr/include/'c++'/
+    ln -sf /opt/llvm-bootstrap/include/llvm-c /sysroot/usr/include/llvm-c && \
+    ln -sf /usr/include/'c++' /sysroot/usr/include/'c++'
 
 
 # Copy the toolchain file into the image
@@ -260,7 +285,8 @@ ENV PATH=/opt/llvm-bootstrap/bin:$PATH
 RUN ls -lap /opt/llvm-bootstrap/bin && \
     ls -lap /opt/llvm-bootstrap/include && \
     ls -lap /sysroot/lib && \
-    ls -lap /sysroot/usr/include
+    ls -lap /sysroot/usr/include && \
+    ls -lap /sysroot/usr/include/'c++'
 
 RUN ls -lap /opt/llvm-bootstrap/lib || true ;
 
@@ -273,6 +299,8 @@ RUN printf "%s\n" "TARGET_TRIPLE is set to: $TARGET_TRIPLE" && \
 
 ## END DEBUG CODE A
 
+ENV SYSROOT=/sysroot
+
 # Build runtimes using the toolchain file
 RUN mkdir -p /build/llvm-build && cd /build/llvmorg/llvm && \
     cmake -S . -B /build/llvm-build -G Ninja \
@@ -282,6 +310,7 @@ RUN mkdir -p /build/llvm-build && cd /build/llvmorg/llvm && \
       -DTARGET_TRIPLE=${TARGET_TRIPLE} \
       -DHOST_TRIPLE=${HOST_TRIPLE} \
       -DSYSROOT=/sysroot \
+      -DCMAKE_SYSROOT=/sysroot \
       -DBOOTSTRAP_CLANG="${BOOTSTRAP_CLANG}" \
       -DBOOTSTRAP_CLANGXX="${BOOTSTRAP_CLANGXX}" \
       -DLLVM_ENABLE_RUNTIMES="libunwind;libcxx;libcxxabi" && \
@@ -343,7 +372,7 @@ LABEL org.opencontainers.image.vendor="individual"
 LABEL org.opencontainers.image.licenses="MIT"
 
 # provenance ENV (kept intentionally)
-ARG LLVM_VERSION=${LLVM_VERSION:-"21.1.1"}
+ARG LLVM_VERSION=${LLVM_VERSION:-"21.1.3"}
 ENV LLVM_VERSION=${LLVM_VERSION}
 ENV LLVM_URL="https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-${LLVM_VERSION}.tar.gz"
 ARG TARGET_TRIPLE
