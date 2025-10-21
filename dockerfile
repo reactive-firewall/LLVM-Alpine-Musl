@@ -211,6 +211,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     pkgconf \
     zlib-dev \
     perl \
+    libc++ \
     cmd:lld \
     cmd:bash \
     build-base \
@@ -234,17 +235,16 @@ COPY --from=fetcher /fetch/llvmorg /build/llvmorg
 # - headers
 COPY --from=sysroot ${MUSL_PREFIX}/lib/ld-musl-*.so.* /sysroot/lib/
 COPY --from=sysroot ${MUSL_PREFIX}/lib/crt*.o /sysroot/lib/
-COPY --from=sysroot ${MUSL_PREFIX}/lib/libc.so* /sysroot/usr/lib/
-COPY --from=sysroot ${MUSL_PREFIX}/include /sysroot/usr/include
+COPY --from=sysroot ${MUSL_PREFIX}/lib/libc.so* /sysroot/lib/
+COPY --from=sysroot ${MUSL_PREFIX}/include /sysroot/include
 COPY --from=bootstrap /opt/llvm-bootstrap/include/* /sysroot/usr/include/
 # map clang bootstrap to sysroot headers
 RUN ln -sf /opt/llvm-bootstrap/include/clang /sysroot/usr/include/clang && \
     ln -sf /opt/llvm-bootstrap/include/clang-c /sysroot/usr/include/clang-c && \
     ln -sf /opt/llvm-bootstrap/include/lld /sysroot/usr/include/lld && \
     ln -sf /opt/llvm-bootstrap/include/llvm /sysroot/usr/include/llvm && \
-    ln -sf /opt/llvm-bootstrap/include/llvm-c /sysroot/usr/include/llvm-c
-
-COPY --from=bootstrap /opt/llvm-bootstrap/include/'c++'/ /sysroot/usr/include/'c++'/
+    ln -sf /opt/llvm-bootstrap/include/llvm-c /sysroot/usr/include/llvm-c && \
+    ln -sf /usr/include/'c++' /sysroot/usr/include/'c++'
 
 
 # Copy the toolchain file into the image
@@ -260,7 +260,9 @@ ENV PATH=/opt/llvm-bootstrap/bin:$PATH
 RUN ls -lap /opt/llvm-bootstrap/bin && \
     ls -lap /opt/llvm-bootstrap/include && \
     ls -lap /sysroot/lib && \
-    ls -lap /sysroot/usr/include
+    ls -lap /sysroot/include && \
+    ls -lap /sysroot/usr/include && \
+    ls -lap /sysroot/usr/include/'c++'
 
 RUN ls -lap /opt/llvm-bootstrap/lib || true ;
 
@@ -343,7 +345,7 @@ LABEL org.opencontainers.image.vendor="individual"
 LABEL org.opencontainers.image.licenses="MIT"
 
 # provenance ENV (kept intentionally)
-ARG LLVM_VERSION=${LLVM_VERSION:-"21.1.1"}
+ARG LLVM_VERSION=${LLVM_VERSION:-"21.1.3"}
 ENV LLVM_VERSION=${LLVM_VERSION}
 ENV LLVM_URL="https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-${LLVM_VERSION}.tar.gz"
 ARG TARGET_TRIPLE

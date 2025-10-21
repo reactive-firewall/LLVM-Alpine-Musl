@@ -36,9 +36,12 @@ message(STATUS "CMAKE_INSTALL_LIBDIR from CMake: ${CMAKE_INSTALL_LIBDIR}")
 if(NOT DEFINED BOOTSTRAP_CLANG)
   set(BOOTSTRAP_CLANG clang)
 endif()
+set(CMAKE_C_COMPILER "${BOOTSTRAP_CLANG}" CACHE FILEPATH "Bootstrap clang" FORCE)
+
 if(NOT DEFINED BOOTSTRAP_CLANGXX)
   set(BOOTSTRAP_CLANGXX clang++)
 endif()
+set(CMAKE_CXX_COMPILER "${BOOTSTRAP_CLANGXX}" CACHE FILEPATH "Bootstrap clang++" FORCE)
 
 # Helper function to produce canonical -target flag from TARGET_TRIPLE
 set(TARGET_FLAG "--target=${TARGET_TRIPLE}")
@@ -46,8 +49,6 @@ set(TARGET_FLAG "--target=${TARGET_TRIPLE}")
 # Compiler programs: wrap bootstrap clang to pass --target and --sysroot.
 # CMake will call these as compilers. We provide wrapper scripts under CMAKE_BINARY_DIR if needed.
 # Prefer using direct commands with -fuse-ld=lld to ensure lld linking.
-set(CMAKE_C_COMPILER "${BOOTSTRAP_CLANG}" CACHE FILEPATH "Bootstrap clang")
-set(CMAKE_CXX_COMPILER "${BOOTSTRAP_CLANGXX}" CACHE FILEPATH "Bootstrap clang++")
 
 # Force compile flags for target triple and sysroot
 set(CMAKE_C_FLAGS_INIT     "${TARGET_FLAG} --sysroot=${CMAKE_SYSROOT} -fPIC -fuse-ld=lld")
