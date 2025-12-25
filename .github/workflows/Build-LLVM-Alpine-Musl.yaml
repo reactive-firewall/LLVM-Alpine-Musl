@@ -182,7 +182,7 @@ jobs:
           platforms: linux/${{ matrix.architecture }}
           build-args: |
             LIBEXECINFO_VERSION=1.3
-            LLVM_VERSION=21.1.8
+            LLVM_VERSION=22.1.1
             LLVM_RTLIB=${{ steps.prep_output.outputs.llvm-rtlib }}
             ZLIB_VERSION=1.3.1
             MUSL_VERSION=1.2.5
@@ -218,7 +218,7 @@ jobs:
           SOURCE_DATE_EPOCH: ${{ needs.seed.outputs.timestamp }}
           SOME_DATE_EPOCH: ${{ needs.seed.outputs.src-timestamp }}
           LIBEXECINFO_VERSION: "1.3"
-          LLVM_VERSION: "21.1.8"
+          LLVM_VERSION: "22.1.1"
           LLVM_RTLIB: ${{ steps.prep_output.outputs.llvm-rtlib }}
           ZLIB_VERSION: "1.3.1"
           MUSL_VERSION: "1.2.5"

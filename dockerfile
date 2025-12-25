@@ -13,7 +13,7 @@ ENV LIBEXECINFO_URL="https://github.com/reactive-firewall/libexecinfo/raw/refs/t
 ARG HOST_HEADERS_VERSION=${HOST_HEADERS_VERSION:-"17.2"}
 ENV HOST_HEADERS_VERSION=${HOST_HEADERS_VERSION}
 ENV HOST_HEADERS_URL="https://www.kernel.org/pub/linux/kernel/v6.x/linux-6.${HOST_HEADERS_VERSION}.tar.gz"
-ARG LLVM_VERSION=${LLVM_VERSION:-"21.1.8"}
+ARG LLVM_VERSION=${LLVM_VERSION:-"22.1.1"}
 ENV LLVM_VERSION=${LLVM_VERSION}
 ENV LLVM_URL="https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-${LLVM_VERSION}.tar.gz"
 ARG MUSL_VERSION=${MUSL_VERSION:-"1.2.5"}
@@ -138,9 +138,10 @@ ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
 ENV SYSROOT="/sysroot"
 ENV MUSL_PREFIX="/usr"
 
+# does not use cmd:bsdtar nor gzip
+
 RUN set -eux \
     && apk add --no-cache \
-        cmd:bsdtar \
         clang \
         llvm \
         libc++ \
@@ -154,9 +155,6 @@ RUN set -eux \
         curl \
         ca-certificates \
         build-base \
-        gzip \
-        perl \
-        paxctl \
     && mkdir -pv /build && mkdir -pv "${SYSROOT}"
 
 WORKDIR /staging
@@ -204,13 +202,15 @@ ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
 # copy sources (for musl headers)
 COPY --from=fetcher /fetch/musl /build/musl
 
-# copy headers to $SYSROOT
+# OPTIONAL - copy headers to $SYSROOT
 
 # linux/kd.h
 # linux/soundcard.h
 # linux/vt.h
 
-COPY --from=linux-trampoline /build/linux/usr/include /sysroot/usr/include
+# DEBUG: try without linux headers
+#COPY --from=linux-trampoline /build/linux/usr/include /sysroot/usr/include
+
 # copy llvm sources (for compiler_rt)
 COPY --from=fetcher /fetch/llvmorg /build/llvm
 
@@ -236,20 +236,25 @@ WORKDIR /build/llvm
 ENV CXXFLAGS="-stdlib=libc++ -fPIC -target ${TARGET_TRIPLE}"
 
 # additional tools for building llvm
+# python3 license: PSF-2.0
 RUN set -eux \
     && apk add --no-cache \
         cmd:ninja \
         cmd:clang++ \
         cmake \
+        python3 \
         pkgconfig \
         zlib-dev \
+        perl \
+        paxctl \
         cmd:find
 
 
 # --- Precompile CC Stage0: prepare musl sysroot with clang builtins for TARGET_TRIPLE ---
 RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
       -DCMAKE_INSTALL_PREFIX="${SYSROOT}${MUSL_PREFIX}" \
-      -DLLVM_CMAKE_DIR=/build/llvm/llvm \
+      -DLLVM_CMAKE_DIR=/build/llvm \
+      -DLLVM_MAIN_SRC_DIR=/build/llvm/llvm \
       -DCOMPILER_RT_BUILD_BUILTINS=ON \
       -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
       -DCOMPILER_RT_BUILD_MEMPROF=OFF \
@@ -262,10 +267,11 @@ RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
       -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_C_FLAGS="-D_XOPEN_SOURCE=700" \
+      -DCMAKE_C_FLAGS="-D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700" \
       -DCMAKE_C_COMPILER=clang \
       -DCMAKE_CXX_COMPILER=clang++ \
-      -DCMAKE_SYSTEM_NAME=Linux \
+      -DCMAKE_SYSTEM_NAME=Generic \
+      -DLIBC_TARGET_TRIPLE=${TARGET_TRIPLE} \
       -DCMAKE_SYSROOT="${SYSROOT}" && \
       cmake --build build-compiler-rt && \
       cmake --install build-compiler-rt && \
@@ -275,11 +281,12 @@ RUN set -eux \
     && apk del --no-cache \
         cmd:ninja \
         cmake \
+        python3 \
         pkgconfig \
-        zlib-dev
+        zlib-dev 2>/dev/null
 
 # Ensure we have the clang builtins lib
-RUN ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/linux/ || true
+RUN ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true;
 
 
 # --- runtime Trampoline Stage: compile musl sysroot with compiler_rt ---
@@ -291,7 +298,7 @@ RUN ./configure --prefix=${MUSL_PREFIX} --target=${TARGET_TRIPLE} \
       CC=clang \
       AR=llvm-ar RANLIB=llvm-ranlib \
       LDFLAGS="${LDFLAGS}" \
-      LIBCC="-l${SYSROOT}/lib/linux/${LLVM_RTLIB}" \
+      LIBCC="-l${SYSROOT}/lib/Generic/${LLVM_RTLIB}" \
       CFLAGS="${CFLAGS} --sysroot=$SYSROOT -rtlib=compiler-rt -fno-math-errno -fPIC -fno-common -fuse-ld=lld" && \
     make -j"$(nproc)" && \
     DESTDIR=${SYSROOT} make install
@@ -324,6 +331,13 @@ RUN ls -l ${SYSROOT}${MUSL_PREFIX}/lib || true && \
 # Ensure we have the libc headers present (sysroot paths)
 RUN ls -l ${SYSROOT}${MUSL_PREFIX}/include || true && \
     file ${SYSROOT}${MUSL_PREFIX}/include/* || true
+
+RUN set -eux \
+    && apk del --no-cache \
+        cmd:clang++ \
+        perl \
+        paxctl \
+        cmd:find
 
 # --- bootstrap: bootstrap environment using distro clang/llvm to compile a minimal clang toolchain ---
 FROM --platform="linux/${TARGETARCH}" alpine:latest AS bootstrap
@@ -360,8 +374,9 @@ ENV SYSROOT="/sysroot"
 
 # may need -Wl,--sysroot=/sysroot
 # may need -Wl,--dynamic-linker=/lib/libc.so
-ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/linux -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld"
-ENV CFLAGS="-rtlib=compiler-rt -fPIC -D__linux__ -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -I/usr/include"
+ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld"
+# may require -D__linux__
+ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -I/usr/include"
 ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
 
 # Install distro packages that provide clang able to cross-emit --target. Adjust names for Alpine tag.
@@ -379,6 +394,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:llvm-ar \
     llvm-runtimes \
     cmake \
+    python3 \
     ninja-build \
     cmd:ninja \
     pkgconfig \
@@ -390,7 +406,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 #    cmd:llvm-nm \
 #    cmd:llvm-strip \
 
-#ENV LIBCC="${SYSROOT}/lib/linux/${LLVM_RTLIB}"
+#ENV LIBCC="${SYSROOT}/lib/generic/${LLVM_RTLIB}"
 
 WORKDIR /bootstrap/llvmorg
 
@@ -403,7 +419,8 @@ WORKDIR /bootstrap/llvmorg
 # Build minimal clang (install to sysroot)
 RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
-    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm \
+    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg \
+    -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
     -DClang_DIR=/bootstrap/llvmorg/clang \
     -DLLVM_ENABLE_RUNTIMES="libunwind" \
     -DLIBUNWIND_USE_COMPILER_RT=ON \
@@ -428,14 +445,15 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     rm -vfr /bootstrap/llvmorg/build-libunwind/
 
 # check on the lib
-RUN ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/linux/ || true
+RUN ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true
 
 # cmake thinks that clang++ requires g++
 RUN apk add --no-cache \
     cmd:g++
 # but we remove it anyway afterwards
 
-ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -D__linux__ -D_BSD_SOURCE -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L"
+# may require -D__linux__
+ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -D_BSD_SOURCE -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L"
 
 # might need -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm
 # might need -DLIBCXX_HAS_ATOMIC_LIB=OFF ??
@@ -452,15 +470,18 @@ ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -DSANITIZER_CAN_USE_PREINI
 # might want -DLIBCXX_HAS_PTHREAD_LIB=ON
 # might want -DLIBCXXABI_HAS_PTHREAD_API=ON
 # might need -DLIBCXXABI_BAREMETAL=ON
-# might want -DCMAKE_SYSTEM_NAME=Linux
+# might want -DCMAKE_SYSTEM_NAME=Generic
 # might want -DCMAKE_SYSROOT="${SYSROOT}"
 # might want unused -DLIBCXXABI_TARGET_TRIPLE=${TARGET_TRIPLE}
 # might want unused -DLIBCXX_TARGET_TRIPLE=${TARGET_TRIPLE}
 # might want unused -DTARGET_TRIPLE=${TARGET_TRIPLE}
 # might want unused -DHOST_TRIPLE=${HOST_TRIPLE}
+# migth want -DLIBCXX_HERMETIC_STATIC_LIBRARY=ON
+
+# does not use manually added -DLLVM_LIBCXXABI_LIBRARY_PATH="${SYSROOT}/usr/lib"
+
 
 # might want -fdebug-prefix-map=/include=${SYSROOT}/usr/include
-
 
 # Build minimal clang (install to sysroot)
 RUN cmake -S runtimes -B build-runtimes -Wno-dev -G "Ninja" \
@@ -486,7 +507,7 @@ RUN cmake -S runtimes -B build-runtimes -Wno-dev -G "Ninja" \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_LINKER=ld.lld \
-    -DCMAKE_SYSTEM_NAME=Linux \
+    -DCMAKE_SYSTEM_NAME=Generic \
     -DCMAKE_SYSROOT="${SYSROOT}" && \
     cmake --build build-runtimes && \
     cmake --install build-runtimes && \
@@ -724,7 +745,7 @@ LABEL org.opencontainers.image.vendor="individual"
 LABEL org.opencontainers.image.licenses="MIT"
 
 # provenance ENV (kept intentionally)
-ARG LLVM_VERSION=${LLVM_VERSION:-"21.1.7"}
+ARG LLVM_VERSION=${LLVM_VERSION:-"22.1.1"}
 ENV LLVM_VERSION=${LLVM_VERSION}
 ENV LLVM_URL="https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-${LLVM_VERSION}.tar.gz"
 ARG TARGET_TRIPLE
