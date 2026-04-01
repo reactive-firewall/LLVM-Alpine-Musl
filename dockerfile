@@ -10,7 +10,7 @@ FROM --platform="linux/${TARGETARCH}" alpine:latest AS fetcher
 ARG LIBEXECINFO_VERSION=${LIBEXECINFO_VERSION:-"1.3"}
 ENV LIBEXECINFO_VERSION=${LIBEXECINFO_VERSION}
 ENV LIBEXECINFO_URL="https://github.com/reactive-firewall/libexecinfo/raw/refs/tags/v${LIBEXECINFO_VERSION}/libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2"
-ARG LLVM_VERSION=${LLVM_VERSION:-"22.1.1"}
+ARG LLVM_VERSION=${LLVM_VERSION:-"22.1.2"}
 ENV LLVM_VERSION=${LLVM_VERSION}
 ENV LLVM_URL="https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-${LLVM_VERSION}.tar.gz"
 ARG MUSL_VERSION=${MUSL_VERSION:-"1.2.5"}
@@ -20,7 +20,7 @@ WORKDIR /fetch
 ENV CC=clang
 ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="clang -c"
+ENV ASM=clang
 ENV RANLIB=llvm-ranlib
 ENV LDFLAGS="-fuse-ld=lld"
 
@@ -71,55 +71,55 @@ RUN curl -fsSLo llvmorg-${LLVM_VERSION}.tar.gz \
     mv /fetch/llvm-project-llvmorg-${LLVM_VERSION} /fetch/llvmorg
 # OPTIONAL
 # get HOST linux Headers
-RUN curl -fsSLo linux-6.${HOST_HEADERS_VERSION}.tar.gz \
-    --url "https://www.kernel.org/pub/linux/kernel/v6.x/linux-6.${HOST_HEADERS_VERSION}.tar.gz" && \
-    bsdtar -xzf linux-6.${HOST_HEADERS_VERSION}.tar.gz && \
-    rm linux-6.${HOST_HEADERS_VERSION}.tar.gz && \
-    mv /fetch/linux-6.${HOST_HEADERS_VERSION} /fetch/linux
+#RUN curl -fsSLo linux-6.${HOST_HEADERS_VERSION}.tar.gz \
+#    --url "https://www.kernel.org/pub/linux/kernel/v6.x/linux-6.${HOST_HEADERS_VERSION}.tar.gz" && \
+#    bsdtar -xzf linux-6.${HOST_HEADERS_VERSION}.tar.gz && \
+#    rm linux-6.${HOST_HEADERS_VERSION}.tar.gz && \
+#    mv /fetch/linux-6.${HOST_HEADERS_VERSION} /fetch/linux
 
 
 # --- Strip-to-headers Stage: prepare stripped linux headers for musl sysroot ---
 # shellcheck disable=SC2154
-FROM --platform="linux/${TARGETARCH}" alpine:latest AS linux-trampoline
+#FROM --platform="linux/${TARGETARCH}" alpine:latest AS linux-trampoline
 
-ARG HOST_HEADERS_VERSION=${HOST_HEADERS_VERSION:-"17.2"}
-ENV HOST_HEADERS_VERSION=${HOST_HEADERS_VERSION}
-ENV HOST_HEADERS_URL="https://www.kernel.org/pub/linux/kernel/v6.x/linux-6.${HOST_HEADERS_VERSION}.tar.gz"
+#ARG HOST_HEADERS_VERSION=${HOST_HEADERS_VERSION:-"17.2"}
+#ENV HOST_HEADERS_VERSION=${HOST_HEADERS_VERSION}
+#ENV HOST_HEADERS_URL="https://www.kernel.org/pub/linux/kernel/v6.x/linux-6.${HOST_HEADERS_VERSION}.tar.gz"
 
-RUN set -eux \
-    && apk add --no-cache \
-        cmd:bsdtar \
-        clang \
-        cmd:clang++ \
-        llvm \
-        libc++ \
-        libc++-dev \
-        compiler-rt \
-        llvm-runtimes \
-        cmd:llvm-ar \
-        lld \
-        make \
-        binutils \
-        curl \
-        ca-certificates \
-        build-base \
-        gzip \
-        perl \
-        paxctl
+#RUN set -eux \
+#    && apk add --no-cache \
+#        cmd:bsdtar \
+#        clang \
+#        cmd:clang++ \
+#        llvm \
+#        libc++ \
+#        libc++-dev \
+#        compiler-rt \
+#        llvm-runtimes \
+#        cmd:llvm-ar \
+#        lld \
+#        make \
+#       binutils \
+#        curl \
+#        ca-certificates \
+#        build-base \
+#        gzip \
+#        perl \
+#        paxctl
 
 # copy optional linux sources (for musl headers)
-COPY --from=fetcher /fetch/linux /build/linux
-ENV CC=clang
-ENV CXX=clang++
-ENV AR=llvm-ar
-ENV AS="clang -c"
-ENV RANLIB=llvm-ranlib
-ENV LDFLAGS="-fuse-ld=lld"
+#COPY --from=fetcher /fetch/linux /build/linux
+#ENV CC=clang
+#ENV CXX=clang++
+#ENV AR=llvm-ar
+#ENV ASM=clang
+#ENV RANLIB=llvm-ranlib
+#ENV LDFLAGS="-fuse-ld=lld"
 
-WORKDIR /build/linux
+#WORKDIR /build/linux
 
-RUN make headers -j$(nproc) && \
-    find usr/include -type f ! -name '*.h' -delete
+#RUN make headers -j$(nproc) && \
+#    find usr/include -type f ! -name '*.h' -delete
 
 
 # --- Prepare Stage: prepare sysroot for musl headers ---
@@ -195,7 +195,7 @@ WORKDIR /build
 
 ENV CC=clang
 ENV AR=llvm-ar
-ENV AS="clang -c"
+ENV ASM=clang
 ENV RANLIB=llvm-ranlib
 ENV LD=ld.lld
 # can't use -Wl,--dynamic-linker=/lib/ld-musl-x86_64.so.1 yet
@@ -214,7 +214,7 @@ COPY --from=fetcher /fetch/musl /build/musl
 # linux/soundcard.h
 # linux/vt.h
 
-# DEBUG: try without linux headers
+# DEBUG: works without linux headers
 #COPY --from=linux-trampoline /build/linux/usr/include /sysroot/usr/include
 
 # copy llvm sources (for compiler_rt)
@@ -245,7 +245,7 @@ ENV CXXFLAGS="-stdlib=libc++ -fPIC -target ${TARGET_TRIPLE}"
 # python3 license: PSF-2.0
 RUN set -eux \
     && apk add --no-cache \
-        cmd:ninja \
+        samurai \
         cmd:clang++ \
         cmake \
         python3 \
@@ -276,6 +276,7 @@ RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
       -DCMAKE_C_FLAGS="-D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700" \
       -DCMAKE_C_COMPILER=clang \
       -DCMAKE_CXX_COMPILER=clang++ \
+      -DCMAKE_ASM_COMPILER=clang \
       -DCMAKE_SYSTEM_NAME=Generic \
       -DLIBC_TARGET_TRIPLE=${TARGET_TRIPLE} \
       -DCMAKE_SYSROOT="${SYSROOT}" && \
@@ -285,7 +286,7 @@ RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
 
 RUN set -eux \
     && apk del --no-cache \
-        cmd:ninja \
+        samurai \
         cmake \
         python3 \
         pkgconfig \
@@ -319,9 +320,9 @@ RUN set -eux \
          find ${SYSROOT}${MUSL_PREFIX}/lib -type f -name "*.o*" -exec strip --strip-unneeded {} + || true; \
        fi
 
-# Ensure loader has canonical name (example: /lib/ld-musl-x86_64.so.1)
+# Ensure loader has canonical name (example: /lib/libc.so ->/lib/ld-musl-x86_64.so.1)
 RUN set -eux \
-    && ln -fns /lib/libc.so "${SYSROOT}/lib/${MUSL_LDLIB}" \
+    && ln -fns libc.so "${SYSROOT}/lib/${MUSL_LDLIB}" \
     && ln -fns "/lib/${MUSL_LDLIB}" "${SYSROOT}/lib/ld-musl.so.1"
 
 # touch artifacts to make more reproducible (optional)
@@ -372,7 +373,7 @@ ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
 ENV CC=clang
 ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="clang -c"
+ENV ASM=clang
 ENV RANLIB=llvm-ranlib
 ENV LD=ld.lld
 
@@ -401,8 +402,8 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     llvm-runtimes \
     cmake \
     python3 \
-    ninja-build \
-    cmd:ninja \
+    samurai \
+    cmd:grep \
     pkgconfig \
     cmd:clang-cpp \
     cmd:clang++ \
@@ -412,6 +413,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 #    cmd:llvm-nm \
 #    cmd:llvm-strip \
 
+# untested for libunwind
 #ENV LIBCC="${SYSROOT}/lib/generic/${LLVM_RTLIB}"
 
 WORKDIR /bootstrap/llvmorg
@@ -446,6 +448,7 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     apk del --no-cache \
         g++ \
         cmd:g++ && \
+    ls -l /bootstrap/llvmorg/build-libunwind/ && \
     cmake --build build-libunwind && \
     cmake --install build-libunwind && \
     rm -vfr /bootstrap/llvmorg/build-libunwind/
@@ -463,7 +466,6 @@ ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -DSANITIZER_CAN_USE_PREINI
 
 # might need -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm
 # might need -DLIBCXX_HAS_ATOMIC_LIB=OFF ??
-# might need -DLIBCXX_HAS_C_LIB=ON
 # might need -DLIBCXXABI_HAS_CXA_THREAD_ATEXIT_IMPL=false
 # might need -DLIBCXX_HAS_RT_LIB=ON
 # might need -DLLVM_ENABLE_ZSTD=OFF
@@ -474,15 +476,13 @@ ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -DSANITIZER_CAN_USE_PREINI
 # might need -DLIBCXXABI_ENABLE_THREADS=ON
 # might need -DLIBCXXABI_HAS_PTHREAD_LIB=ON
 # might want -DLIBCXX_HAS_PTHREAD_LIB=ON
-# might want -DLIBCXXABI_HAS_PTHREAD_API=ON
-# might need -DLIBCXXABI_BAREMETAL=ON
-# might want -DCMAKE_SYSTEM_NAME=Generic
-# might want -DCMAKE_SYSROOT="${SYSROOT}"
 # might want unused -DLIBCXXABI_TARGET_TRIPLE=${TARGET_TRIPLE}
 # might want unused -DLIBCXX_TARGET_TRIPLE=${TARGET_TRIPLE}
 # might want unused -DTARGET_TRIPLE=${TARGET_TRIPLE}
 # might want unused -DHOST_TRIPLE=${HOST_TRIPLE}
 # migth want -DLIBCXX_HERMETIC_STATIC_LIBRARY=ON
+# might want unused -DLIBCXX_HAS_C_LIB=ON
+
 
 # does not use manually added -DLLVM_LIBCXXABI_LIBRARY_PATH="${SYSROOT}/usr/lib"
 
@@ -490,41 +490,23 @@ ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -DSANITIZER_CAN_USE_PREINI
 # might want -fdebug-prefix-map=/include=${SYSROOT}/usr/include
 
 # Build minimal clang (install to sysroot)
-RUN cmake -S runtimes -B build-runtimes-libcxxabi -Wno-dev -G "Ninja" \
+RUN cmake -S runtimes -B build-runtimes -Wno-dev -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
-    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm \
-    -DLLVM_ENABLE_RUNTIMES="libcxxabi" \
+    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg \
+    -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
+    -DClang_DIR=/bootstrap/llvmorg/clang \
+    -DLLVM_ENABLE_RUNTIMES="libcxxabi;libcxx" \
     -DLIBCXXABI_USE_COMPILER_RT=ON \
     -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
     -DLIBCXXABI_HAS_C_LIB=ON \
-    -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
-    -DLLVM_DEFAULT_TARGET_TRIPLE=${HOST_TRIPLE} \
-    -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
-    -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
-    -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
-    -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
-    -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-    -DCMAKE_CXX_FLAGS="${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ \
-    -DCMAKE_LINKER=ld.lld \
-    -DCMAKE_SYSTEM_NAME=Generic \
-    -DCMAKE_SYSROOT="${SYSROOT}" \
     -DLIBCXXABI_ENABLE_SHARED=OFF \
-    -DLIBCXXABI_ENABLE_STATIC=ON && \
-    cmake --build build-runtimes-libcxxabi -v && \
-    cmake --install build-runtimes-libcxxabi && \
-    rm -vfr /bootstrap/llvmorg/build-runtimes-libcxxabi/
-
-RUN cmake -S runtimes -B build-runtimes-libcxx -Wno-dev -G "Ninja" \
-    -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
-    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm \
-    -DLLVM_ENABLE_RUNTIMES="libcxx" \
+    -DLIBCXXABI_ENABLE_STATIC=ON \
     -DLIBCXX_USE_COMPILER_RT=ON \
     -DLIBCXX_HAS_MUSL_LIBC=ON \
     -DLIBCXX_INCLUDE_BENCHMARKS=OFF \
     -DLIBCXX_HARDENING_MODE=extensive \
+    -DLIBCXX_ENABLE_SHARED=ON \
+    -DLIBCXX_ENABLE_STATIC=OFF \
     -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
     -DLLVM_DEFAULT_TARGET_TRIPLE=${HOST_TRIPLE} \
     -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
@@ -536,14 +518,14 @@ RUN cmake -S runtimes -B build-runtimes-libcxx -Wno-dev -G "Ninja" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
-    -DCMAKE_LINKER=ld.lld \
+    -DCMAKE_ASM_COMPILER=clang \
     -DCMAKE_SYSTEM_NAME=Generic \
-    -DCMAKE_SYSROOT="${SYSROOT}" \
-    -DLIBCXX_ENABLE_SHARED=ON \
-    -DLIBCXX_ENABLE_STATIC=OFF && \
-    cmake --build build-runtimes-libcxx  && \
-    cmake --install build-runtimes-libcxx && \
-    rm -vfr /bootstrap/llvmorg/build-runtimes-libcxx/ && \
+    -DCMAKE_LINKER=ld.lld && \
+    ls -l build-runtimes && \
+    grep -HF "lib/libc++abi.a" /bootstrap/llvmorg/build-runtimes/build.ninja && \
+    cmake --build build-runtimes -v && \
+    cmake --install build-runtimes && \
+    rm -vfr /bootstrap/llvmorg/build-runtimes/ && \
     apk del --no-cache \
         g++ \
         cmd:g++
@@ -560,7 +542,9 @@ RUN ls -l ${SYSROOT}/usr/include || true \
 RUN cmake -S llvm -B build-llvm -G "Ninja" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
-    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm \
+    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg \
+    -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
+    -DClang_DIR=/bootstrap/llvmorg/clang \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_SYSTEM_NAME=Linux \
@@ -622,8 +606,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
   apk update && \
   apk add \
     cmake \
-    ninja-build \
-    cmd:ninja \
+    samurai \
     python3 \
     musl-dev \
     pkgconf \
@@ -770,14 +753,14 @@ RUN /home/builder/llvm/bin/clang -target ${TARGET_TRIPLE} -o /tests/test_s
 # Final artifact stage: copy llvm-alpine-musl
 FROM scratch AS llvm-alpine-musl
 
-LABEL version="20250924"
+LABEL version="20260401"
 LABEL org.opencontainers.image.title="llvm-alpine-musl"
 LABEL org.opencontainers.image.description="Hermetically built llvm-alpine-musl."
 LABEL org.opencontainers.image.vendor="individual"
 LABEL org.opencontainers.image.licenses="MIT"
 
 # provenance ENV (kept intentionally)
-ARG LLVM_VERSION=${LLVM_VERSION:-"22.1.1"}
+ARG LLVM_VERSION=${LLVM_VERSION:-"22.1.2"}
 ENV LLVM_VERSION=${LLVM_VERSION}
 ENV LLVM_URL="https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-${LLVM_VERSION}.tar.gz"
 ARG TARGET_TRIPLE
