@@ -513,7 +513,7 @@ RUN cmake -S runtimes -B build-runtimes-libcxxabi -Wno-dev -G "Ninja" \
     -DCMAKE_SYSROOT="${SYSROOT}" \
     -DLIBCXXABI_ENABLE_SHARED=OFF \
     -DLIBCXXABI_ENABLE_STATIC=ON && \
-    cmake --build build-runtimes-libcxxabi  && \
+    cmake --build build-runtimes-libcxxabi -v && \
     cmake --install build-runtimes-libcxxabi && \
     rm -vfr /bootstrap/llvmorg/build-runtimes-libcxxabi/
 
