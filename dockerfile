@@ -10,9 +10,6 @@ FROM --platform="linux/${TARGETARCH}" alpine:latest AS fetcher
 ARG LIBEXECINFO_VERSION=${LIBEXECINFO_VERSION:-"1.3"}
 ENV LIBEXECINFO_VERSION=${LIBEXECINFO_VERSION}
 ENV LIBEXECINFO_URL="https://github.com/reactive-firewall/libexecinfo/raw/refs/tags/v${LIBEXECINFO_VERSION}/libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2"
-ARG HOST_HEADERS_VERSION=${HOST_HEADERS_VERSION:-"17.2"}
-ENV HOST_HEADERS_VERSION=${HOST_HEADERS_VERSION}
-ENV HOST_HEADERS_URL="https://www.kernel.org/pub/linux/kernel/v6.x/linux-6.${HOST_HEADERS_VERSION}.tar.gz"
 ARG LLVM_VERSION=${LLVM_VERSION:-"22.1.1"}
 ENV LLVM_VERSION=${LLVM_VERSION}
 ENV LLVM_URL="https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-${LLVM_VERSION}.tar.gz"
@@ -26,6 +23,12 @@ ENV AR=llvm-ar
 ENV AS="clang -c"
 ENV RANLIB=llvm-ranlib
 ENV LDFLAGS="-fuse-ld=lld"
+
+# OTHER VARS - BUNDLE ONLY (NOT USED ATM)
+ARG HOST_HEADERS_VERSION=${HOST_HEADERS_VERSION:-"17.2"}
+ENV HOST_HEADERS_VERSION=${HOST_HEADERS_VERSION}
+ENV HOST_HEADERS_URL="https://www.kernel.org/pub/linux/kernel/v6.x/linux-6.${HOST_HEADERS_VERSION}.tar.gz"
+
 
 # Install necessary packages
 # ca-certificates - MPL AND MIT - do not bundle - just to verify certificates (weak)
@@ -53,23 +56,26 @@ RUN curl -fsSLo musl-${MUSL_VERSION}.tar.gz \
     bsdtar -xzf musl-${MUSL_VERSION}.tar.gz && \
     rm musl-${MUSL_VERSION}.tar.gz && \
     mv /fetch/musl-${MUSL_VERSION} /fetch/musl
-# get HOST linux Headers
-RUN curl -fsSLo linux-6.${HOST_HEADERS_VERSION}.tar.gz \
-    --url "https://www.kernel.org/pub/linux/kernel/v6.x/linux-6.${HOST_HEADERS_VERSION}.tar.gz" && \
-    bsdtar -xzf linux-6.${HOST_HEADERS_VERSION}.tar.gz && \
-    rm linux-6.${HOST_HEADERS_VERSION}.tar.gz && \
-    mv /fetch/linux-6.${HOST_HEADERS_VERSION} /fetch/linux
+# get libexecinfo (patched mirror)
 RUN curl -fsSLo libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2 \
     --url "$LIBEXECINFO_URL" && \
     bsdtar -xzf libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2 && \
     rm libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2 && \
     mv /fetch/libexecinfo-${LIBEXECINFO_VERSION}r /fetch/libexecinfo && \
     rm /fetch/libexecinfo/patches.tar.bz2
+# get llvm-project
 RUN curl -fsSLo llvmorg-${LLVM_VERSION}.tar.gz \
     --url "$LLVM_URL" && \
     bsdtar -xzf llvmorg-${LLVM_VERSION}.tar.gz && \
     rm llvmorg-${LLVM_VERSION}.tar.gz && \
     mv /fetch/llvm-project-llvmorg-${LLVM_VERSION} /fetch/llvmorg
+# OPTIONAL
+# get HOST linux Headers
+RUN curl -fsSLo linux-6.${HOST_HEADERS_VERSION}.tar.gz \
+    --url "https://www.kernel.org/pub/linux/kernel/v6.x/linux-6.${HOST_HEADERS_VERSION}.tar.gz" && \
+    bsdtar -xzf linux-6.${HOST_HEADERS_VERSION}.tar.gz && \
+    rm linux-6.${HOST_HEADERS_VERSION}.tar.gz && \
+    mv /fetch/linux-6.${HOST_HEADERS_VERSION} /fetch/linux
 
 
 # --- Strip-to-headers Stage: prepare stripped linux headers for musl sysroot ---
@@ -101,7 +107,7 @@ RUN set -eux \
         perl \
         paxctl
 
-# copy sources (for musl headers)
+# copy optional linux sources (for musl headers)
 COPY --from=fetcher /fetch/linux /build/linux
 ENV CC=clang
 ENV CXX=clang++
@@ -484,13 +490,37 @@ ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -DSANITIZER_CAN_USE_PREINI
 # might want -fdebug-prefix-map=/include=${SYSROOT}/usr/include
 
 # Build minimal clang (install to sysroot)
-RUN cmake -S runtimes -B build-runtimes -Wno-dev -G "Ninja" \
+RUN cmake -S runtimes -B build-runtimes-libcxxabi -Wno-dev -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
     -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm \
-    -DLLVM_ENABLE_RUNTIMES="libcxxabi;libcxx" \
+    -DLLVM_ENABLE_RUNTIMES="libcxxabi" \
     -DLIBCXXABI_USE_COMPILER_RT=ON \
     -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
     -DLIBCXXABI_HAS_C_LIB=ON \
+    -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
+    -DLLVM_DEFAULT_TARGET_TRIPLE=${HOST_TRIPLE} \
+    -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
+    -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
+    -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
+    -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
+    -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
+    -DCMAKE_CXX_FLAGS="${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_LINKER=ld.lld \
+    -DCMAKE_SYSTEM_NAME=Generic \
+    -DCMAKE_SYSROOT="${SYSROOT}" \
+    -DLIBCXXABI_ENABLE_SHARED=OFF \
+    -DLIBCXXABI_ENABLE_STATIC=ON && \
+    cmake --build build-runtimes-libcxxabi  && \
+    cmake --install build-runtimes-libcxxabi && \
+    rm -vfr /bootstrap/llvmorg/build-runtimes-libcxxabi/
+
+RUN cmake -S runtimes -B build-runtimes-libcxx -Wno-dev -G "Ninja" \
+    -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
+    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm \
+    -DLLVM_ENABLE_RUNTIMES="libcxx" \
     -DLIBCXX_USE_COMPILER_RT=ON \
     -DLIBCXX_HAS_MUSL_LIBC=ON \
     -DLIBCXX_INCLUDE_BENCHMARKS=OFF \
@@ -508,11 +538,13 @@ RUN cmake -S runtimes -B build-runtimes -Wno-dev -G "Ninja" \
     -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_LINKER=ld.lld \
     -DCMAKE_SYSTEM_NAME=Generic \
-    -DCMAKE_SYSROOT="${SYSROOT}" && \
-    cmake --build build-runtimes && \
-    cmake --install build-runtimes && \
-    rm -vfr /bootstrap/llvmorg/build-runtimes/ && \
-        apk del --no-cache \
+    -DCMAKE_SYSROOT="${SYSROOT}" \
+    -DLIBCXX_ENABLE_SHARED=ON \
+    -DLIBCXX_ENABLE_STATIC=OFF && \
+    cmake --build build-runtimes-libcxx  && \
+    cmake --install build-runtimes-libcxx && \
+    rm -vfr /bootstrap/llvmorg/build-runtimes-libcxx/ && \
+    apk del --no-cache \
         g++ \
         cmd:g++
 
