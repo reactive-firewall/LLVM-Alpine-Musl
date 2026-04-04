@@ -72,7 +72,7 @@ RUN curl -fsSLo libcxxrt-${LIBCXXABIRT_VERSION}.tar.gz \
     --url "$LIBCXXABIRT_URL" && \
     bsdtar -xzf libcxxrt-${LIBCXXABIRT_VERSION}.tar.gz && \
     rm libcxxrt-${LIBCXXABIRT_VERSION}.tar.gz && \
-    mv /fetch/${LIBCXXABIRT_VERSION} /fetch/libcxxrt
+    mv /fetch/libcxxrt-${LIBCXXABIRT_VERSION} /fetch/libcxxrt
 # get llvm-project
 RUN curl -fsSLo llvmorg-${LLVM_VERSION}.tar.gz \
     --url "$LLVM_URL" && \
@@ -475,7 +475,7 @@ ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -D_BS
 WORKDIR /bootstrap/libcxxrt
 RUN set -eux; \
   rm -rf build && mkdir -p build && cd build; \
-  cmake -S . -B .. -G Ninja \
+  cmake -S .. -B . -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
