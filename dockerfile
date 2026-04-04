@@ -537,7 +537,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 #    cmd:llvm-nm \
 #    cmd:llvm-strip \
 
-# untested for libunwind
+# untested for libcxx
 #ENV LIBCC="${SYSROOT}/lib/generic/${LLVM_RTLIB}"
 
 WORKDIR /bootstrap/llvmorg
@@ -548,7 +548,7 @@ RUN apk add --no-cache \
 # but we remove it anyway afterwards
 
 # may require -D__linux__
-ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -D_BSD_SOURCE -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L"
+ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -D_BSD_SOURCE -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L"
 
 # might need -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm
 # might need -DLIBCXX_HAS_ATOMIC_LIB=OFF ??
@@ -595,6 +595,7 @@ RUN cmake -S runtimes -B build-runtimes -Wno-dev -G "Ninja" \
     -DLIBCXXABI_ENABLE_STATIC=ON \
     -DLIBCXXABI_BAREMETAL=ON \
     -DLIBCXX_CXX_ABI=libcxxabi \
+    -DLIBCXX_ABI_VERSION=2 \
     -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
     -DLLVM_DEFAULT_TARGET_TRIPLE=${HOST_TRIPLE} \
     -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
@@ -612,7 +613,7 @@ RUN cmake -S runtimes -B build-runtimes -Wno-dev -G "Ninja" \
 	apk del --no-cache \
         g++ \
         cmd:g++ && \
-    cmake --build build-runtimes -- -v -j1 && \
+    cmake --build build-runtimes --target cxx --target cxxabi && \
     cmake --install build-runtimes && \
     rm -vfr /bootstrap/llvmorg/build-runtimes/
 
