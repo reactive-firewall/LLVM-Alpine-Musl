@@ -16,6 +16,10 @@ ENV LLVM_URL="https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-${L
 ARG MUSL_VERSION=${MUSL_VERSION:-"1.2.5"}
 ENV MUSL_VERSION=${MUSL_VERSION}
 ENV MUSL_URL="https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz"
+ARG LIBCXXABIRT_VERSION=${LIBCXXABIRT_VERSION:-"4.0.10"}
+ENV LIBCXXABIRT_VERSION=${LIBCXXABIRT_VERSION}
+ENV LIBCXXABIRT_URL="https://github.com/libcxxrt/libcxxrt/archive/refs/tags/${LIBCXXABIRT_VERSION}.tar.gz"
+
 WORKDIR /fetch
 ENV CC=clang
 ENV CXX=clang++
@@ -52,7 +56,7 @@ WORKDIR /fetch
 # Fetch the signed release tarballs (or supply via build-args)
 # Download musl
 RUN curl -fsSLo musl-${MUSL_VERSION}.tar.gz \
-    --url "https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz" && \
+    --url "$MUSL_URL" && \
     bsdtar -xzf musl-${MUSL_VERSION}.tar.gz && \
     rm musl-${MUSL_VERSION}.tar.gz && \
     mv /fetch/musl-${MUSL_VERSION} /fetch/musl
@@ -63,6 +67,12 @@ RUN curl -fsSLo libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2 \
     rm libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2 && \
     mv /fetch/libexecinfo-${LIBEXECINFO_VERSION}r /fetch/libexecinfo && \
     rm /fetch/libexecinfo/patches.tar.bz2
+# get libcxxrt
+RUN curl -fsSLo libcxxrt-${LIBCXXABIRT_VERSION}.tar.gz \
+    --url "$LIBCXXABIRT_URL" && \
+    bsdtar -xzf libcxxrt-${LIBCXXABIRT_VERSION}.tar.gz && \
+    rm libcxxrt-${LIBCXXABIRT_VERSION}.tar.gz && \
+    mv /fetch/${LIBCXXABIRT_VERSION} /fetch/libcxxrt
 # get llvm-project
 RUN curl -fsSLo llvmorg-${LLVM_VERSION}.tar.gz \
     --url "$LLVM_URL" && \
@@ -353,6 +363,7 @@ WORKDIR /bootstrap
 
 # copy sources
 COPY --from=fetcher /fetch/llvmorg /bootstrap/llvmorg
+COPY --from=fetcher /fetch/libcxxrt /bootstrap/libcxxrt
 COPY --from=sysroot /sysroot /sysroot
 
 ARG MUSL_LDLIB
@@ -456,6 +467,35 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
 # check on the lib
 RUN ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true
 
+
+# may require -D__linux__
+ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -D_BSD_SOURCE -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L"
+
+# build and install libcxxrt into the sysroot
+WORKDIR /bootstrap/libcxxrt
+RUN set -eux; \
+  rm -rf build && mkdir -p build && cd build; \
+  cmake -S . -B .. -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_LINKER=ld.lld \
+    -DCMAKE_AR=llvm-ar \
+    -DCMAKE_RANLIB=llvm-ranlib \
+    -DCMAKE_SYSROOT=${SYSROOT} \
+    -DCMAKE_INSTALL_PREFIX=${SYSROOT}/usr \
+    -DCMAKE_INSTALL_LIBDIR=lib/generic \
+    -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments --target=${TARGET_TRIPLE}" \
+    -DCMAKE_CXX_FLAGS="${CXXFLAGS} -Qunused-arguments --target=${TARGET_TRIPLE}" \
+    -DLIBCXXRT_INSTALL_HEADERS=ON \
+    -DLIBCXXRT_INSTALL_LIBS=ON || (cat CMakeFiles/*/CMakeOutput.log || true) ; \
+  cmake --build . -- ; \
+  cmake --install . --strip --component runtime || true ; \
+  # ensure libs/headers are present in sysroot layout expected by libc++ later
+  install -d ${SYSROOT}/lib/generic ${SYSROOT}/usr/include ; \
+  ls -lah ${SYSROOT}/lib/generic || true; \
+  ls -lah ${SYSROOT}/usr/include || true;
+
 # cmake thinks that clang++ requires g++
 RUN apk add --no-cache \
     cmd:g++
@@ -489,24 +529,33 @@ ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -DSANITIZER_CAN_USE_PREINI
 
 # might want -fdebug-prefix-map=/include=${SYSROOT}/usr/include
 
+# use libcxxrt instead of libcxxabi (for this stage)
+# so don't need to pass cmake:
+#    -DLIBCXXABI_USE_COMPILER_RT=ON \
+#    -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
+#    -DLIBCXXABI_HAS_C_LIB=ON \
+#    -DLIBCXXABI_ENABLE_SHARED=OFF \
+#    -DLIBCXXABI_ENABLE_STATIC=ON
+#
+# and might not need
+#    -DLIBCXX_ENABLE_SHARED=ON \
+#    -DLIBCXX_ENABLE_STATIC=OFF
+
 # Build minimal clang (install to sysroot)
 RUN cmake -S runtimes -B build-runtimes -Wno-dev -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
     -DLLVM_CMAKE_DIR=/bootstrap/llvmorg \
     -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
     -DClang_DIR=/bootstrap/llvmorg/clang \
-    -DLLVM_ENABLE_RUNTIMES="libcxxabi;libcxx" \
-    -DLIBCXXABI_USE_COMPILER_RT=ON \
+    -DLLVM_ENABLE_RUNTIMES="libcxx" \
+    -DLIBCXX_CXX_ABI=libcxxrt \
+    -DLIBCXX_ENABLE_NEW_DELETE_DEFINITIONS=ON \
     -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
-    -DLIBCXXABI_HAS_C_LIB=ON \
-    -DLIBCXXABI_ENABLE_SHARED=OFF \
-    -DLIBCXXABI_ENABLE_STATIC=ON \
+    -DLIBCXX_CXX_ABI_INCLUDE_PATHS=/bootstrap/libcxxrt/src \
     -DLIBCXX_USE_COMPILER_RT=ON \
     -DLIBCXX_HAS_MUSL_LIBC=ON \
     -DLIBCXX_INCLUDE_BENCHMARKS=OFF \
     -DLIBCXX_HARDENING_MODE=extensive \
-    -DLIBCXX_ENABLE_SHARED=ON \
-    -DLIBCXX_ENABLE_STATIC=OFF \
     -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
     -DLLVM_DEFAULT_TARGET_TRIPLE=${HOST_TRIPLE} \
     -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
@@ -521,8 +570,6 @@ RUN cmake -S runtimes -B build-runtimes -Wno-dev -G "Ninja" \
     -DCMAKE_ASM_COMPILER=clang \
     -DCMAKE_SYSTEM_NAME=Generic \
     -DCMAKE_LINKER=ld.lld && \
-    ls -l build-runtimes && \
-    grep -HF "lib/libc++abi.a" /bootstrap/llvmorg/build-runtimes/build.ninja && \
     cmake --build build-runtimes -v && \
     cmake --install build-runtimes && \
     rm -vfr /bootstrap/llvmorg/build-runtimes/ && \
