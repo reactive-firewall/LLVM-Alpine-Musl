@@ -505,7 +505,7 @@ ENV SYSROOT="/sysroot"
 ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld"
 # may require -D__linux__
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -I/usr/include"
-ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
+ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -D_BSD_SOURCE -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L"
 
 # Ensure unwind has canonical name (example: /usr/lib/libunwind.so -> /usr/lib/libunwind.so.1.0)
 RUN set -eux \
@@ -547,9 +547,6 @@ RUN apk add --no-cache \
     cmd:g++
 # but we remove it anyway afterwards
 
-# may require -D__linux__
-ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -D_BSD_SOURCE -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L"
-
 # might need -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm
 # might need -DLIBCXX_HAS_ATOMIC_LIB=OFF ??
 # might need -DLIBCXXABI_HAS_CXA_THREAD_ATEXIT_IMPL=false
@@ -557,11 +554,12 @@ ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -D_LIBUNWIND_USE_DLADDR=0 
 # might need -DLLVM_ENABLE_ZSTD=OFF
 # might need -DLLVM_ENABLE_ZLIB=OFF
 # might need -DLIBCXXABI_HAS_PTHREAD_API=ON
-# might need -DLIBCXXABI_BAREMETAL=ON
 # might want -DLIBCXX_ENABLE_THREADS=ON
 # might need -DLIBCXXABI_ENABLE_THREADS=ON
 # might need -DLIBCXXABI_HAS_PTHREAD_LIB=ON
 # might want -DLIBCXX_HAS_PTHREAD_LIB=ON
+# might want -DLLVM_RUNTIME_TARGETS="${TARGET_TRIPLE}"
+
 # might want unused -DLIBCXXABI_TARGET_TRIPLE=${TARGET_TRIPLE}
 # might want unused -DLIBCXX_TARGET_TRIPLE=${TARGET_TRIPLE}
 # might want unused -DTARGET_TRIPLE=${TARGET_TRIPLE}
@@ -576,44 +574,46 @@ ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -D_LIBUNWIND_USE_DLADDR=0 
 # might want -fdebug-prefix-map=/include=${SYSROOT}/usr/include
 
 # Build minimal static libc++.a (install to sysroot)
-RUN cmake -S runtimes -B build-runtimes -Wno-dev -G "Ninja" \
+RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
     -DLLVM_CMAKE_DIR=/bootstrap/llvmorg \
     -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
     -DClang_DIR=/bootstrap/llvmorg/clang \
-    -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi" \
+    -DLLVM_ENABLE_RUNTIMES="libcxxabi;libcxx" \
     -DLIBCXX_USE_COMPILER_RT=ON \
     -DLIBCXX_ENABLE_SHARED=OFF \
+    -DLIBCXX_ENABLE_STATIC=ON \
     -DLIBCXX_HAS_MUSL_LIBC=ON \
     -DLIBCXX_INCLUDE_BENCHMARKS=OFF \
     -DLIBCXX_HARDENING_MODE=extensive \
     -DLIBCXX_ENABLE_STATIC_ABI_LIBRARY=ON \
+    -DLIBCXX_ABI_VERSION=1 \
+    -DLIBCXX_HERMETIC_STATIC_LIBRARY=ON \
     -DLIBCXXABI_USE_COMPILER_RT=ON \
     -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
     -DLIBCXXABI_HAS_C_LIB=ON \
     -DLIBCXXABI_ENABLE_SHARED=OFF \
     -DLIBCXXABI_ENABLE_STATIC=ON \
     -DLIBCXXABI_BAREMETAL=ON \
+    -DLIBCXXABI_HERMETIC_STATIC_LIBRARY=ON \
     -DLIBCXX_CXX_ABI=libcxxabi \
-    -DLIBCXX_ABI_VERSION=2 \
-    -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
-    -DLLVM_DEFAULT_TARGET_TRIPLE=${HOST_TRIPLE} \
     -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
+    -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
+    -DLLVM_DEFAULT_TARGET_TRIPLE=${HOST_TRIPLE} \
     -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
     -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
     -DCMAKE_CXX_FLAGS="${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
-    -DCMAKE_ASM_COMPILER=clang \
     -DCMAKE_SYSTEM_NAME=Generic \
     -DCMAKE_LINKER=ld.lld && \
 	apk del --no-cache \
         g++ \
         cmd:g++ && \
-    cmake --build build-runtimes --target cxx --target cxxabi && \
+    cmake --build build-runtimes && \
     cmake --install build-runtimes && \
     rm -vfr /bootstrap/llvmorg/build-runtimes/
 
