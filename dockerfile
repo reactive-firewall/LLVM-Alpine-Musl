@@ -16,9 +16,6 @@ ENV LLVM_URL="https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-${L
 ARG MUSL_VERSION=${MUSL_VERSION:-"1.2.5"}
 ENV MUSL_VERSION=${MUSL_VERSION}
 ENV MUSL_URL="https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz"
-ARG LIBCXXABIRT_VERSION=${LIBCXXABIRT_VERSION:-"4.0.10"}
-ENV LIBCXXABIRT_VERSION=${LIBCXXABIRT_VERSION}
-ENV LIBCXXABIRT_URL="https://github.com/libcxxrt/libcxxrt/archive/refs/tags/${LIBCXXABIRT_VERSION}.tar.gz"
 
 WORKDIR /fetch
 ENV CC=clang
@@ -67,12 +64,6 @@ RUN curl -fsSLo libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2 \
     rm libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2 && \
     mv /fetch/libexecinfo-${LIBEXECINFO_VERSION}r /fetch/libexecinfo && \
     rm /fetch/libexecinfo/patches.tar.bz2
-# get libcxxrt
-RUN curl -fsSLo libcxxrt-${LIBCXXABIRT_VERSION}.tar.gz \
-    --url "$LIBCXXABIRT_URL" && \
-    bsdtar -xzf libcxxrt-${LIBCXXABIRT_VERSION}.tar.gz && \
-    rm libcxxrt-${LIBCXXABIRT_VERSION}.tar.gz && \
-    mv /fetch/libcxxrt-${LIBCXXABIRT_VERSION} /fetch/libcxxrt
 # get llvm-project
 RUN curl -fsSLo llvmorg-${LLVM_VERSION}.tar.gz \
     --url "$LLVM_URL" && \
@@ -356,14 +347,13 @@ RUN set -eux \
         paxctl \
         cmd:find
 
-# --- bootstrap: bootstrap environment using distro clang/llvm to compile a minimal clang toolchain ---
-FROM --platform="linux/${TARGETARCH}" alpine:latest AS bootstrap
+# --- bootstrap: bootstrap unwind using distro clang/llvm to compile a minimal unwind library ---
+FROM --platform="linux/${TARGETARCH}" alpine:latest AS build-unwind
 
 WORKDIR /bootstrap
 
 # copy sources
 COPY --from=fetcher /fetch/llvmorg /bootstrap/llvmorg
-COPY --from=fetcher /fetch/libcxxrt /bootstrap/libcxxrt
 COPY --from=sysroot /sysroot /sysroot
 
 ARG MUSL_LDLIB
@@ -467,34 +457,90 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
 # check on the lib
 RUN ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true
 
+# --- bootstrap: bootstrap environment using distro clang/llvm to compile a minimal clang toolchain ---
+FROM --platform="linux/${TARGETARCH}" alpine:latest AS bootstrap
 
+WORKDIR /bootstrap
+
+# copy sources
+COPY --from=fetcher /fetch/llvmorg /bootstrap/llvmorg
+COPY --from=sysroot /sysroot /sysroot
+COPY --from=build-unwind /sysroot/usr/lib/libunwind.a /sysroot/usr/lib/libunwind.a
+COPY --from=build-unwind /sysroot/usr/include/__libunwind_config.h /sysroot/usr/include/__libunwind_config.h
+COPY --from=build-unwind /sysroot/usr/include/libunwind.h /sysroot/usr/include/libunwind.h
+COPY --from=build-unwind /sysroot/usr/include/libunwind.modulemap /sysroot/usr/include/libunwind.modulemap
+COPY --from=build-unwind /sysroot/usr/include/mach-o/compact_unwind_encoding.h /sysroot/usr/include/mach-o/compact_unwind_encoding.h
+COPY --from=build-unwind /sysroot/usr/include/unwind_arm_ehabi.h /sysroot/usr/include/unwind_arm_ehabi.h
+COPY --from=build-unwind /sysroot/usr/include/unwind_itanium.h /sysroot/usr/include/unwind_itanium.h
+COPY --from=build-unwind /sysroot/usr/include/unwind.h /sysroot/usr/include/unwind.h
+COPY --from=build-unwind /sysroot/usr/lib/libunwind.a /sysroot/usr/lib/libunwind.a
+COPY --from=build-unwind /sysroot/usr/lib/libunwind.so.1.0 /sysroot/usr/lib/libunwind.so.1.0
+
+ARG MUSL_LDLIB
+ENV MUSL_LDLIB="${MUSL_LDLIB}"
+
+ARG LLVM_RTLIB
+ENV LLVM_RTLIB="${LLVM_RTLIB}"
+
+ARG TARGET_FOR_LLVM
+ENV TARGET_FOR_LLVM=${TARGET_FOR_LLVM}
+
+ARG TARGET_TRIPLE
+ENV TARGET_TRIPLE=${TARGET_TRIPLE}
+
+ARG HOST_TRIPLE
+ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
+
+ENV CC=clang
+ENV CXX=clang++
+ENV AR=llvm-ar
+ENV ASM=clang
+ENV RANLIB=llvm-ranlib
+ENV LD=ld.lld
+
+ENV SYSROOT="/sysroot"
+
+# may need -Wl,--sysroot=/sysroot
+# may need -Wl,--dynamic-linker=/lib/libc.so
+ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld"
 # may require -D__linux__
-ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -D_BSD_SOURCE -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L"
+ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -I/usr/include"
+ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
 
-# build and install libcxxrt into the sysroot
-WORKDIR /bootstrap/libcxxrt
-RUN set -eux; \
-  rm -rf build && mkdir -p build && cd build; \
-  cmake -S .. -B . -G Ninja \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ \
-    -DCMAKE_LINKER=ld.lld \
-    -DCMAKE_AR=llvm-ar \
-    -DCMAKE_RANLIB=llvm-ranlib \
-    -DCMAKE_SYSROOT=${SYSROOT} \
-    -DCMAKE_INSTALL_PREFIX=${SYSROOT}/usr \
-    -DCMAKE_INSTALL_LIBDIR=lib/generic \
-    -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments --target=${TARGET_TRIPLE}" \
-    -DCMAKE_CXX_FLAGS="${CXXFLAGS} -Qunused-arguments --target=${TARGET_TRIPLE}" \
-    -DLIBCXXRT_INSTALL_HEADERS=ON \
-    -DLIBCXXRT_INSTALL_LIBS=ON || (cat CMakeFiles/*/CMakeOutput.log || true) ; \
-  cmake --build . -- ; \
-  cmake --install . --strip --component runtime || true ; \
-  # ensure libs/headers are present in sysroot layout expected by libc++ later
-  install -d ${SYSROOT}/lib/generic ${SYSROOT}/usr/include ; \
-  ls -lah ${SYSROOT}/lib/generic || true; \
-  ls -lah ${SYSROOT}/usr/include || true;
+# Ensure unwind has canonical name (example: /usr/lib/libunwind.so -> /usr/lib/libunwind.so.1.0)
+RUN set -eux \
+    && ln -fns libunwind.so.1.0 /sysroot/usr/lib/libunwind.so.1 && \
+    ln -fns libunwind.so.1 /sysroot/usr/lib/libunwind.so
+
+# Install distro packages that provide clang able to cross-emit --target. Adjust names for Alpine tag.
+RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
+  apk update && \
+  apk add --no-cache \
+    cmd:bash \
+    cmd:dash \
+    cmd:clang \
+    llvm \
+    lld \
+    libc++ \
+    libc++-dev \
+    compiler-rt \
+    cmd:llvm-ar \
+    cmake \
+    python3 \
+    samurai \
+    cmd:grep \
+    pkgconfig \
+    cmd:clang-cpp \
+    cmd:clang++
+
+#    cmd:llvm-otool \
+#    cmd:llvm-nm \
+#    cmd:llvm-strip \
+
+# untested for libunwind
+#ENV LIBCC="${SYSROOT}/lib/generic/${LLVM_RTLIB}"
+
+WORKDIR /bootstrap/llvmorg
 
 # cmake thinks that clang++ requires g++
 RUN apk add --no-cache \
@@ -529,33 +575,26 @@ ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -DSANITIZER_CAN_USE_PREINI
 
 # might want -fdebug-prefix-map=/include=${SYSROOT}/usr/include
 
-# use libcxxrt instead of libcxxabi (for this stage)
-# so don't need to pass cmake:
-#    -DLIBCXXABI_USE_COMPILER_RT=ON \
-#    -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
-#    -DLIBCXXABI_HAS_C_LIB=ON \
-#    -DLIBCXXABI_ENABLE_SHARED=OFF \
-#    -DLIBCXXABI_ENABLE_STATIC=ON
-#
-# and might not need
-#    -DLIBCXX_ENABLE_SHARED=ON \
-#    -DLIBCXX_ENABLE_STATIC=OFF
-
-# Build minimal clang (install to sysroot)
+# Build minimal static libc++.a (install to sysroot)
 RUN cmake -S runtimes -B build-runtimes -Wno-dev -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
     -DLLVM_CMAKE_DIR=/bootstrap/llvmorg \
     -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
     -DClang_DIR=/bootstrap/llvmorg/clang \
-    -DLLVM_ENABLE_RUNTIMES="libcxx" \
-    -DLIBCXX_CXX_ABI=libcxxrt \
-    -DLIBCXX_ENABLE_NEW_DELETE_DEFINITIONS=ON \
-    -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
-    -DLIBCXX_CXX_ABI_INCLUDE_PATHS=/bootstrap/libcxxrt/src \
+    -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi" \
     -DLIBCXX_USE_COMPILER_RT=ON \
+    -DLIBCXX_ENABLE_SHARED=OFF \
     -DLIBCXX_HAS_MUSL_LIBC=ON \
     -DLIBCXX_INCLUDE_BENCHMARKS=OFF \
     -DLIBCXX_HARDENING_MODE=extensive \
+    -DLIBCXX_ENABLE_STATIC_ABI_LIBRARY=ON \
+    -DLIBCXXABI_USE_COMPILER_RT=ON \
+    -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
+    -DLIBCXXABI_HAS_C_LIB=ON \
+    -DLIBCXXABI_ENABLE_SHARED=OFF \
+    -DLIBCXXABI_ENABLE_STATIC=ON \
+    -DLIBCXXABI_BAREMETAL=ON \
+    -DLIBCXX_CXX_ABI=libcxxabi \
     -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
     -DLLVM_DEFAULT_TARGET_TRIPLE=${HOST_TRIPLE} \
     -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
@@ -570,12 +609,12 @@ RUN cmake -S runtimes -B build-runtimes -Wno-dev -G "Ninja" \
     -DCMAKE_ASM_COMPILER=clang \
     -DCMAKE_SYSTEM_NAME=Generic \
     -DCMAKE_LINKER=ld.lld && \
-    cmake --build build-runtimes -v && \
-    cmake --install build-runtimes && \
-    rm -vfr /bootstrap/llvmorg/build-runtimes/ && \
-    apk del --no-cache \
+	apk del --no-cache \
         g++ \
-        cmd:g++
+        cmd:g++ && \
+    cmake --build build-runtimes -- -v -j1 && \
+    cmake --install build-runtimes && \
+    rm -vfr /bootstrap/llvmorg/build-runtimes/
 
 # Ensure we have the dynamic loader and libs present (sysroot paths)
 RUN ls -l ${SYSROOT}${MUSL_PREFIX}/lib || true \
