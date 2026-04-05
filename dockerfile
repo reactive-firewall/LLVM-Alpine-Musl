@@ -524,6 +524,8 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:clang \
     llvm \
     lld \
+    libc++ \
+    libc++-dev \
     compiler-rt \
     cmd:llvm-ar \
     cmake \
@@ -532,14 +534,14 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:grep \
     pkgconfig \
     cmd:clang-cpp \
-    cmd:clang++
+    cmd:clang++ \
 
 #    cmd:llvm-otool \
 #    cmd:llvm-nm \
 #    cmd:llvm-strip \
 
 # untested for libcxx
-#ENV LIBCC="${SYSROOT}/lib/generic/${LLVM_RTLIB}"
+ENV LIBCC="${SYSROOT}/lib/generic/${LLVM_RTLIB}"
 
 WORKDIR /bootstrap/llvmorg
 
