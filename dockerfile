@@ -465,6 +465,7 @@ FROM --platform="linux/${TARGETARCH}" alpine:latest AS bootstrap
 WORKDIR /bootstrap
 
 # copy sources
+COPY libcxxabi-ignore-libstdcxx.cmake /bootstrap/libcxxabi-ignore-libstdcxx.cmake
 COPY --from=fetcher /fetch/llvmorg /bootstrap/llvmorg
 COPY --from=sysroot /sysroot /sysroot
 COPY --from=build-unwind /sysroot/usr/lib/libunwind.a /sysroot/usr/lib/libunwind.a
@@ -523,8 +524,6 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:clang \
     llvm \
     lld \
-    libc++ \
-    libc++-dev \
     compiler-rt \
     cmd:llvm-ar \
     cmake \
@@ -545,8 +544,8 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 WORKDIR /bootstrap/llvmorg
 
 # cmake thinks that clang++ requires g++
-RUN apk add --no-cache \
-    cmd:g++
+#RUN apk add --no-cache \
+#    cmd:g++
 # but we remove it anyway afterwards
 
 # might need -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm
@@ -597,10 +596,8 @@ RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_SYSTEM_NAME=Generic \
-    -DCMAKE_LINKER=ld.lld && \
-    apk del --no-cache \
-        g++ \
-        cmd:g++ && \
+    -DCMAKE_LINKER=ld.lld \
+    -C /bootstrap/libcxxabi-ignore-libstdcxx.cmake && \
     cmake --build build-runtimes && \
     cmake --install build-runtimes && \
     rm -vfr /bootstrap/llvmorg/build-runtimes/
