@@ -577,9 +577,9 @@ RUN apk add --no-cache \
 RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
     -DLLVM_CMAKE_DIR=/bootstrap/llvmorg \
-    -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
-    -DClang_DIR=/bootstrap/llvmorg/clang \
     -DLLVM_ENABLE_RUNTIMES="libcxxabi;libcxx" \
+    -DLIBCXX_HAS_GCC_LIB=NO \
+    -DLIBCXX_HAS_GCC_S_LIB=NO \
     -DLIBCXX_USE_COMPILER_RT=ON \
     -DLIBCXX_ENABLE_SHARED=OFF \
     -DLIBCXX_ENABLE_STATIC=ON \
