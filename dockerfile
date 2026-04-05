@@ -196,6 +196,7 @@ WORKDIR /build
 
 ENV CC=clang
 ENV AR=llvm-ar
+ENV AS="clang -c"
 ENV ASM=clang
 ENV RANLIB=llvm-ranlib
 ENV LD=ld.lld
@@ -374,6 +375,7 @@ ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
 ENV CC=clang
 ENV CXX=clang++
 ENV AR=llvm-ar
+ENV AS="clang -c"
 ENV ASM=clang
 ENV RANLIB=llvm-ranlib
 ENV LD=ld.lld
@@ -505,7 +507,7 @@ ENV SYSROOT="/sysroot"
 ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld"
 # may require -D__linux__
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -I/usr/include"
-ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -D_BSD_SOURCE -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L"
+ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -D_BSD_SOURCE -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L"
 
 # Ensure unwind has canonical name (example: /usr/lib/libunwind.so -> /usr/lib/libunwind.so.1.0)
 RUN set -eux \
@@ -573,11 +575,51 @@ RUN apk add --no-cache \
 
 # might want -fdebug-prefix-map=/include=${SYSROOT}/usr/include
 
+# Build minimal static libc++abi.a (install to sysroot)
+RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
+    -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
+    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm \
+    -DLLVM_ENABLE_RUNTIMES="libcxxabi" \
+    -DLIBCXXABI_USE_COMPILER_RT=ON \
+    -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
+    -DLIBCXXABI_HAS_C_LIB=ON \
+    -DLIBCXXABI_BAREMETAL=ON \
+    -DLIBCXXABI_HERMETIC_STATIC_LIBRARY=ON \
+    -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
+    -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
+    -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
+    -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
+    -DLLVM_DEFAULT_TARGET_TRIPLE=${HOST_TRIPLE} \
+    -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
+    -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
+    -DCMAKE_CXX_FLAGS="${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_SYSTEM_NAME=Generic \
+    -DCMAKE_LINKER=ld.lld && \
+    apk del --no-cache \
+        g++ \
+        cmd:g++ && \
+    cmake --build build-runtimes && \
+    cmake --install build-runtimes && \
+    rm -vfr /bootstrap/llvmorg/build-runtimes/
+
+# Ensure we have the dynamic loader and libs present (sysroot paths)
+RUN ls -l ${SYSROOT}${MUSL_PREFIX}/lib || true \
+    && file ${SYSROOT}/usr/lib/* || true
+
+# Ensure we have the libc headers present (sysroot paths)
+RUN ls -l ${SYSROOT}/usr/include || true \
+    && file ${SYSROOT}/usr/include/* || true
+
 # Build minimal static libc++.a (install to sysroot)
 RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
     -DLLVM_CMAKE_DIR=/bootstrap/llvmorg \
-    -DLLVM_ENABLE_RUNTIMES="libcxxabi;libcxx" \
+    -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
+    -DClang_DIR=/bootstrap/llvmorg/clang \
+    -DLLVM_ENABLE_RUNTIMES="libcxx" \
     -DLIBCXX_HAS_GCC_LIB=NO \
     -DLIBCXX_HAS_GCC_S_LIB=NO \
     -DLIBCXX_USE_COMPILER_RT=ON \
@@ -589,13 +631,6 @@ RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
     -DLIBCXX_ENABLE_STATIC_ABI_LIBRARY=ON \
     -DLIBCXX_ABI_VERSION=1 \
     -DLIBCXX_HERMETIC_STATIC_LIBRARY=ON \
-    -DLIBCXXABI_USE_COMPILER_RT=ON \
-    -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
-    -DLIBCXXABI_HAS_C_LIB=ON \
-    -DLIBCXXABI_ENABLE_SHARED=OFF \
-    -DLIBCXXABI_ENABLE_STATIC=ON \
-    -DLIBCXXABI_BAREMETAL=ON \
-    -DLIBCXXABI_HERMETIC_STATIC_LIBRARY=ON \
     -DLIBCXX_CXX_ABI=libcxxabi \
     -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
