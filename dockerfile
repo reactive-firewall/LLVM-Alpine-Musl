@@ -534,7 +534,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:grep \
     pkgconfig \
     cmd:clang-cpp \
-    cmd:clang++ \
+    cmd:clang++
 
 #    cmd:llvm-otool \
 #    cmd:llvm-nm \
