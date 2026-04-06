@@ -597,6 +597,7 @@ RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_CXX_COMPILER_WORKS=ON \
     -DCMAKE_SYSTEM_NAME=Generic \
     -DCMAKE_LINKER=ld.lld \
     -C /bootstrap/libcxxabi-ignore-libstdcxx.cmake && \
