@@ -505,7 +505,7 @@ ENV SYSROOT="/sysroot"
 
 # may need -Wl,--sysroot=/sysroot
 # may need -Wl,--dynamic-linker=/lib/libc.so
-ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld"
+ENV LDFLAGS="-nostdlib++ -Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld"
 # may require -D__linux__
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -I/usr/include"
 ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -I${SYSROOT}/usr/include/c++/v1 -D_LIBCPP_ABI_VERSION=2 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -D_BSD_SOURCE -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L"
@@ -547,7 +547,7 @@ WORKDIR /bootstrap/llvmorg
 
 # Install libc++ headers into sysroot (headers only)
 RUN mkdir -p ${SYSROOT}/usr/include/c++/v1 && \
-    cp -r /bootstrap/llvmorg/libcxx/include/* ${SYSROOT}/usr/include/c++/v1/
+    cp -vfr /bootstrap/llvmorg/libcxx/include/* ${SYSROOT}/usr/include/c++/v1/
 
 
 # cmake thinks that clang++ requires g++
