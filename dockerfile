@@ -540,8 +540,8 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 #    cmd:llvm-nm \
 #    cmd:llvm-strip \
 
-# untested for libcxx
-ENV LIBCC="${SYSROOT}/lib/generic/${LLVM_RTLIB}"
+# untested for libcxx (buggy)
+#ENV LIBCC="${SYSROOT}/lib/generic/${LLVM_RTLIB}"
 
 WORKDIR /bootstrap/llvmorg
 
