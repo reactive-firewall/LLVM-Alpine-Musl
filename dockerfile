@@ -325,7 +325,7 @@ RUN set -eux \
 # Ensure loader has canonical name (example: /lib/libc.so ->/lib/ld-musl-x86_64.so.1)
 RUN set -eux \
     && ln -fns libc.so "${SYSROOT}/lib/${MUSL_LDLIB}" \
-    && ln -fns "/lib/${MUSL_LDLIB}" "${SYSROOT}/lib/ld-musl.so.1"
+    && ln -fns "${MUSL_LDLIB}" "${SYSROOT}/lib/ld-musl.so.1"
 
 # touch artifacts to make more reproducible (optional)
 RUN find ${SYSROOT}${MUSL_PREFIX}/lib -type f -name "*.so" -exec touch -d "${SOME_DATE_EPOCH}" {} + || true; \
@@ -459,6 +459,23 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
 # check on the lib
 RUN ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true
 
+# move the changed files out to stage
+
+RUN mkdir /stage && \
+    for UNWIND_FILE_ARTIFACT in usr/lib/libunwind.a \
+        usr/include/__libunwind_config.h \
+        usr/include/libunwind.h \
+        usr/include/libunwind.modulemap \
+        usr/include/mach-o/compact_unwind_encoding.h \
+        usr/include/unwind_arm_ehabi.h \
+        usr/include/unwind_itanium.h \
+        usr/include/unwind.h \
+        usr/lib/libunwind.a \
+        usr/lib/libunwind.so.1.0 ; do \
+          cp -vf /sysroot/${UNWIND_FILE_ARTIFACT} /stage/${UNWIND_FILE_ARTIFACT} ; \
+    done ;
+
+
 # --- bootstrap: bootstrap environment using distro clang/llvm to compile a minimal clang toolchain ---
 FROM --platform="linux/${TARGETARCH}" alpine:latest AS bootstrap
 
@@ -468,16 +485,7 @@ WORKDIR /bootstrap
 COPY libcxxabi-ignore-libstdcxx.cmake /bootstrap/libcxxabi-ignore-libstdcxx.cmake
 COPY --from=fetcher /fetch/llvmorg /bootstrap/llvmorg
 COPY --from=sysroot /sysroot /sysroot
-COPY --from=build-unwind /sysroot/usr/lib/libunwind.a /sysroot/usr/lib/libunwind.a
-COPY --from=build-unwind /sysroot/usr/include/__libunwind_config.h /sysroot/usr/include/__libunwind_config.h
-COPY --from=build-unwind /sysroot/usr/include/libunwind.h /sysroot/usr/include/libunwind.h
-COPY --from=build-unwind /sysroot/usr/include/libunwind.modulemap /sysroot/usr/include/libunwind.modulemap
-COPY --from=build-unwind /sysroot/usr/include/mach-o/compact_unwind_encoding.h /sysroot/usr/include/mach-o/compact_unwind_encoding.h
-COPY --from=build-unwind /sysroot/usr/include/unwind_arm_ehabi.h /sysroot/usr/include/unwind_arm_ehabi.h
-COPY --from=build-unwind /sysroot/usr/include/unwind_itanium.h /sysroot/usr/include/unwind_itanium.h
-COPY --from=build-unwind /sysroot/usr/include/unwind.h /sysroot/usr/include/unwind.h
-COPY --from=build-unwind /sysroot/usr/lib/libunwind.a /sysroot/usr/lib/libunwind.a
-COPY --from=build-unwind /sysroot/usr/lib/libunwind.so.1.0 /sysroot/usr/lib/libunwind.so.1.0
+COPY --from=build-unwind /stage /stage
 
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
@@ -507,8 +515,23 @@ ENV SYSROOT="/sysroot"
 # may need -Wl,--dynamic-linker=/lib/libc.so
 ENV LDFLAGS="-nostdlib++ -Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld"
 # may require -D__linux__
-ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -I/usr/include"
-ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -I${SYSROOT}/usr/include/c++/v1 -D_LIBCPP_ABI_VERSION=2 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -D_BSD_SOURCE -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L"
+ENV CFLAGS="-v -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -I/usr/include"
+ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -I${SYSROOT}/usr/include/c++/v1 -D_LIBCPP_ABI_VERSION=2 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
+
+# overlay the unwinder
+RUN mkdir /stage && \
+    for UNWIND_FILE_ARTIFACT in usr/lib/libunwind.a \
+        usr/include/__libunwind_config.h \
+        usr/include/libunwind.h \
+        usr/include/libunwind.modulemap \
+        usr/include/mach-o/compact_unwind_encoding.h \
+        usr/include/unwind_arm_ehabi.h \
+        usr/include/unwind_itanium.h \
+        usr/include/unwind.h \
+        usr/lib/libunwind.a \
+        usr/lib/libunwind.so.1.0 ; do \
+          cp -vf /stage/${UNWIND_FILE_ARTIFACT} ${SYSROOT}/${UNWIND_FILE_ARTIFACT} ; \
+    done ;
 
 # Ensure unwind has canonical name (example: /usr/lib/libunwind.so -> /usr/lib/libunwind.so.1.0)
 RUN set -eux \
@@ -598,7 +621,7 @@ RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
     -DLLVM_DEFAULT_TARGET_TRIPLE=${HOST_TRIPLE} \
     -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
     -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-    -DCMAKE_CXX_FLAGS="-nostdinc++ ${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
+    -DCMAKE_CXX_FLAGS="-nostdinc++ ${CXXFLAGS} -v -I${SYSROOT}/usr/include/c++/v1 -Qunused-arguments -Wl,--verbose" \
     -DLIBCXXABI_ENABLE_SHARED=ON \
     -DLIBCXXABI_ENABLE_STATIC=ON \
     -DLIBCXXABI_USE_COMPILER_RT=ON \
