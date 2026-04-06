@@ -508,7 +508,7 @@ ENV SYSROOT="/sysroot"
 ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld"
 # may require -D__linux__
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -I/usr/include"
-ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -D_BSD_SOURCE -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L"
+ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -I${SYSROOT}/usr/include/c++/v1 -D_LIBCPP_ABI_VERSION=2 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -D_BSD_SOURCE -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L"
 
 # Ensure unwind has canonical name (example: /usr/lib/libunwind.so -> /usr/lib/libunwind.so.1.0)
 RUN set -eux \
@@ -544,6 +544,11 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 #ENV LIBCC="${SYSROOT}/lib/generic/${LLVM_RTLIB}"
 
 WORKDIR /bootstrap/llvmorg
+
+# Install libc++ headers into sysroot (headers only)
+RUN mkdir -p ${SYSROOT}/usr/include/c++/v1 && \
+    cp -r /bootstrap/llvmorg/libcxx/include/* ${SYSROOT}/usr/include/c++/v1/
+
 
 # cmake thinks that clang++ requires g++
 #RUN apk add --no-cache \
@@ -581,11 +586,11 @@ RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
     -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm \
     -DLLVM_ENABLE_RUNTIMES="libcxxabi" \
-    -DLIBCXXABI_USE_COMPILER_RT=ON \
-    -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
-    -DLIBCXXABI_HAS_C_LIB=ON \
-    -DLIBCXXABI_BAREMETAL=ON \
-    -DLIBCXXABI_HERMETIC_STATIC_LIBRARY=ON \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_SYSTEM_NAME=Generic \
+    -DCMAKE_LINKER=ld.lld \
     -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
@@ -593,14 +598,19 @@ RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
     -DLLVM_DEFAULT_TARGET_TRIPLE=${HOST_TRIPLE} \
     -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
     -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-    -DCMAKE_CXX_FLAGS="${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ \
-    -DCMAKE_CXX_COMPILER_WORKS=ON \
-    -DCMAKE_SYSTEM_NAME=Generic \
-    -DCMAKE_LINKER=ld.lld \
-    -C /bootstrap/libcxxabi-ignore-libstdcxx.cmake && \
+    -DCMAKE_CXX_FLAGS="-nostdinc++ ${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
+    -DLIBCXXABI_ENABLE_SHARED=ON \
+    -DLIBCXXABI_ENABLE_STATIC=ON \
+    -DLIBCXXABI_USE_COMPILER_RT=ON \
+    -DLIBCXXABI_LIBCXX_INCLUDES=${SYSROOT}/usr/include/c++/v1 \
+    -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
+    -DLIBCXXABI_ENABLE_NEW_DELETE_DEFINITIONS=ON \
+    -DLIBCXXABI_USE_LLVM_UNWINDER=ON \
+    -DLIBCXXABI_BAREMETAL=ON \
+    -DLIBCXXABI_HERMETIC_STATIC_LIBRARY=ON \
+    -DLLVM_CONFIG_PATH=/usr/bin/llvm-config \
+    -DCMAKE_INSTALL_RPATH="/lib;/usr/lib" \
+    -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON && \
     cmake --build build-runtimes && \
     cmake --install build-runtimes && \
     rm -vfr /bootstrap/llvmorg/build-runtimes/
