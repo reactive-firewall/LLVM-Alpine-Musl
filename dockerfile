@@ -482,7 +482,6 @@ FROM --platform="linux/${TARGETARCH}" alpine:latest AS bootstrap
 WORKDIR /bootstrap
 
 # copy sources
-COPY libcxxabi-ignore-libstdcxx.cmake /bootstrap/libcxxabi-ignore-libstdcxx.cmake
 COPY --from=fetcher /fetch/llvmorg /bootstrap/llvmorg
 COPY --from=sysroot /sysroot /sysroot
 COPY --from=build-unwind /stage /stage
@@ -513,10 +512,10 @@ ENV SYSROOT="/sysroot"
 
 # may need -Wl,--sysroot=/sysroot
 # may need -Wl,--dynamic-linker=/lib/libc.so
-ENV LDFLAGS="-nostdlib++ -Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld"
+ENV LDFLAGS="-Wl,-nostdlib++ -Wl,--nostdlib -Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -lc -lm -lunwind -fuse-ld=lld"
 # may require -D__linux__
-ENV CFLAGS="-v -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -I/usr/include"
-ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -I${SYSROOT}/usr/include/c++/v1 -D_LIBCPP_ABI_VERSION=2 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
+ENV CFLAGS="-v -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include"
+ENV CXXFLAGS="-Wp,-nostdinc++ -rtlib=compiler-rt -fPIC -Wp,-I${SYSROOT}/usr/include/c++/v1 -Wp,-I${SYSROOT}/usr/include -Wp,-D_LIBCPP_ABI_VERSION=2 -Wp,-D_LIBUNWIND_USE_DLADDR=0 -Wp,-DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
@@ -598,6 +597,7 @@ RUN mkdir -p ${SYSROOT}/usr/include/c++/v1 && \
 # migth want -DLIBCXX_HERMETIC_STATIC_LIBRARY=ON
 # might want unused -DLIBCXX_HAS_C_LIB=ON
 
+# might want -DLLVM_CONFIG_PATH=/usr/bin/llvm-config  (but need mocking implementation for sysroot)
 
 # does not use manually added -DLLVM_LIBCXXABI_LIBRARY_PATH="${SYSROOT}/usr/lib"
 
@@ -614,14 +614,14 @@ RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
     -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_SYSTEM_NAME=Generic \
     -DCMAKE_LINKER=ld.lld \
+    -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
+    -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
     -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
-    -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
-    -DLLVM_DEFAULT_TARGET_TRIPLE=${HOST_TRIPLE} \
     -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
     -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-    -DCMAKE_CXX_FLAGS="-nostdinc++ ${CXXFLAGS} -v -I${SYSROOT}/usr/include/c++/v1 -Qunused-arguments -Wl,--verbose" \
+    -DCMAKE_CXX_FLAGS="${CXXFLAGS} -v -Qunused-arguments -Wl,--verbose" \
     -DLIBCXXABI_ENABLE_SHARED=ON \
     -DLIBCXXABI_ENABLE_STATIC=ON \
     -DLIBCXXABI_USE_COMPILER_RT=ON \
@@ -630,10 +630,7 @@ RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
     -DLIBCXXABI_ENABLE_NEW_DELETE_DEFINITIONS=ON \
     -DLIBCXXABI_USE_LLVM_UNWINDER=ON \
     -DLIBCXXABI_BAREMETAL=ON \
-    -DLIBCXXABI_HERMETIC_STATIC_LIBRARY=ON \
-    -DLLVM_CONFIG_PATH=/usr/bin/llvm-config \
-    -DCMAKE_INSTALL_RPATH="/lib;/usr/lib" \
-    -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON && \
+    -DLIBCXXABI_HERMETIC_STATIC_LIBRARY=ON && \
     cmake --build build-runtimes && \
     cmake --install build-runtimes && \
     rm -vfr /bootstrap/llvmorg/build-runtimes/
