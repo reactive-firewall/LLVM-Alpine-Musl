@@ -461,7 +461,7 @@ RUN ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true
 
 # move the changed files out to stage
 
-RUN mkdir /stage && \
+RUN mkdir -pv /stage/usr/include/mach-o && mkdir -pv /stage/usr/lib && \
     for UNWIND_FILE_ARTIFACT in usr/lib/libunwind.a \
         usr/include/__libunwind_config.h \
         usr/include/libunwind.h \
@@ -519,7 +519,7 @@ ENV CFLAGS="-v -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L 
 ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -I${SYSROOT}/usr/include/c++/v1 -D_LIBCPP_ABI_VERSION=2 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
 
 # overlay the unwinder
-RUN mkdir /stage && \
+RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
     for UNWIND_FILE_ARTIFACT in usr/lib/libunwind.a \
         usr/include/__libunwind_config.h \
         usr/include/libunwind.h \
