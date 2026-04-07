@@ -307,7 +307,7 @@ RUN ./configure --prefix=${MUSL_PREFIX} --target=${TARGET_TRIPLE} \
       CC=clang \
       AR=llvm-ar RANLIB=llvm-ranlib \
       LDFLAGS="${LDFLAGS}" \
-      LIBCC="-l${SYSROOT}/lib/Generic/${LLVM_RTLIB}" \
+      LIBCC="-l${SYSROOT}${MUSL_PREFIX}/lib/Generic/${LLVM_RTLIB}" \
       CFLAGS="${CFLAGS} --sysroot=$SYSROOT -rtlib=compiler-rt -fno-math-errno -fPIC -fno-common -fuse-ld=lld" && \
     make -j"$(nproc)" && \
     DESTDIR=${SYSROOT} make install
@@ -324,8 +324,8 @@ RUN set -eux \
 
 # Ensure loader has canonical name (example: /lib/libc.so ->/lib/ld-musl-x86_64.so.1)
 RUN set -eux \
-    && ln -fns libc.so "${SYSROOT}/lib/${MUSL_LDLIB}" \
-    && ln -fns "${MUSL_LDLIB}" "${SYSROOT}/lib/ld-musl.so.1"
+    && ln -fns libc.so "${SYSROOT}${MUSL_PREFIX}/lib/${MUSL_LDLIB}" \
+    && ln -fns "${MUSL_LDLIB}" "${SYSROOT}${MUSL_PREFIX}/lib/ld-musl.so.1"
 
 # touch artifacts to make more reproducible (optional)
 RUN find ${SYSROOT}${MUSL_PREFIX}/lib -type f -name "*.so" -exec touch -d "${SOME_DATE_EPOCH}" {} + || true; \
@@ -381,13 +381,14 @@ ENV RANLIB=llvm-ranlib
 ENV LD=ld.lld
 
 ENV SYSROOT="/sysroot"
+ENV MUSL_PREFIX="/usr"
 
 # may need -Wl,--sysroot=/sysroot
 # may need -Wl,--dynamic-linker=/lib/libc.so
-ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld"
+ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -l${LLVM_RTLIB} -fuse-ld=lld"
 # may require -D__linux__
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -I/usr/include"
-ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
+ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
 
 # Install distro packages that provide clang able to cross-emit --target. Adjust names for Alpine tag.
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
@@ -415,9 +416,6 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 #    cmd:llvm-otool \
 #    cmd:llvm-nm \
 #    cmd:llvm-strip \
-
-# untested for libunwind
-#ENV LIBCC="${SYSROOT}/lib/generic/${LLVM_RTLIB}"
 
 WORKDIR /bootstrap/llvmorg
 
@@ -462,8 +460,7 @@ RUN ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true
 # move the changed files out to stage
 
 RUN mkdir -pv /stage/usr/include/mach-o && mkdir -pv /stage/usr/lib && \
-    for UNWIND_FILE_ARTIFACT in usr/lib/libunwind.a \
-        usr/include/__libunwind_config.h \
+    for UNWIND_FILE_ARTIFACT in usr/include/__libunwind_config.h \
         usr/include/libunwind.h \
         usr/include/libunwind.modulemap \
         usr/include/mach-o/compact_unwind_encoding.h \
@@ -472,7 +469,7 @@ RUN mkdir -pv /stage/usr/include/mach-o && mkdir -pv /stage/usr/lib && \
         usr/include/unwind.h \
         usr/lib/libunwind.a \
         usr/lib/libunwind.so.1.0 ; do \
-          cp -vf /sysroot/${UNWIND_FILE_ARTIFACT} /stage/${UNWIND_FILE_ARTIFACT} ; \
+          cp -vf ${SYSROOT}/${UNWIND_FILE_ARTIFACT} /stage/${UNWIND_FILE_ARTIFACT} ; \
     done ;
 
 
@@ -509,18 +506,18 @@ ENV RANLIB=llvm-ranlib
 ENV LD=ld.lld
 
 ENV SYSROOT="/sysroot"
+ENV MUSL_PREFIX="/usr"
 
 # may need -Wl,--sysroot=/sysroot
 # may need -Wl,--dynamic-linker=/lib/libc.so
-ENV LDFLAGS="-Wl,--nostdlib -Wl,--sysroot=${SYSROOT} -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -lc -lm -lunwind -fuse-ld=lld"
+ENV LDFLAGS="-Wl,--nostdlib -Wl,--sysroot=${SYSROOT} -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -lc -lm -l${LLVM_RTLIB} -fuse-ld=lld"
 # may require -D__linux__
 ENV CFLAGS="-v -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include"
-ENV CXXFLAGS="-nostdinc++ -rtlib=compiler-rt -fPIC -isysroot ${SYSROOT} -iwithsysroot /usr/include -iwithsysroot /usr/include/c++/v1 -Wp,-D_LIBCPP_ABI_VERSION=2 -Wp,-D_LIBUNWIND_USE_DLADDR=0 -Wp,-DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
+ENV CXXFLAGS="-nostdinc++ -rtlib=compiler-rt -fPIC -isysroot ${SYSROOT} -iwithsysroot /usr/include -iwithsysroot /usr/include/c++/v1 -Wp,-D_LIBCPP_ABI_VERSION=2 -Wp,-D_LIBUNWIND_USE_DLADDR=0 -Wp,-DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -Wl,-lunwind"
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
-    for UNWIND_FILE_ARTIFACT in usr/lib/libunwind.a \
-        usr/include/__libunwind_config.h \
+    for UNWIND_FILE_ARTIFACT in usr/include/__libunwind_config.h \
         usr/include/libunwind.h \
         usr/include/libunwind.modulemap \
         usr/include/mach-o/compact_unwind_encoding.h \
@@ -534,8 +531,15 @@ RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
 
 # Ensure unwind has canonical name (example: /usr/lib/libunwind.so -> /usr/lib/libunwind.so.1.0)
 RUN set -eux \
-    && ln -fns libunwind.so.1.0 /sysroot/usr/lib/libunwind.so.1 && \
-    ln -fns libunwind.so.1 /sysroot/usr/lib/libunwind.so
+    && ln -fns libunwind.so.1.0 ${SYSROOT}/lib/libunwind.so.1 && \
+    ln -fns libunwind.so.1 ${SYSROOT}/lib/libunwind.so
+
+# Ensure we have the unwinder and libc headers present (sysroot paths)
+RUN ls -l ${SYSROOT}${MUSL_PREFIX}/include || true \
+    && file ${SYSROOT}${MUSL_PREFIX}/include/* || true
+
+#check the lib directories too
+RUN ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true
 
 # Install distro packages that provide clang able to cross-emit --target. Adjust names for Alpine tag.
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
@@ -556,21 +560,23 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:grep \
     pkgconfig \
     cmd:clang-cpp \
-    cmd:clang++
+    cmd:clang++ \
+    cmd:find
 
 #    cmd:llvm-otool \
 #    cmd:llvm-nm \
 #    cmd:llvm-strip \
 
-# untested for libcxx (buggy)
-#ENV LIBCC="${SYSROOT}/lib/generic/${LLVM_RTLIB}"
-
 WORKDIR /bootstrap/llvmorg
 
 # Install libc++ headers into sysroot (headers only)
 RUN mkdir -p ${SYSROOT}/usr/include/c++/v1 && \
-    cp -vfr /bootstrap/llvmorg/libcxx/include/* ${SYSROOT}/usr/include/c++/v1/
+    cp -vfr /bootstrap/llvmorg/libcxx/include/* ${SYSROOT}/usr/include/c++/v1/ && \
+    find ${SYSROOT}/usr/include/c++/v1 -type f ! -name '*.h' -delete
 
+# DEBUG MARK 1
+RUN ls -lap /etc/clang* && \
+    cat /etc/clang21/${HOST_TRIPLE}.cfg
 
 # cmake thinks that clang++ requires g++
 #RUN apk add --no-cache \
