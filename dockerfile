@@ -512,10 +512,10 @@ ENV SYSROOT="/sysroot"
 
 # may need -Wl,--sysroot=/sysroot
 # may need -Wl,--dynamic-linker=/lib/libc.so
-ENV LDFLAGS="-Wl,-nostdlib++ -Wl,--nostdlib -Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -lc -lm -lunwind -fuse-ld=lld"
+ENV LDFLAGS="-Wl,--nostdlib -Wl,--sysroot=${SYSROOT} -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -lc -lm -lunwind -fuse-ld=lld"
 # may require -D__linux__
 ENV CFLAGS="-v -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include"
-ENV CXXFLAGS="-Wp,-nostdinc++ -rtlib=compiler-rt -fPIC -Wp,-I${SYSROOT}/usr/include/c++/v1 -Wp,-I${SYSROOT}/usr/include -Wp,-D_LIBCPP_ABI_VERSION=2 -Wp,-D_LIBUNWIND_USE_DLADDR=0 -Wp,-DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
+ENV CXXFLAGS="-nostdinc++ -rtlib=compiler-rt -fPIC -isysroot ${SYSROOT} -iwithsysroot /usr/include -iwithsysroot /usr/include/c++/v1 -Wp,-D_LIBCPP_ABI_VERSION=2 -Wp,-D_LIBUNWIND_USE_DLADDR=0 -Wp,-DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
@@ -603,6 +603,10 @@ RUN mkdir -p ${SYSROOT}/usr/include/c++/v1 && \
 
 
 # might want -fdebug-prefix-map=/include=${SYSROOT}/usr/include
+# sysroot diff hint To see what will be set, inspect the built binary with: readelf -d <bin> | grep RUNPATH or objdump -x <bin> | grep RPATH
+# may need to play with -DCMAKE_INSTALL_RPATH="/lib;/usr/lib" -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON
+# may need to play with CXXFLAGS -withisysroot and cmake -DLIBCXXABI_LIBCXX_INCLUDES=${SYSROOT}/usr/include/c++/v1 stuff
+
 
 # Build minimal static libc++abi.a (install to sysroot)
 RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
@@ -625,12 +629,12 @@ RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
     -DLIBCXXABI_ENABLE_SHARED=ON \
     -DLIBCXXABI_ENABLE_STATIC=ON \
     -DLIBCXXABI_USE_COMPILER_RT=ON \
-    -DLIBCXXABI_LIBCXX_INCLUDES=${SYSROOT}/usr/include/c++/v1 \
     -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
     -DLIBCXXABI_ENABLE_NEW_DELETE_DEFINITIONS=ON \
     -DLIBCXXABI_USE_LLVM_UNWINDER=ON \
     -DLIBCXXABI_BAREMETAL=ON \
-    -DLIBCXXABI_HERMETIC_STATIC_LIBRARY=ON && \
+    -DLIBCXXABI_HERMETIC_STATIC_LIBRARY=ON \
+    -DCMAKE_INSTALL_RPATH="/lib;/usr/lib" && \
     cmake --build build-runtimes && \
     cmake --install build-runtimes && \
     rm -vfr /bootstrap/llvmorg/build-runtimes/
