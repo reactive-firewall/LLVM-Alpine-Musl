@@ -10,10 +10,10 @@ FROM --platform="linux/${TARGETARCH}" alpine:latest AS fetcher
 ARG LIBEXECINFO_VERSION=${LIBEXECINFO_VERSION:-"1.3"}
 ENV LIBEXECINFO_VERSION=${LIBEXECINFO_VERSION}
 ENV LIBEXECINFO_URL="https://github.com/reactive-firewall/libexecinfo/raw/refs/tags/v${LIBEXECINFO_VERSION}/libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2"
-ARG LLVM_VERSION=${LLVM_VERSION:-"22.1.2"}
+ARG LLVM_VERSION=${LLVM_VERSION:-"22.1.3"}
 ENV LLVM_VERSION=${LLVM_VERSION}
 ENV LLVM_URL="https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-${LLVM_VERSION}.tar.gz"
-ARG MUSL_VERSION=${MUSL_VERSION:-"1.2.5"}
+ARG MUSL_VERSION=${MUSL_VERSION:-"1.2.6"}
 ENV MUSL_VERSION=${MUSL_VERSION}
 ENV MUSL_URL="https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz"
 
@@ -129,13 +129,15 @@ FROM --platform="linux/${TARGETARCH}" alpine:latest AS sysroot
 
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG MUSL_VERSION=${MUSL_VERSION:-"1.2.5"}
+ARG MUSL_VERSION=${MUSL_VERSION:-"1.2.6"}
 ENV MUSL_VERSION=${MUSL_VERSION}
 ENV MUSL_URL="https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz"
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
+ARG LLVM_RTLIB_STUB
+ENV LLVM_RTLIB_STUB="${LLVM_RTLIB_STUB}"
 ARG LLVM_RTLIB
-ENV LLVM_RTLIB="${LLVM_RTLIB}"
+ENV LLVM_RTLIB="${LLVM_RTLIB:-lib${LLVM_RTLIB_STUB}.a}"
 ARG TARGET_FOR_LLVM
 ENV TARGET_FOR_LLVM=${TARGET_FOR_LLVM}
 ARG TARGET_TRIPLE
@@ -360,8 +362,11 @@ COPY --from=sysroot /sysroot /sysroot
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
 
+ARG LLVM_RTLIB_STUB
+ENV LLVM_RTLIB_STUB="${LLVM_RTLIB_STUB}"
+
 ARG LLVM_RTLIB
-ENV LLVM_RTLIB="${LLVM_RTLIB}"
+ENV LLVM_RTLIB="${LLVM_RTLIB:-lib${LLVM_RTLIB_STUB}.a}"
 
 ARG TARGET_FOR_LLVM
 ENV TARGET_FOR_LLVM=${TARGET_FOR_LLVM}
@@ -375,7 +380,7 @@ ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
 ENV CC=clang
 ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="clang -c"
+ENV AS="clang -integrated-as -c"
 ENV ASM=clang
 ENV RANLIB=llvm-ranlib
 ENV LD=ld.lld
@@ -385,9 +390,9 @@ ENV MUSL_PREFIX="/usr"
 
 # may need -Wl,--sysroot=/sysroot
 # may need -Wl,--dynamic-linker=/lib/libc.so
-ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -l${LLVM_RTLIB} -fuse-ld=lld"
+ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -l${LLVM_RTLIB_STUB} -fuse-ld=lld"
 # may require -D__linux__
-ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -I/usr/include"
+ENV CFLAGS="-rtlib=compiler-rt -fPIC -Wp,-D_BSD_SOURCE -Wp,-D_POSIX_C_SOURCE=200809L -Wp,-D_XOPEN_SOURCE=700 -Wp,-DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -iwithsysroot /usr/include"
 ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
 
 # Install distro packages that provide clang able to cross-emit --target. Adjust names for Alpine tag.
@@ -500,7 +505,9 @@ ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
 
 ENV CC=clang
 ENV CXX=clang++
+ENV CPP=clang-cpp
 ENV AR=llvm-ar
+ENV AS="clang -integrated-as -c"
 ENV ASM=clang
 ENV RANLIB=llvm-ranlib
 ENV LD=ld.lld
@@ -510,10 +517,10 @@ ENV MUSL_PREFIX="/usr"
 
 # may need -Wl,--sysroot=/sysroot
 # may need -Wl,--dynamic-linker=/lib/libc.so
-ENV LDFLAGS="-Wl,--nostdlib -Wl,--sysroot=${SYSROOT} -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -lc -lm -l${LLVM_RTLIB} -fuse-ld=lld"
+ENV LDFLAGS="-Wl,--nostdlib -Wl,--sysroot=${SYSROOT} -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -lc -l${LLVM_RTLIB_STUB} -lm -fuse-ld=lld"
 # may require -D__linux__
-ENV CFLAGS="-v -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include"
-ENV CXXFLAGS="-nostdinc++ -rtlib=compiler-rt -fPIC -isysroot ${SYSROOT} -iwithsysroot /usr/include -iwithsysroot /usr/include/c++/v1 -Wp,-D_LIBCPP_ABI_VERSION=2 -Wp,-D_LIBUNWIND_USE_DLADDR=0 -Wp,-DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -Wl,-lunwind"
+ENV CFLAGS="-v -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -iwithsysroot /usr/include"
+ENV CXXFLAGS="-nostdinc++ -rtlib=compiler-rt -fPIC -isysroot ${SYSROOT} -iwithsysroot /usr/include -iwithsysroot /usr/include/c++/v1 -Wp,-D_LIBCPP_ABI_VERSION=2 -Wp,-DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -Wl,-lunwind"
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
