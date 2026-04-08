@@ -384,13 +384,15 @@ ENV AS="clang -integrated-as -c"
 ENV ASM=clang
 ENV RANLIB=llvm-ranlib
 ENV LD=ld.lld
+# will use /sysroot/usr/bin/ld.musl-clang later
+#ENV LD=ld.musl-clang
 
 ENV SYSROOT="/sysroot"
 ENV MUSL_PREFIX="/usr"
 
 # may need -Wl,--sysroot=/sysroot
 # may need -Wl,--dynamic-linker=/lib/libc.so
-ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -l${LLVM_RTLIB_STUB} -fuse-ld=lld"
+ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -llib${LLVM_RTLIB_STUB}.a -fuse-ld=lld"
 # may require -D__linux__
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -Wp,-D_BSD_SOURCE -Wp,-D_POSIX_C_SOURCE=200809L -Wp,-D_XOPEN_SOURCE=700 -Wp,-DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -iwithsysroot /usr/include"
 ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
