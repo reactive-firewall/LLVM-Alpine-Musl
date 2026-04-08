@@ -362,12 +362,6 @@ COPY --from=sysroot /sysroot /sysroot
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
 
-ARG LLVM_RTLIB_STUB
-ENV LLVM_RTLIB_STUB="${LLVM_RTLIB_STUB}"
-
-ARG LLVM_RTLIB
-ENV LLVM_RTLIB="${LLVM_RTLIB:-lib${LLVM_RTLIB_STUB}.a}"
-
 ARG TARGET_FOR_LLVM
 ENV TARGET_FOR_LLVM=${TARGET_FOR_LLVM}
 
@@ -384,15 +378,13 @@ ENV AS="clang -integrated-as -c"
 ENV ASM=clang
 ENV RANLIB=llvm-ranlib
 ENV LD=ld.lld
-# will use /sysroot/usr/bin/ld.musl-clang later
-#ENV LD=ld.musl-clang
 
 ENV SYSROOT="/sysroot"
 ENV MUSL_PREFIX="/usr"
 
 # may need -Wl,--sysroot=/sysroot
 # may need -Wl,--dynamic-linker=/lib/libc.so
-ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -llib${LLVM_RTLIB_STUB}.a -fuse-ld=lld"
+ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld"
 # may require -D__linux__
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -Wp,-D_BSD_SOURCE -Wp,-D_POSIX_C_SOURCE=200809L -Wp,-D_XOPEN_SOURCE=700 -Wp,-DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -iwithsysroot /usr/include"
 ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
@@ -493,8 +485,11 @@ COPY --from=build-unwind /stage /stage
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
 
+ARG LLVM_RTLIB_STUB
+ENV LLVM_RTLIB_STUB="${LLVM_RTLIB_STUB}"
+
 ARG LLVM_RTLIB
-ENV LLVM_RTLIB="${LLVM_RTLIB}"
+ENV LLVM_RTLIB="${LLVM_RTLIB:-lib${LLVM_RTLIB_STUB}.a}"
 
 ARG TARGET_FOR_LLVM
 ENV TARGET_FOR_LLVM=${TARGET_FOR_LLVM}
@@ -513,13 +508,15 @@ ENV AS="clang -integrated-as -c"
 ENV ASM=clang
 ENV RANLIB=llvm-ranlib
 ENV LD=ld.lld
+# will use /sysroot/usr/bin/ld.musl-clang later
+#ENV LD=/sysroot/usr/bin/ld.musl-clang
 
 ENV SYSROOT="/sysroot"
 ENV MUSL_PREFIX="/usr"
 
 # may need -Wl,--sysroot=/sysroot
 # may need -Wl,--dynamic-linker=/lib/libc.so
-ENV LDFLAGS="-Wl,--nostdlib -Wl,--sysroot=${SYSROOT} -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -lc -l${LLVM_RTLIB_STUB} -lm -fuse-ld=lld"
+ENV LDFLAGS="-Wl,--nostdlib -Wl,--sysroot=${SYSROOT} -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -lc -lm -fuse-ld=lld"
 # may require -D__linux__
 ENV CFLAGS="-v -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -iwithsysroot /usr/include"
 ENV CXXFLAGS="-nostdinc++ -rtlib=compiler-rt -fPIC -isysroot ${SYSROOT} -iwithsysroot /usr/include -iwithsysroot /usr/include/c++/v1 -Wp,-D_LIBCPP_ABI_VERSION=2 -Wp,-DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -Wl,-lunwind"
@@ -612,6 +609,8 @@ RUN ls -lap /etc/clang* && \
 # migth want -DLIBCXX_HERMETIC_STATIC_LIBRARY=ON
 # might want unused -DLIBCXX_HAS_C_LIB=ON
 
+# might want -DCMAKE_LINKER=ld.lld
+
 # might want -DLLVM_CONFIG_PATH=/usr/bin/llvm-config  (but need mocking implementation for sysroot)
 
 # does not use manually added -DLLVM_LIBCXXABI_LIBRARY_PATH="${SYSROOT}/usr/lib"
@@ -626,13 +625,14 @@ RUN ls -lap /etc/clang* && \
 # Build minimal static libc++abi.a (install to sysroot)
 RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
-    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm \
+    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg \
+    -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
+    -DClang_DIR=/bootstrap/llvmorg/clang \
     -DLLVM_ENABLE_RUNTIMES="libcxxabi" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_SYSTEM_NAME=Generic \
-    -DCMAKE_LINKER=ld.lld \
     -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
     -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
     -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
@@ -648,8 +648,7 @@ RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
     -DLIBCXXABI_ENABLE_NEW_DELETE_DEFINITIONS=ON \
     -DLIBCXXABI_USE_LLVM_UNWINDER=ON \
     -DLIBCXXABI_BAREMETAL=ON \
-    -DLIBCXXABI_HERMETIC_STATIC_LIBRARY=ON \
-    -DCMAKE_INSTALL_RPATH="/lib;/usr/lib" && \
+    -DLIBCXXABI_HERMETIC_STATIC_LIBRARY=ON && \
     cmake --build build-runtimes && \
     cmake --install build-runtimes && \
     rm -vfr /bootstrap/llvmorg/build-runtimes/
