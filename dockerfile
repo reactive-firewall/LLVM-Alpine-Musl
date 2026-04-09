@@ -390,6 +390,7 @@ ENV MUSL_PREFIX="/usr"
 
 # may need -Wl,--sysroot=/sysroot
 # may need -Wl,--dynamic-linker=/lib/libc.so
+# may need to play around with -Wl,--allow-shlib-undefined to allow __eh_* undefs
 ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld -rtlib=compiler-rt"
 # may require -D__linux__
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -iwithsysroot /usr/include"
@@ -461,7 +462,7 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
         g++ \
         cmd:g++ \
         cmd:find && \
-    ls -l /bootstrap/llvmorg/build-libunwind/ && \
+    ls -lap /bootstrap/llvmorg/build-libunwind/ && \
     cmake --build build-libunwind && \
     cmake --install build-libunwind && \
     rm -vfr /bootstrap/llvmorg/build-libunwind/
@@ -470,6 +471,12 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
 RUN apk add --no-cache \
     cmd:g++
 # but we remove it anyway afterwards
+
+# DEBUG CHECK between phases
+RUN printf "%s\n" "Bootstrapped Libs [DEBUG]:" && \
+    ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true ; \
+    printf "%s\n" "Bootstrapped Headers [DEBUG]:" && \
+    ls -lapr ${SYSROOT}/include/ || true
 
 # and again for shared lib (but use clang++ for first pass)
 RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
@@ -488,20 +495,18 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
     -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-    -DCMAKE_CXX_FLAGS="${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
-    -DLIBUNWIND_LINK_FLAGS="${LDFLAGS} -Wl,--allow-shlib-undefined" \
+    -DCMAKE_CXX_FLAGS="${CXXFLAGS} -v -Qunused-arguments -Wl,--verbose" \
     -DLIBUNWIND_HAS_DL_LIB=OFF \
     -DLIBUNWIND_IS_BAREMETAL=ON \
-    -DLIBUNWIND_ENABLE_SHARED=ON \
     -DLIBUNWIND_ENABLE_STATIC=OFF \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
-    -DCMAKE_LINKER=ld.lld && \
+    -DCMAKE_LINKER=lld && \
     apk del --no-cache \
         g++ \
         cmd:g++ && \
-    ls -l /bootstrap/llvmorg/build-libunwind/ && \
+    ls -lap /bootstrap/llvmorg/build-libunwind/ && \
     cmake --build build-libunwind && \
     cmake --install build-libunwind && \
     rm -vfr /bootstrap/llvmorg/build-libunwind/
