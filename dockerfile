@@ -489,6 +489,7 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
     -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
     -DCMAKE_CXX_FLAGS="${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
+    -DLIBUNWIND_LINK_FLAGS="${LDFLAGS} -Wl,--allow-shlib-undefined" \
     -DLIBUNWIND_HAS_DL_LIB=OFF \
     -DLIBUNWIND_IS_BAREMETAL=ON \
     -DLIBUNWIND_ENABLE_SHARED=ON \
