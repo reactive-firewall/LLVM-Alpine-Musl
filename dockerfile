@@ -19,8 +19,10 @@ ENV MUSL_URL="https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz"
 
 WORKDIR /fetch
 ENV CC=clang
-ENV CXX=clang++
+ENV CXX=clang-cpp
+ENV CPP=clang-cpp
 ENV AR=llvm-ar
+ENV AS="clang -integrated-as -c"
 ENV ASM=clang
 ENV RANLIB=llvm-ranlib
 ENV LDFLAGS="-fuse-ld=lld"
@@ -197,8 +199,9 @@ RUN set -eux; \
 WORKDIR /build
 
 ENV CC=clang
+ENV CPP=clang-cpp
 ENV AR=llvm-ar
-ENV AS="clang -c"
+ENV AS="clang -integrated-as -c"
 ENV ASM=clang
 ENV RANLIB=llvm-ranlib
 ENV LD=ld.lld
@@ -372,12 +375,13 @@ ARG HOST_TRIPLE
 ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
 
 ENV CC=clang
-ENV CXX=clang++
+ENV CXX=clang-cpp
+ENV CPP=clang-cpp
 ENV AR=llvm-ar
 ENV AS="clang -integrated-as -c"
 ENV ASM=clang
 ENV RANLIB=llvm-ranlib
-ENV LD=ld.lld
+ENV LD=lld
 
 ENV SYSROOT="/sysroot"
 ENV MUSL_PREFIX="/usr"
@@ -444,7 +448,7 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang-cpp \
-    -DCMAKE_LINKER=ld.lld && \
+    -DCMAKE_LINKER=lld && \
     apk del --no-cache \
         g++ \
         cmd:g++ && \
@@ -501,13 +505,13 @@ ARG HOST_TRIPLE
 ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
 
 ENV CC=clang
-ENV CXX=clang++
+ENV CXX=clang-cpp
 ENV CPP=clang-cpp
 ENV AR=llvm-ar
 ENV AS="clang -integrated-as -c"
 ENV ASM=clang
 ENV RANLIB=llvm-ranlib
-ENV LD=ld.lld
+ENV LD=lld
 # will use /sysroot/usr/bin/ld.musl-clang later
 #ENV LD=/sysroot/usr/bin/ld.musl-clang
 
@@ -625,6 +629,7 @@ RUN ls -lap /etc/clang* && \
 # DEBUG Mark 2
 RUN printf "%s\n" "PATH=$PATH" && \
     printf "%s\n" "CMake Version: $(cmake --version)" && \
+    printf "%s\n" "Clang-cpp Version: $(clang-cpp --version)" && \
     printf "%s\n" "Clang++ Version: $(clang++ --version)" && \
     printf "%s\n" "Installed Libraries:" && \
     ls -1 ${SYSROOT}/usr/lib/ && ls -1 ${SYSROOT}/usr/lib/generic/ && \
