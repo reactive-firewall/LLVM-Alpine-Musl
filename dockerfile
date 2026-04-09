@@ -438,6 +438,7 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
     -DClang_DIR=/bootstrap/llvmorg/clang \
     -DLLVM_ENABLE_RUNTIMES="libunwind" \
+    -DLIBUNWIND_WEAK_PTHREAD_LIB=ON \
     -DLIBUNWIND_USE_COMPILER_RT=ON \
     -DLIBUNWIND_HAS_NODEFAULTLIBS_FLAG=OFF \
     -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
@@ -449,6 +450,9 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
     -DCMAKE_CXX_FLAGS="${CXXFLAGS} -Qunused-arguments" \
     -DLIBUNWIND_HAS_DL_LIB=OFF \
+    -DLIBUNWIND_IS_BAREMETAL=ON \
+    -DLIBUNWIND_ENABLE_SHARED=OFF \
+    -DLIBUNWIND_ENABLE_STATIC=ON \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang-cpp \
