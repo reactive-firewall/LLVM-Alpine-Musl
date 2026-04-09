@@ -395,7 +395,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
   apk add --no-cache \
     cmd:bash \
     cmd:dash \
-    clang \
+    cmd:clang \
     llvm \
     lld \
     libc++ \
@@ -443,7 +443,7 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DLIBUNWIND_HAS_DL_LIB=OFF \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_CXX_COMPILER=clang-cpp \
     -DCMAKE_LINKER=ld.lld && \
     apk del --no-cache \
         g++ \
@@ -639,7 +639,7 @@ RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
     -DLLVM_ENABLE_RUNTIMES="libcxxabi" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_CXX_COMPILER=clang-cpp \
     -DCLANG_DEFAULT_CXX_LIB=libc++ \
     -DLIBUNWIND_HAS_MUSL_LIBC=ON \
     -DCMAKE_SYSTEM_NAME=Generic \
@@ -657,8 +657,7 @@ RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
     -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
     -DLIBCXXABI_ENABLE_NEW_DELETE_DEFINITIONS=ON \
     -DLIBCXXABI_USE_LLVM_UNWINDER=ON \
-    -DLIBCXXABI_BAREMETAL=ON \
-    -DLIBCXXABI_HERMETIC_STATIC_LIBRARY=ON && \
+    -DLIBCXXABI_BAREMETAL=ON && \
     cmake --build build-runtimes && \
     cmake --install build-runtimes && \
     rm -vfr /bootstrap/llvmorg/build-runtimes/
