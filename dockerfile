@@ -227,6 +227,8 @@ COPY --from=fetcher /fetch/musl /build/musl
 # copy llvm sources (for compiler_rt)
 COPY --from=fetcher /fetch/llvmorg /build/llvm
 
+# musl should be given these values too
+ENV CFLAGS="-D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700"
 
 # --- Prepare Stage: prepare musl sysroot with headers ---
 WORKDIR /build/musl
