@@ -392,8 +392,8 @@ ENV MUSL_PREFIX="/usr"
 # may need -Wl,--dynamic-linker=/lib/libc.so
 ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld"
 # may require -D__linux__
-ENV CFLAGS="-rtlib=compiler-rt -fPIC -Wp,-D_BSD_SOURCE -Wp,-D_POSIX_C_SOURCE=200809L -Wp,-D_XOPEN_SOURCE=700 -Wp,-DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -iwithsysroot /usr/include"
-ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
+ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -iwithsysroot /usr/include"
+ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
 
 # Install distro packages that provide clang able to cross-emit --target. Adjust names for Alpine tag.
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
@@ -416,16 +416,12 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     pkgconfig \
     cmd:clang-cpp \
     cmd:clang++ \
+    cmd:llvm-strip \
     cmd:find \
     cmd:g++
 
 #    cmd:llvm-otool \
-#    cmd:llvm-nm \
-#    cmd:llvm-strip \
-
-
-RUN printf "%s\n" "Looking for 'uintptr_t' defined in headers:" && \
-    find ${SYSROOT}${MUSL_PREFIX}/include -type f -exec grep -HF "uintptr_t;" {} + || true;
+#    cmd:llvm-nm
 
 WORKDIR /bootstrap/llvmorg
 
@@ -435,7 +431,7 @@ WORKDIR /bootstrap/llvmorg
 # may want unused -DLIBUNWIND_HAS_MUSL_LIBC=ON and -DLIBUNWIND_HAS_C_LIB=ON
 # may want unused -DLIBUNWIND_TARGET_TRIPLE=${TARGET_TRIPLE}
 
-# Build minimal clang (install to sysroot)
+# Build minimal llvm libunwind (install to sysroot)
 RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
     -DLLVM_CMAKE_DIR=/bootstrap/llvmorg \
@@ -451,6 +447,7 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
     -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
+    -DCMAKE_CXX_FLAGS="${CXXFLAGS} -Qunused-arguments" \
     -DLIBUNWIND_HAS_DL_LIB=OFF \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=clang \
@@ -483,9 +480,15 @@ RUN mkdir -pv /stage/usr/include/mach-o && mkdir -pv /stage/usr/lib && \
         usr/include/unwind.h \
         usr/lib/libunwind.a \
         usr/lib/libunwind.so.1.0 ; do \
-          cp -vf ${SYSROOT}/${UNWIND_FILE_ARTIFACT} /stage/${UNWIND_FILE_ARTIFACT} ; \
-    done ;
-
+          cp -vf ${SYSROOT}/${UNWIND_FILE_ARTIFACT} /stage/${UNWIND_FILE_ARTIFACT} || true ; \
+    done ; \
+    if [ -f usr/lib/libunwind.so.1.0 ] ; then \
+      if command -v llvm-strip >/dev/null 2>&1; then \
+         llvm-strip --strip-unneeded /stage/usr/lib/libunwind.so.1.0 + || true; \
+      else \
+         strip --strip-unneeded /stage/usr/lib/libunwind.so.1.0 + || true; \
+      fi \
+    fi
 
 # --- bootstrap: bootstrap environment using distro clang/llvm to compile a minimal clang toolchain ---
 FROM --platform="linux/${TARGETARCH}" alpine:latest AS bootstrap
