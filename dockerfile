@@ -571,14 +571,15 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 
 #    cmd:llvm-otool \
 #    cmd:llvm-nm \
-#    cmd:llvm-strip \
+#    cmd:llvm-strip
 
 WORKDIR /bootstrap/llvmorg
 
 # Install libc++ headers into sysroot (headers only)
 RUN mkdir -p ${SYSROOT}/usr/include/c++/v1 && \
-    cp -vfr /bootstrap/llvmorg/libcxx/include/* ${SYSROOT}/usr/include/c++/v1/ && \
-    find ${SYSROOT}/usr/include/c++/v1 -type f ! -name '*.h' -delete
+    cp -vfr /bootstrap/llvmorg/libcxx/include/* ${SYSROOT}/usr/include/c++/v1/
+
+# might cleanup with: find ${SYSROOT}/usr/include/c++/v1 -type f ! -name '*.h' -delete
 
 # DEBUG MARK 1
 RUN ls -lap /etc/clang* && \
@@ -621,6 +622,13 @@ RUN ls -lap /etc/clang* && \
 # may need to play with -DCMAKE_INSTALL_RPATH="/lib;/usr/lib" -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON
 # may need to play with CXXFLAGS -withisysroot and cmake -DLIBCXXABI_LIBCXX_INCLUDES=${SYSROOT}/usr/include/c++/v1 stuff
 
+# DEBUG Mark 2
+RUN printf "%s\n" "PATH=$PATH" && \
+    printf "%s\n" "CMake Version: $(cmake --version)" && \
+    printf "%s\n" "Clang++ Version: $(clang++ --version)" && \
+    printf "%s\n" "Installed Libraries:" && \
+    ls -1 ${SYSROOT}/usr/lib/ && ls -1 ${SYSROOT}/usr/lib/generic/ && \
+    printf "\n"
 
 # Build minimal static libc++abi.a (install to sysroot)
 RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
@@ -632,6 +640,8 @@ RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
+    -DCLANG_DEFAULT_CXX_LIB=libc++ \
+    -DLIBUNWIND_HAS_MUSL_LIBC=ON \
     -DCMAKE_SYSTEM_NAME=Generic \
     -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
     -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
