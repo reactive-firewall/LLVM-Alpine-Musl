@@ -416,11 +416,16 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     pkgconfig \
     cmd:clang-cpp \
     cmd:clang++ \
+    cmd:find \
     cmd:g++
 
 #    cmd:llvm-otool \
 #    cmd:llvm-nm \
 #    cmd:llvm-strip \
+
+
+RUN printf "%s\n" "Looking for 'uintptr_t' defined in headers:" && \
+    find ${SYSROOT}${MUSL_PREFIX}/include -type f -exec grep -HF "uintptr_t;" {} + || true;
 
 WORKDIR /bootstrap/llvmorg
 
@@ -453,14 +458,18 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DCMAKE_LINKER=lld && \
     apk del --no-cache \
         g++ \
-        cmd:g++ && \
+        cmd:g++ \
+        cmd:find && \
     ls -l /bootstrap/llvmorg/build-libunwind/ && \
     cmake --build build-libunwind && \
     cmake --install build-libunwind && \
     rm -vfr /bootstrap/llvmorg/build-libunwind/
 
 # check on the lib
-RUN ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true
+RUN printf "%s\n" "Bootstrapped Libs:" && \
+    ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true ; \
+    printf "%s\n" "Bootstrapped Headers:" && \
+    ls -lapr ${SYSROOT}/include/ || true
 
 # move the changed files out to stage
 
@@ -587,10 +596,6 @@ RUN mkdir -p ${SYSROOT}/usr/include/c++/v1 && \
 
 # might cleanup with: find ${SYSROOT}/usr/include/c++/v1 -type f ! -name '*.h' -delete
 
-# DEBUG MARK 1
-RUN ls -lap /etc/clang* && \
-    cat /etc/clang21/${HOST_TRIPLE}.cfg
-
 # cmake thinks that clang++ requires g++
 #RUN apk add --no-cache \
 #    cmd:g++
@@ -629,8 +634,7 @@ RUN ls -lap /etc/clang* && \
 # may need to play with CXXFLAGS -withisysroot and cmake -DLIBCXXABI_LIBCXX_INCLUDES=${SYSROOT}/usr/include/c++/v1 stuff
 
 # DEBUG Mark 2
-RUN printf "%s\n" "PATH=$PATH" && \
-    printf "%s\n" "CMake Version: $(cmake --version)" && \
+RUN printf "%s\n" "CMake Version: $(cmake --version)" && \
     printf "%s\n" "Clang-cpp Version: $(clang-cpp --version)" && \
     printf "%s\n" "Clang++ Version: $(clang++ --version)" && \
     printf "%s\n" "Installed Libraries:" && \
