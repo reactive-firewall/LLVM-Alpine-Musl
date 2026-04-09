@@ -390,7 +390,7 @@ ENV MUSL_PREFIX="/usr"
 
 # may need -Wl,--sysroot=/sysroot
 # may need -Wl,--dynamic-linker=/lib/libc.so
-ENV LDFLAGS="-Wl,--verbose -Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld"
+ENV LDFLAGS="-Wl,--verbose -Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld -rtlib=compiler-rt"
 # may require -D__linux__
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -iwithsysroot /usr/include"
 ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
@@ -466,6 +466,46 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     cmake --install build-libunwind && \
     rm -vfr /bootstrap/llvmorg/build-libunwind/
 
+# WORKAROUND: cmake still thinks that clang++ requires g++
+RUN apk add --no-cache \
+    cmd:g++
+# but we remove it anyway afterwards
+
+# and again for shared lib (but use clang++ for first pass)
+RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
+    -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
+    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg \
+    -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
+    -DClang_DIR=/bootstrap/llvmorg/clang \
+    -DLLVM_ENABLE_RUNTIMES="libunwind" \
+    -DLIBUNWIND_WEAK_PTHREAD_LIB=ON \
+    -DLIBUNWIND_USE_COMPILER_RT=ON \
+    -DLIBUNWIND_HAS_NODEFAULTLIBS_FLAG=OFF \
+    -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
+    -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
+    -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
+    -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
+    -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
+    -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
+    -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
+    -DCMAKE_CXX_FLAGS="${CXXFLAGS} -Qunused-arguments" \
+    -DLIBUNWIND_HAS_DL_LIB=OFF \
+    -DLIBUNWIND_IS_BAREMETAL=ON \
+    -DLIBUNWIND_ENABLE_SHARED=ON \
+    -DLIBUNWIND_ENABLE_STATIC=OFF \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_LINKER=lld && \
+    apk del --no-cache \
+        g++ \
+        cmd:g++ && \
+    ls -l /bootstrap/llvmorg/build-libunwind/ && \
+    cmake --build build-libunwind && \
+    cmake --install build-libunwind && \
+    rm -vfr /bootstrap/llvmorg/build-libunwind/
+
+
 # check on the lib
 RUN printf "%s\n" "Bootstrapped Libs:" && \
     ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true ; \
@@ -484,7 +524,7 @@ RUN mkdir -pv /stage/usr/include/mach-o && mkdir -pv /stage/usr/lib && \
         usr/include/unwind.h \
         usr/lib/libunwind.a \
         usr/lib/libunwind.so.1.0 ; do \
-          cp -vf ${SYSROOT}/${UNWIND_FILE_ARTIFACT} /stage/${UNWIND_FILE_ARTIFACT} || true ; \
+          cp -vn ${SYSROOT}/${UNWIND_FILE_ARTIFACT} /stage/${UNWIND_FILE_ARTIFACT} || true ; \
     done ; \
     if [ -f usr/lib/libunwind.so.1.0 ] ; then \
       if command -v llvm-strip >/dev/null 2>&1; then \
@@ -538,10 +578,10 @@ ENV MUSL_PREFIX="/usr"
 
 # may need -Wl,--sysroot=/sysroot
 # may need -Wl,--dynamic-linker=/lib/libc.so
-ENV LDFLAGS="-Wl,--nostdlib -Wl,--sysroot=${SYSROOT} -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -lc -lm -fuse-ld=lld"
+ENV LDFLAGS="-Wl,--nostdlib -Wl,--sysroot=${SYSROOT} -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -lc -lm -fuse-ld=lld -rtlib=compiler-rt -unwindlib=libunwind"
 # may require -D__linux__
 ENV CFLAGS="-v -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -iwithsysroot /usr/include"
-ENV CXXFLAGS="-nostdinc++ -rtlib=compiler-rt -fPIC -isysroot ${SYSROOT} -iwithsysroot /usr/include -iwithsysroot /usr/include/c++/v1 -Wp,-D_LIBCPP_ABI_VERSION=2 -Wp,-DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -Wl,-lunwind"
+ENV CXXFLAGS="-nostdinc++ -rtlib=compiler-rt -fPIC -isysroot ${SYSROOT} -iwithsysroot /usr/include -iwithsysroot /usr/include/c++/v1 -Wp,-D_LIBCPP_ABI_VERSION=2 -Wp,-DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -unwindlib=libunwind -Wl,-lunwind"
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
@@ -554,7 +594,7 @@ RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
         usr/include/unwind.h \
         usr/lib/libunwind.a \
         usr/lib/libunwind.so.1.0 ; do \
-          cp -vf /stage/${UNWIND_FILE_ARTIFACT} ${SYSROOT}/${UNWIND_FILE_ARTIFACT} ; \
+          cp -vf /stage/${UNWIND_FILE_ARTIFACT} ${SYSROOT}/${UNWIND_FILE_ARTIFACT} || true ; \
     done ;
 
 # Ensure unwind has canonical name (example: /usr/lib/libunwind.so -> /usr/lib/libunwind.so.1.0)
@@ -603,9 +643,9 @@ RUN mkdir -p ${SYSROOT}/usr/include/c++/v1 && \
 
 # might cleanup with: find ${SYSROOT}/usr/include/c++/v1 -type f ! -name '*.h' -delete
 
-# cmake thinks that clang++ requires g++
-#RUN apk add --no-cache \
-#    cmd:g++
+# WORKAROUND: cmake still thinks that clang++ requires g++
+RUN apk add --no-cache \
+    cmd:g++
 # but we remove it anyway afterwards
 
 # might need -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm
