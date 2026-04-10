@@ -476,7 +476,7 @@ RUN apk add --no-cache \
 RUN printf "%s\n" "Bootstrapped Libs [DEBUG]:" && \
     ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true ; \
     printf "%s\n" "Bootstrapped Headers [DEBUG]:" && \
-    ls -lapr ${SYSROOT}/include/ || true
+    ls -lapr ${SYSROOT}/usr/include/ || true
 
 # and again for shared lib (but use clang++ for first pass)
 RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
@@ -516,7 +516,7 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
 RUN printf "%s\n" "Bootstrapped Libs:" && \
     ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true ; \
     printf "%s\n" "Bootstrapped Headers:" && \
-    ls -lapr ${SYSROOT}/include/ || true
+    ls -lapr ${SYSROOT}/usr/include/ || true
 
 # move the changed files out to stage
 
