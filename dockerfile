@@ -516,7 +516,7 @@ RUN mkdir -pv /stage-static/usr/include/mach-o && mkdir -pv /stage-static/usr/li
           cp -vn ${SYSROOT}/${UNWIND_FILE_ARTIFACT} /stage-static/${UNWIND_FILE_ARTIFACT} || true ; \
     done ;
 
-# --- unwind-base: bootstrap unwind using distro clang/llvm to compile a minimal unwind library ---
+# --- build-unwind: bootstrap unwind using distro clang/llvm to compile a minimal unwind library ---
 FROM --platform="linux/${TARGETARCH}" build-unwind-base AS build-unwind
 
 WORKDIR /bootstrap
@@ -534,8 +534,7 @@ ARG HOST_TRIPLE
 ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
 
 ENV CC=clang
-ENV CXX=clang-cpp
-ENV CPP=clang-cpp
+ENV CXX=clang++
 ENV AR=llvm-ar
 ENV AS="clang -integrated-as -c"
 ENV ASM=clang
@@ -551,7 +550,7 @@ ENV MUSL_PREFIX="/usr"
 ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld"
 # may require -D__linux__
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -iwithsysroot /usr/include"
-ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
+ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
 
 WORKDIR /bootstrap/llvmorg
 
@@ -570,7 +569,6 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DLLVM_ENABLE_RUNTIMES="libunwind" \
     -DLIBUNWIND_WEAK_PTHREAD_LIB=ON \
     -DLIBUNWIND_USE_COMPILER_RT=ON \
-    -DLIBUNWIND_HAS_NODEFAULTLIBS_FLAG=OFF \
     -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
     -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
     -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
@@ -688,7 +686,12 @@ RUN ls -l ${SYSROOT}${MUSL_PREFIX}/include || true \
     && file ${SYSROOT}${MUSL_PREFIX}/include/* || true
 
 #check the lib directories too
-RUN ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true
+# check on the lib
+RUN printf "%s\n" "Bootstrapped Libs (pre-c++):" && \
+    ls -lap ${SYSROOT}/lib/ && file ${SYSROOT}/lib/generic/* || true ;\
+    ls -lap ${SYSROOT}/lib/generic/ && file ${SYSROOT}/lib/generic/* || true ;\
+    printf "%s\n" "Bootstrapped Headers:" && \
+    ls -lapr ${SYSROOT}/usr/include/ || true
 
 # Install distro packages that provide clang able to cross-emit --target. Adjust names for Alpine tag.
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
