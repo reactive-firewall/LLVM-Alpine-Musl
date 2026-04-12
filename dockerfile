@@ -581,7 +581,7 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
     -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-    -DCMAKE_CXX_FLAGS="${CXXFLAGS} -v -Qunused-arguments -Wl,--verbose" \
+    -DCMAKE_CXX_FLAGS="${CXXFLAGS} -v -Qunused-arguments -Wl,--eh-frame-hdr -Wl,--verbose" \
     -DLIBUNWIND_HAS_DL_LIB=OFF \
     -DLIBUNWIND_IS_BAREMETAL=ON \
     -DCMAKE_BUILD_TYPE=Release \
