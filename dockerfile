@@ -504,7 +504,7 @@ RUN printf "%s\n" "Bootstrapped Libs (static):" && \
 
 # move the changed files out to stage
 
-RUN mkdir -pv /stage/usr/include/mach-o && mkdir -pv /stage/usr/lib && \
+RUN mkdir -pv /stage-static/usr/include/mach-o && mkdir -pv /stage-static/usr/lib && \
     for UNWIND_FILE_ARTIFACT in usr/include/__libunwind_config.h \
         usr/include/libunwind.h \
         usr/include/libunwind.modulemap \
