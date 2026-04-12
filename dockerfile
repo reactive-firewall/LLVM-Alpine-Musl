@@ -539,7 +539,7 @@ ENV AR=llvm-ar
 ENV AS="clang -integrated-as -c"
 ENV ASM=clang
 ENV RANLIB=llvm-ranlib
-ENV LD=lld
+ENV LD=ld.lld
 
 ENV SYSROOT="/sysroot"
 ENV MUSL_PREFIX="/usr"
@@ -569,6 +569,7 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DLLVM_ENABLE_RUNTIMES="libunwind" \
     -DLIBUNWIND_WEAK_PTHREAD_LIB=ON \
     -DLIBUNWIND_USE_COMPILER_RT=ON \
+    -DLIBUNWIND_HAS_NODEFAULTLIBS_FLAG=OFF \
     -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
     -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
     -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
@@ -580,9 +581,10 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DLIBUNWIND_HAS_DL_LIB=OFF \
     -DLIBUNWIND_IS_BAREMETAL=ON \
     -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_SYSTEM_NAME=Generic \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
-    -DCMAKE_LINKER=lld && \
+    -DCMAKE_LINKER=ld.lld && \
     apk del --no-cache \
         g++ \
         cmd:g++ && \
