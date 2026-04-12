@@ -539,7 +539,7 @@ ENV AR=llvm-ar
 ENV AS="clang -integrated-as -c"
 ENV ASM=clang
 ENV RANLIB=llvm-ranlib
-ENV LD=ld.lld
+ENV LD=lld
 
 ENV SYSROOT="/sysroot"
 ENV MUSL_PREFIX="/usr"
@@ -556,9 +556,14 @@ WORKDIR /bootstrap/llvmorg
 
 # might need LDFLAGS="-Wl,--exclude-libs,libssp_nonshared.a"
 # also might need -DCMAKE_C_FLAGS="-fno-stack-protector" -DCMAKE_CXX_FLAGS="-fno-stack-protector"
-# also might need -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE
-# may want unused -DLIBUNWIND_HAS_MUSL_LIBC=ON and -DLIBUNWIND_HAS_C_LIB=ON
-# may want unused -DLIBUNWIND_TARGET_TRIPLE=${TARGET_TRIPLE}
+
+#DEBUG find __eh_* defs in host root
+RUN printf "%s\n" "select headers (host):" && \
+    find /usr/include -type f -name "*.h*" -exec grep -HF "__eh_frame_start" {} + || true; \
+    printf "%s\n" "select headers (sysroot):" && \
+    find ${SYSROOT}/usr/include -type f -name "*.h*" -exec grep -HF "__eh_frame_start" {} + || true; \
+    printf "%s\n" "select headers (libunwind src):" && \
+    find ./libunwind -type f -name "*.h*" -exec grep -HF "__eh_frame_start" {} + || true;
 
 # and again for shared lib (but use clang++ for first pass)
 RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
@@ -569,7 +574,6 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DLLVM_ENABLE_RUNTIMES="libunwind" \
     -DLIBUNWIND_WEAK_PTHREAD_LIB=ON \
     -DLIBUNWIND_USE_COMPILER_RT=ON \
-    -DLIBUNWIND_HAS_NODEFAULTLIBS_FLAG=OFF \
     -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
     -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
     -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
@@ -581,12 +585,9 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DLIBUNWIND_HAS_DL_LIB=OFF \
     -DLIBUNWIND_IS_BAREMETAL=ON \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_SYSTEM_NAME=Generic \
-    -DLIBUNWIND_ENABLE_SHARED=ON \
-    -DLIBUNWIND_ENABLE_STATIC=OFF \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
-    -DCMAKE_LINKER=ld.lld && \
+    -DCMAKE_LINKER=lld && \
     apk del --no-cache \
         g++ \
         cmd:g++ && \
