@@ -582,6 +582,8 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DLIBUNWIND_IS_BAREMETAL=ON \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_SYSTEM_NAME=Generic \
+    -DLIBUNWIND_ENABLE_SHARED=ON \
+    -DLIBUNWIND_ENABLE_STATIC=OFF \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_LINKER=ld.lld && \
