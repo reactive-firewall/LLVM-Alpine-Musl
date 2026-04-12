@@ -355,8 +355,8 @@ RUN set -eux \
         paxctl \
         cmd:find
 
-# --- bootstrap: bootstrap unwind using distro clang/llvm to compile a minimal unwind library ---
-FROM --platform="linux/${TARGETARCH}" alpine:latest AS build-unwind
+# --- unwind-base: bootstrap unwind using distro clang/llvm to compile a minimal unwind library ---
+FROM --platform="linux/${TARGETARCH}" alpine:latest AS build-unwind-base
 
 WORKDIR /bootstrap
 
@@ -388,14 +388,6 @@ ENV LD=lld
 ENV SYSROOT="/sysroot"
 ENV MUSL_PREFIX="/usr"
 
-# may need -Wl,--sysroot=/sysroot
-# may need -Wl,--dynamic-linker=/lib/libc.so
-# may need to play around with -Wl,--allow-shlib-undefined to allow __eh_* undefs
-ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld -rtlib=compiler-rt"
-# may require -D__linux__
-ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -iwithsysroot /usr/include"
-ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
-
 # Install distro packages that provide clang able to cross-emit --target. Adjust names for Alpine tag.
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
   apk update && \
@@ -423,6 +415,43 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 
 #    cmd:llvm-otool \
 #    cmd:llvm-nm
+
+# --- unwind-base: bootstrap unwind using distro clang/llvm to compile a minimal unwind library ---
+FROM --platform="linux/${TARGETARCH}" build-unwind-base AS build-unwind-static
+
+WORKDIR /bootstrap
+
+ARG MUSL_LDLIB
+ENV MUSL_LDLIB="${MUSL_LDLIB}"
+
+ARG TARGET_FOR_LLVM
+ENV TARGET_FOR_LLVM=${TARGET_FOR_LLVM}
+
+ARG TARGET_TRIPLE
+ENV TARGET_TRIPLE=${TARGET_TRIPLE}
+
+ARG HOST_TRIPLE
+ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
+
+ENV CC=clang
+ENV CXX=clang-cpp
+ENV CPP=clang-cpp
+ENV AR=llvm-ar
+ENV AS="clang -integrated-as -c"
+ENV ASM=clang
+ENV RANLIB=llvm-ranlib
+ENV LD=lld
+
+ENV SYSROOT="/sysroot"
+ENV MUSL_PREFIX="/usr"
+
+# may need -Wl,--sysroot=/sysroot
+# may need -Wl,--dynamic-linker=/lib/libc.so
+# may need to play around with -Wl,--allow-shlib-undefined to allow __eh_* undefs
+ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld -rtlib=compiler-rt"
+# may require -D__linux__
+ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -iwithsysroot /usr/include"
+ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
 
 WORKDIR /bootstrap/llvmorg
 
@@ -467,16 +496,70 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     cmake --install build-libunwind && \
     rm -vfr /bootstrap/llvmorg/build-libunwind/
 
-# WORKAROUND: cmake still thinks that clang++ requires g++
-RUN apk add --no-cache \
-    cmd:g++
-# but we remove it anyway afterwards
-
-# DEBUG CHECK between phases
-RUN printf "%s\n" "Bootstrapped Libs [DEBUG]:" && \
+# check on the lib
+RUN printf "%s\n" "Bootstrapped Libs (static):" && \
     ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true ; \
-    printf "%s\n" "Bootstrapped Headers [DEBUG]:" && \
+    printf "%s\n" "Bootstrapped Headers:" && \
     ls -lapr ${SYSROOT}/usr/include/ || true
+
+# move the changed files out to stage
+
+RUN mkdir -pv /stage/usr/include/mach-o && mkdir -pv /stage/usr/lib && \
+    for UNWIND_FILE_ARTIFACT in usr/include/__libunwind_config.h \
+        usr/include/libunwind.h \
+        usr/include/libunwind.modulemap \
+        usr/include/mach-o/compact_unwind_encoding.h \
+        usr/include/unwind_arm_ehabi.h \
+        usr/include/unwind_itanium.h \
+        usr/include/unwind.h \
+        usr/lib/libunwind.a ; do \
+          cp -vn ${SYSROOT}/${UNWIND_FILE_ARTIFACT} /stage-static/${UNWIND_FILE_ARTIFACT} || true ; \
+    done ;
+
+# --- unwind-base: bootstrap unwind using distro clang/llvm to compile a minimal unwind library ---
+FROM --platform="linux/${TARGETARCH}" build-unwind-base AS build-unwind
+
+WORKDIR /bootstrap
+
+ARG MUSL_LDLIB
+ENV MUSL_LDLIB="${MUSL_LDLIB}"
+
+ARG TARGET_FOR_LLVM
+ENV TARGET_FOR_LLVM=${TARGET_FOR_LLVM}
+
+ARG TARGET_TRIPLE
+ENV TARGET_TRIPLE=${TARGET_TRIPLE}
+
+ARG HOST_TRIPLE
+ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
+
+ENV CC=clang
+ENV CXX=clang-cpp
+ENV CPP=clang-cpp
+ENV AR=llvm-ar
+ENV AS="clang -integrated-as -c"
+ENV ASM=clang
+ENV RANLIB=llvm-ranlib
+ENV LD=lld
+
+ENV SYSROOT="/sysroot"
+ENV MUSL_PREFIX="/usr"
+
+# may need -Wl,--sysroot=/sysroot
+# may need -Wl,--dynamic-linker=/lib/libc.so
+# may need to play around with -Wl,--allow-shlib-undefined to allow __eh_* undefs
+ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld"
+# may require -D__linux__
+ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -iwithsysroot /usr/include"
+ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
+
+WORKDIR /bootstrap/llvmorg
+
+# might need LDFLAGS="-Wl,--exclude-libs,libssp_nonshared.a"
+# also might need -DCMAKE_C_FLAGS="-fno-stack-protector" -DCMAKE_CXX_FLAGS="-fno-stack-protector"
+# also might need -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE
+# may want unused -DLIBUNWIND_HAS_MUSL_LIBC=ON and -DLIBUNWIND_HAS_C_LIB=ON
+# may want unused -DLIBUNWIND_TARGET_TRIPLE=${TARGET_TRIPLE}
 
 # and again for shared lib (but use clang++ for first pass)
 RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
@@ -498,7 +581,6 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DCMAKE_CXX_FLAGS="${CXXFLAGS} -v -Qunused-arguments -Wl,--verbose" \
     -DLIBUNWIND_HAS_DL_LIB=OFF \
     -DLIBUNWIND_IS_BAREMETAL=ON \
-    -DLIBUNWIND_ENABLE_STATIC=OFF \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
@@ -513,23 +595,16 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
 
 
 # check on the lib
-RUN printf "%s\n" "Bootstrapped Libs:" && \
+RUN printf "%s\n" "Bootstrapped Libs (dynamic):" && \
     ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true ; \
     printf "%s\n" "Bootstrapped Headers:" && \
     ls -lapr ${SYSROOT}/usr/include/ || true
 
+# bring in the staged files from static
+COPY --from=build-unwind-static /stage-static /stage
 # move the changed files out to stage
 
-RUN mkdir -pv /stage/usr/include/mach-o && mkdir -pv /stage/usr/lib && \
-    for UNWIND_FILE_ARTIFACT in usr/include/__libunwind_config.h \
-        usr/include/libunwind.h \
-        usr/include/libunwind.modulemap \
-        usr/include/mach-o/compact_unwind_encoding.h \
-        usr/include/unwind_arm_ehabi.h \
-        usr/include/unwind_itanium.h \
-        usr/include/unwind.h \
-        usr/lib/libunwind.a \
-        usr/lib/libunwind.so.1.0 ; do \
+RUN for UNWIND_FILE_ARTIFACT in usr/lib/libunwind.so.1.0 ; do \
           cp -vn ${SYSROOT}/${UNWIND_FILE_ARTIFACT} /stage/${UNWIND_FILE_ARTIFACT} || true ; \
     done ; \
     if [ -f usr/lib/libunwind.so.1.0 ] ; then \
