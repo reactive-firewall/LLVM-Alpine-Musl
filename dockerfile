@@ -666,7 +666,7 @@ ENV MUSL_PREFIX="/usr"
 # may need -Wl,--sysroot=/sysroot
 # may need -Wl,--dynamic-linker=/lib/libc.so
 # may want linker flag -Wl,--nostdlib to prevent linking to any std c++
-ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld -unwindlib=libunwind -Wl,-lunwind"
+ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld -unwindlib=libunwind"
 # may require -D__linux__
 ENV CFLAGS="-v -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT} -iwithsysroot /usr/include"
 # might need -nostdinc++
