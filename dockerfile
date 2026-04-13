@@ -666,10 +666,11 @@ ENV MUSL_PREFIX="/usr"
 # may need -Wl,--sysroot=/sysroot
 # may need -Wl,--dynamic-linker=/lib/libc.so
 # may want linker flag -Wl,--nostdlib to prevent linking to any std c++
-ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld -unwindlib=libunwind"
+ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld -unwindlib=libunwind -Wl,-lunwind"
 # may require -D__linux__
-ENV CFLAGS="-v -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -iwithsysroot /usr/include"
-ENV CXXFLAGS="-nostdinc++ -rtlib=compiler-rt -fPIC -isysroot ${SYSROOT} -iwithsysroot /usr/include -iwithsysroot /usr/include/c++/v1 -Wp,-D_LIBCPP_ABI_VERSION=2 -Wp,-DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -unwindlib=libunwind -Wl,-lunwind"
+ENV CFLAGS="-v -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT} -iwithsysroot /usr/include"
+# might need -nostdinc++
+ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
@@ -731,14 +732,14 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 WORKDIR /bootstrap/llvmorg
 
 # Install libc++ headers into sysroot (headers only)
-RUN mkdir -p ${SYSROOT}/usr/include/c++/v1 && \
-    cp -vfr /bootstrap/llvmorg/libcxx/include/* ${SYSROOT}/usr/include/c++/v1/
+#RUN mkdir -p ${SYSROOT}/usr/include/c++/v1 && \
+#    cp -vfr /bootstrap/llvmorg/libcxx/include/* ${SYSROOT}/usr/include/c++/v1/
 
 # might cleanup with: find ${SYSROOT}/usr/include/c++/v1 -type f ! -name '*.h' -delete
 
 # WORKAROUND: cmake still thinks that clang++ requires g++
-RUN apk add --no-cache \
-    cmd:g++
+#RUN apk add --no-cache \
+#    cmd:g++
 # but we remove it anyway afterwards
 
 # might need -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm
@@ -772,27 +773,23 @@ RUN apk add --no-cache \
 # sysroot diff hint To see what will be set, inspect the built binary with: readelf -d <bin> | grep RUNPATH or objdump -x <bin> | grep RPATH
 # may need to play with -DCMAKE_INSTALL_RPATH="/lib;/usr/lib" -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON
 # may need to play with CXXFLAGS -withisysroot and cmake -DLIBCXXABI_LIBCXX_INCLUDES=${SYSROOT}/usr/include/c++/v1 stuff
+# may need to play with -DCLANG_DEFAULT_CXX_LIB=libc++
 
 # DEBUG Mark 2
 RUN printf "%s\n" "CMake Version: $(cmake --version)" && \
     printf "%s\n" "Clang-cpp Version: $(clang-cpp --version)" && \
-    printf "%s\n" "Clang++ Version: $(clang++ --version)" && \
     printf "%s\n" "Installed Libraries:" && \
     ls -1 ${SYSROOT}/usr/lib/ && ls -1 ${SYSROOT}/usr/lib/generic/ && \
     printf "\n"
 
-# Build minimal static libc++abi.a (install to sysroot)
-RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
+# Build minimal static libc++abi.so (install to sysroot)
+RUN cmake -S libcxxabi -B build-libcxxabi -Wno-dev -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
-    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg \
-    -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
-    -DClang_DIR=/bootstrap/llvmorg/clang \
     -DLLVM_ENABLE_RUNTIMES="libcxxabi" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang-cpp \
-    -DCLANG_DEFAULT_CXX_LIB=libc++ \
-    -DLIBUNWIND_HAS_MUSL_LIBC=ON \
+    -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
     -DCMAKE_SYSTEM_NAME=Generic \
     -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
     -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
@@ -803,15 +800,16 @@ RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
     -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
     -DCMAKE_CXX_FLAGS="${CXXFLAGS} -v -Qunused-arguments -Wl,--verbose" \
     -DLIBCXXABI_ENABLE_SHARED=ON \
-    -DLIBCXXABI_ENABLE_STATIC=ON \
+    -DLIBCXXABI_ENABLE_STATIC=OFF \
     -DLIBCXXABI_USE_COMPILER_RT=ON \
     -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
     -DLIBCXXABI_ENABLE_NEW_DELETE_DEFINITIONS=ON \
-    -DLIBCXXABI_USE_LLVM_UNWINDER=ON \
+    -DLIBCXXABI_HAS_GCC_S_LIB=NO \
+    -DLIBCXXABI_HAS_GCC_LIB=NO \
     -DLIBCXXABI_BAREMETAL=ON && \
-    cmake --build build-runtimes && \
-    cmake --install build-runtimes && \
-    rm -vfr /bootstrap/llvmorg/build-runtimes/
+    cmake --build build-libcxxabi && \
+    cmake --install build-libcxxabi && \
+    rm -vfr /bootstrap/llvmorg/build-libcxxabi/
 
 # Ensure we have the dynamic loader and libs present (sysroot paths)
 RUN ls -l ${SYSROOT}${MUSL_PREFIX}/lib || true \
