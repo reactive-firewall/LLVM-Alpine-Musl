@@ -665,7 +665,8 @@ ENV MUSL_PREFIX="/usr"
 
 # may need -Wl,--sysroot=/sysroot
 # may need -Wl,--dynamic-linker=/lib/libc.so
-ENV LDFLAGS="-Wl,--nostdlib -Wl,--sysroot=${SYSROOT} -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -lc -lm -fuse-ld=lld -rtlib=compiler-rt -unwindlib=libunwind"
+# may want linker flag -Wl,--nostdlib to prevent linking to any std c++
+ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld -unwindlib=libunwind"
 # may require -D__linux__
 ENV CFLAGS="-v -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -iwithsysroot /usr/include"
 ENV CXXFLAGS="-nostdinc++ -rtlib=compiler-rt -fPIC -isysroot ${SYSROOT} -iwithsysroot /usr/include -iwithsysroot /usr/include/c++/v1 -Wp,-D_LIBCPP_ABI_VERSION=2 -Wp,-DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -unwindlib=libunwind -Wl,-lunwind"
@@ -849,7 +850,7 @@ RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
     -DCMAKE_CXX_FLAGS="${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_CXX_COMPILER=clang-cpp \
     -DCMAKE_SYSTEM_NAME=Generic \
     -DCMAKE_LINKER=ld.lld && \
 	apk del --no-cache \
