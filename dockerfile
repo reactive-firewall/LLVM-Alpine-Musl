@@ -794,7 +794,7 @@ RUN cmake -S runtimes -B build-libcxxabi -Wno-dev -G "Ninja" \
     -DLLVM_ENABLE_RUNTIMES="libcxxabi" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang-cpp \
+    -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_LINKER=lld \
     -DCMAKE_SYSTEM_NAME=Generic \
     -DCMAKE_CXX_COMPILER_ID="Clang" \
