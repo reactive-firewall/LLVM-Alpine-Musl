@@ -816,7 +816,7 @@ RUN cmake -S runtimes -B build-libcxxabi -Wno-dev -G "Ninja" \
     apk del --no-cache \
         g++ \
         cmd:g++ && \
-    ls -lap /bootstrap/llvmorg/build-libunwind/ && \
+    ls -lap /bootstrap/llvmorg/build-libcxxabi/ && \
     cmake --build build-libcxxabi && \
     cmake --install build-libcxxabi && \
     rm -vfr /bootstrap/llvmorg/build-libcxxabi/
