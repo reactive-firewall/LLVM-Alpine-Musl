@@ -818,7 +818,7 @@ RUN cmake -S runtimes -B build-libcxxabi -Wno-dev -G "Ninja" \
         g++ \
         cmd:g++ && \
     ls -lap /bootstrap/llvmorg/build-libcxxabi/ && \
-    ninja -t targets all && \
+    cd /bootstrap/llvmorg/build-libcxxabi/ && ninja -t targets all && cd /bootstrap/llvmorg && \
     cmake --build build-libcxxabi --target libcxxabi && \
     cmake --install build-libcxxabi && \
     rm -vfr /bootstrap/llvmorg/build-libcxxabi/
@@ -863,7 +863,7 @@ RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
     -DCMAKE_CXX_COMPILER=clang-cpp \
     -DCMAKE_SYSTEM_NAME=Generic \
     -DCMAKE_LINKER=ld.lld && \
-	apk del --no-cache \
+    apk del --no-cache \
         g++ \
         cmd:g++ && \
     cmake --build build-runtimes && \
