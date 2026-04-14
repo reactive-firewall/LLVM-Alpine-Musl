@@ -667,7 +667,7 @@ ENV MUSL_PREFIX="/usr"
 # may need -Wl,--dynamic-linker=/lib/libc.so
 # may want linker flag -Wl,--nostdlib to prevent linking to any std c++
 ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld -unwindlib=libunwind"
-# may require -D__linux__
+# may require -D__ELF__
 ENV CFLAGS="-v -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT} -iwithsysroot /usr/include"
 # might need -nostdinc++
 ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
@@ -775,6 +775,8 @@ WORKDIR /bootstrap/llvmorg
 # may need to play with CXXFLAGS -withisysroot and cmake -DLIBCXXABI_LIBCXX_INCLUDES=${SYSROOT}/usr/include/c++/v1 stuff
 # may need to play with -DCLANG_DEFAULT_CXX_LIB=libc++
 
+# might want unused -DLIBCXXABI_HAS_GCC_LIB=NO
+
 # DEBUG Mark 2
 RUN printf "%s\n" "CMake Version: $(cmake --version)" && \
     printf "%s\n" "Clang-cpp Version: $(clang-cpp --version)" && \
@@ -804,14 +806,15 @@ RUN cmake -S runtimes -B build-libcxxabi -Wno-dev -G "Ninja" \
     -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
     -DCMAKE_CXX_FLAGS="${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
     -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
-    -DLIBCXXABI_ENABLE_STATIC=OFF \
     -DLIBCXXABI_USE_COMPILER_RT=ON \
     -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
     -DLIBCXXABI_ENABLE_NEW_DELETE_DEFINITIONS=ON \
-    -DLIBCXXABI_HAS_GCC_LIB=NO \
     -DLIBCXXABI_HAS_GCC_S_LIB=NO \
     -DLIBCXXABI_BAREMETAL=ON \
     -DLIBCXXABI_ENABLE_SHARED=ON && \
+    apk del --no-cache \
+        g++ \
+        cmd:g++ && \
     cmake --build build-libcxxabi && \
     cmake --install build-libcxxabi && \
     rm -vfr /bootstrap/llvmorg/build-libcxxabi/
