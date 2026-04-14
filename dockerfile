@@ -227,6 +227,7 @@ COPY --from=fetcher /fetch/musl /build/musl
 # copy llvm sources (for compiler_rt)
 COPY --from=fetcher /fetch/llvmorg /build/llvm
 
+# MAY want -D_POSIX_C_SOURCE=202405L for v1.2.6 (TODO: review)
 # musl should be given these values too
 ENV CFLAGS="-D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700"
 
@@ -268,7 +269,7 @@ RUN set -eux \
 # --- Precompile CC Stage0: prepare musl sysroot with clang builtins for TARGET_TRIPLE ---
 RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
       -DCMAKE_INSTALL_PREFIX="${SYSROOT}${MUSL_PREFIX}" \
-      -DLLVM_CMAKE_DIR=/build/llvm \
+      -DLLVM_CMAKE_DIR=/build/llvm/cmake/modules \
       -DLLVM_MAIN_SRC_DIR=/build/llvm/llvm \
       -DCOMPILER_RT_BUILD_BUILTINS=ON \
       -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
@@ -348,6 +349,7 @@ RUN ls -l ${SYSROOT}${MUSL_PREFIX}/lib || true && \
 RUN ls -l ${SYSROOT}${MUSL_PREFIX}/include || true && \
     file ${SYSROOT}${MUSL_PREFIX}/include/* || true
 
+# purge transient packages
 RUN set -eux \
     && apk del --no-cache \
         cmd:clang++ \
@@ -411,13 +413,19 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:grep \
     pkgconfig \
     cmd:clang-cpp \
-    cmd:clang++ \
     cmd:llvm-strip \
-    cmd:find \
-    cmd:g++
+    cmd:find
 
 #    cmd:llvm-otool \
 #    cmd:llvm-nm
+
+# WORKAROUND: cmake still thinks that clang++ requires g++
+RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
+  apk update && \
+  apk add --no-cache \
+    cmd:clang++ \
+    cmd:g++
+# but we remove it anyway afterwards
 
 # --- unwind-base: bootstrap unwind using distro clang/llvm to compile a minimal unwind library ---
 FROM --platform="linux/${TARGETARCH}" build-unwind-base AS build-unwind-static
@@ -448,26 +456,22 @@ ENV LD=lld
 ENV SYSROOT="/sysroot"
 ENV MUSL_PREFIX="/usr"
 
-# may need -Wl,--sysroot=/sysroot
-# may need -Wl,--dynamic-linker=/lib/libc.so
-# may need to play around with -Wl,--allow-shlib-undefined to allow __eh_* undefs
-ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld -rtlib=compiler-rt"
+# may need -Wl,--sysroot=/sysroot OR -Wl,--dynamic-linker=/lib/libc.so
+# may want to play around with -Wl,--allow-shlib-undefined to allow __eh_* undefs (see ehframe.ld)
+ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/sysroot/lib/${MUSL_LDLIB} -fuse-ld=lld -unwindlib=none"
 # may require -D__linux__
-ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -iwithsysroot /usr/include"
-ENV CXXFLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
+ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include"
+ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
 
 WORKDIR /bootstrap/llvmorg
 
 # might need LDFLAGS="-Wl,--exclude-libs,libssp_nonshared.a"
 # also might need -DCMAKE_C_FLAGS="-fno-stack-protector" -DCMAKE_CXX_FLAGS="-fno-stack-protector"
-# also might need -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE
-# may want unused -DLIBUNWIND_HAS_MUSL_LIBC=ON and -DLIBUNWIND_HAS_C_LIB=ON
-# may want unused -DLIBUNWIND_TARGET_TRIPLE=${TARGET_TRIPLE}
 
 # Build minimal llvm libunwind (install to sysroot)
 RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
-    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg \
+    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm/cmake/modules \
     -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
     -DClang_DIR=/bootstrap/llvmorg/clang \
     -DLLVM_ENABLE_RUNTIMES="libunwind" \
@@ -537,6 +541,7 @@ ARG HOST_TRIPLE
 ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
 
 ENV CC=clang
+ENV CPP=clang-cpp
 ENV CXX=clang++
 ENV AR=llvm-ar
 ENV AS="clang -integrated-as -c"
@@ -547,10 +552,10 @@ ENV LD=lld
 ENV SYSROOT="/sysroot"
 ENV MUSL_PREFIX="/usr"
 
-# may need -Wl,--sysroot=/sysroot
-# may need -Wl,--dynamic-linker=/lib/libc.so
+# may need -Wl,--sysroot=/sysroot OR -Wl,--dynamic-linker=/lib/libc.so
 # may need to play around with -Wl,--allow-shlib-undefined to allow __eh_* undefs
-ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld -Wl,-T,/bootstrap/ehframe.ld"
+# may want -unwindlib=none when building libunwind
+ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/sysroot/lib/${MUSL_LDLIB} -fuse-ld=lld -Wl,-T,/bootstrap/ehframe.ld"
 # may require -D__linux__
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -iwithsysroot /usr/include"
 ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
@@ -560,18 +565,10 @@ WORKDIR /bootstrap/llvmorg
 # might need LDFLAGS="-Wl,--exclude-libs,libssp_nonshared.a"
 # also might need -DCMAKE_C_FLAGS="-fno-stack-protector" -DCMAKE_CXX_FLAGS="-fno-stack-protector"
 
-#DEBUG find __eh_* defs in host root
-RUN printf "%s\n" "select headers (host):" && \
-    find /usr/include -type f -name "*.h*" -exec grep -HF "__eh_frame_start" {} + || true; \
-    printf "%s\n" "select headers (sysroot):" && \
-    find ${SYSROOT}/usr/include -type f -name "*.h*" -exec grep -HF "__eh_frame_start" {} + || true; \
-    printf "%s\n" "select headers (libunwind src):" && \
-    find ./libunwind -type f -name "*.h*" -exec grep -HF "__eh_frame_start" {} + || true;
-
 # and again for shared lib (but use clang++ for first pass)
 RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
-    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg \
+    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm/cmake/modules \
     -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
     -DClang_DIR=/bootstrap/llvmorg/clang \
     -DLLVM_ENABLE_RUNTIMES="libunwind" \
@@ -666,11 +663,11 @@ ENV MUSL_PREFIX="/usr"
 # may need -Wl,--sysroot=/sysroot
 # may need -Wl,--dynamic-linker=/lib/libc.so
 # may want linker flag -Wl,--nostdlib to prevent linking to any std c++
-ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/usr/lib -Wl,-L,/lib -Wl,-L,/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} -fuse-ld=lld -unwindlib=libunwind"
+ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/sysroot/lib/${MUSL_LDLIB} -fuse-ld=lld"
 # may require -D__ELF__
 ENV CFLAGS="-v -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT} -iwithsysroot /usr/include"
 # might need -nostdinc++
-ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
+ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
@@ -742,18 +739,18 @@ WORKDIR /bootstrap/llvmorg
 #    cmd:g++
 # but we remove it anyway afterwards
 
-# might need -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm
-# might need -DLIBCXX_HAS_ATOMIC_LIB=OFF ??
-# might need -DLIBCXXABI_HAS_CXA_THREAD_ATEXIT_IMPL=false
-# might need -DLIBCXX_HAS_RT_LIB=ON
-# might need -DLLVM_ENABLE_ZSTD=OFF
-# might need -DLLVM_ENABLE_ZLIB=OFF
-# might need -DLIBCXXABI_HAS_PTHREAD_API=ON
 # might want -DLIBCXX_ENABLE_THREADS=ON
-# might need -DLIBCXXABI_ENABLE_THREADS=ON
-# might need -DLIBCXXABI_HAS_PTHREAD_LIB=ON
 # might want -DLIBCXX_HAS_PTHREAD_LIB=ON
 # might want -DLLVM_RUNTIME_TARGETS="${TARGET_TRIPLE}"
+# might need -DLIBCXX_HAS_ATOMIC_LIB=OFF ??
+# might need -DLIBCXX_HAS_RT_LIB=ON
+# might need -DLIBCXXABI_ENABLE_THREADS=ON
+# might need -DLIBCXXABI_HAS_CXA_THREAD_ATEXIT_IMPL=false
+# might need -DLIBCXXABI_HAS_PTHREAD_API=ON
+# might need -DLIBCXXABI_HAS_PTHREAD_LIB=ON
+# might need -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm
+# might need -DLLVM_ENABLE_ZLIB=OFF
+# might need -DLLVM_ENABLE_ZSTD=OFF
 
 # might want unused -DLIBCXXABI_TARGET_TRIPLE=${TARGET_TRIPLE}
 # might want unused -DLIBCXX_TARGET_TRIPLE=${TARGET_TRIPLE}
@@ -787,7 +784,7 @@ RUN printf "%s\n" "CMake Version: $(cmake --version)" && \
 # Build minimal static libc++abi.so (install to sysroot)
 RUN cmake -S runtimes -B build-libcxxabi -Wno-dev -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
-    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg \
+    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm/cmake/modules \
     -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
     -DClang_DIR=/bootstrap/llvmorg/clang \
     -DLLVM_ENABLE_RUNTIMES="libcxxabi" \
@@ -815,8 +812,8 @@ RUN cmake -S runtimes -B build-libcxxabi -Wno-dev -G "Ninja" \
     apk del --no-cache \
         g++ \
         cmd:g++ && \
-    cmake --build build-libcxxabi && \
-    cmake --install build-libcxxabi && \
+    cmake --build build-libcxxabi cxxabi && \
+    cmake --install build-libcxxabi cxxabi && \
     rm -vfr /bootstrap/llvmorg/build-libcxxabi/
 
 # Ensure we have the dynamic loader and libs present (sysroot paths)
@@ -830,7 +827,7 @@ RUN ls -l ${SYSROOT}/usr/include || true \
 # Build minimal static libc++.a (install to sysroot)
 RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
-    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg \
+    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm/cmake/modules \
     -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
     -DClang_DIR=/bootstrap/llvmorg/clang \
     -DLLVM_ENABLE_RUNTIMES="libcxx" \
