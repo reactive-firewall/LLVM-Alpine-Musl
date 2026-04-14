@@ -785,12 +785,16 @@ RUN printf "%s\n" "CMake Version: $(cmake --version)" && \
 # Build minimal static libc++abi.so (install to sysroot)
 RUN cmake -S runtimes -B build-libcxxabi -Wno-dev -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
+    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg \
+    -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
+    -DClang_DIR=/bootstrap/llvmorg/clang \
     -DLLVM_ENABLE_RUNTIMES="libcxxabi" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang-cpp \
     -DCMAKE_LINKER=lld \
     -DCMAKE_SYSTEM_NAME=Generic \
+    -DCMAKE_CXX_COMPILER_ID="Clang" \
     -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
     -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
     -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
@@ -804,8 +808,8 @@ RUN cmake -S runtimes -B build-libcxxabi -Wno-dev -G "Ninja" \
     -DLIBCXXABI_USE_COMPILER_RT=ON \
     -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
     -DLIBCXXABI_ENABLE_NEW_DELETE_DEFINITIONS=ON \
-    -DLIBCXXABI_HAS_GCC_S_LIB=NO \
     -DLIBCXXABI_HAS_GCC_LIB=NO \
+    -DLIBCXXABI_HAS_GCC_S_LIB=NO \
     -DLIBCXXABI_BAREMETAL=ON \
     -DLIBCXXABI_ENABLE_SHARED=ON && \
     cmake --build build-libcxxabi && \
