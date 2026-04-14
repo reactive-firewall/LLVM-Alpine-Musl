@@ -667,9 +667,9 @@ ENV MUSL_PREFIX="/usr"
 # may need -Wl,--sysroot=/sysroot
 # may need -Wl,--dynamic-linker=/lib/libc.so
 # may want linker flag -Wl,--nostdlib to prevent linking to any std c++
-ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/sysroot/lib/${MUSL_LDLIB} -fuse-ld=lld"
+ENV LDFLAGS="-v -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/sysroot/lib/${MUSL_LDLIB} -fuse-ld=lld"
 # may require -D__ELF__
-ENV CFLAGS="-v -rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT} -iwithsysroot /usr/include"
+ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT} -iwithsysroot /usr/include"
 # might need -nostdinc++
 ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
 
@@ -812,6 +812,7 @@ RUN cmake -S runtimes -B build-libcxxabi -Wno-dev -G "Ninja" \
     -DLIBCXXABI_ENABLE_NEW_DELETE_DEFINITIONS=ON \
     -DLIBCXXABI_HAS_GCC_S_LIB=NO \
     -DLIBCXXABI_BAREMETAL=ON \
+    -DLIBCXXABI_ENABLE_STATIC=OFF \
     -DLIBCXXABI_ENABLE_SHARED=ON && \
     apk del --no-cache \
         g++ \
