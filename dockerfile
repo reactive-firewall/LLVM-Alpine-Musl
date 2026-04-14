@@ -170,6 +170,10 @@ RUN set -eux \
 
 WORKDIR /staging
 
+# IMPORTANT:
+# carefully craft symlinks to only look deeper, build tools like ninja don't resolve symlinks well
+# see https://github.com/ninja-build/ninja/issues/1330
+
 RUN mkdir -pv ${MUSL_PREFIX} && \
     mkdir -pv "${SYSROOT}"/dev && \
     mkdir -pv "${SYSROOT}"/proc && \
@@ -812,8 +816,9 @@ RUN cmake -S runtimes -B build-libcxxabi -Wno-dev -G "Ninja" \
     apk del --no-cache \
         g++ \
         cmd:g++ && \
-    cmake --build build-libcxxabi cxxabi && \
-    cmake --install build-libcxxabi cxxabi && \
+    ls -lap /bootstrap/llvmorg/build-libunwind/ && \
+    cmake --build build-libcxxabi && \
+    cmake --install build-libcxxabi && \
     rm -vfr /bootstrap/llvmorg/build-libcxxabi/
 
 # Ensure we have the dynamic loader and libs present (sysroot paths)
