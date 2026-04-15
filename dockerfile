@@ -773,7 +773,6 @@ WORKDIR /bootstrap/llvmorg
 # might want -fdebug-prefix-map=/include=${SYSROOT}/usr/include
 # sysroot diff hint To see what will be set, inspect the built binary with: readelf -d <bin> | grep RUNPATH or objdump -x <bin> | grep RPATH
 # may need to play with -DCMAKE_INSTALL_RPATH="/lib;/usr/lib" -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON
-# may need to play with CXXFLAGS -withisysroot and cmake -DLIBCXXABI_LIBCXX_INCLUDES=${SYSROOT}/usr/include/c++/v1 stuff
 # may need to play with -DCLANG_DEFAULT_CXX_LIB=libc++
 # may need to play with -DLIBCXXABI_ENABLE_NEW_DELETE_DEFINITIONS=ON
 
@@ -814,7 +813,7 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -Wno-dev -G "Ninja" \
     -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
     -DLIBCXXABI_HAS_GCC_S_LIB=NO \
     -DLIBCXXABI_BAREMETAL=ON \
-    -DLIBCXXABI_SHARED_OUTPUT_NAME="c++abi"
+    -DLIBCXXABI_SHARED_OUTPUT_NAME="c++abi" \
     -DLIBCXXABI_ENABLE_SHARED=ON && \
     apk del --no-cache \
         g++ \
