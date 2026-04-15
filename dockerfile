@@ -777,6 +777,7 @@ WORKDIR /bootstrap/llvmorg
 # may need to play with -DCMAKE_INSTALL_RPATH="/lib;/usr/lib" -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON
 # may need to play with -DCLANG_DEFAULT_CXX_LIB=libc++
 # may need to play with -DLIBCXXABI_ENABLE_NEW_DELETE_DEFINITIONS=ON
+# may want to play with -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON
 
 # might want unused -DLIBCXXABI_HAS_GCC_LIB=NO
 
@@ -806,7 +807,6 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -Wno-dev -G "Ninja" \
     -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
-    -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON \
     -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
     -DCMAKE_CXX_FLAGS="${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
     -DLIBCXXABI_SOURCE_DIR=/bootstrap/llvmorg/libcxxabi \
