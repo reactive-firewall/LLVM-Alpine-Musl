@@ -775,6 +775,7 @@ WORKDIR /bootstrap/llvmorg
 # may need to play with -DCMAKE_INSTALL_RPATH="/lib;/usr/lib" -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON
 # may need to play with CXXFLAGS -withisysroot and cmake -DLIBCXXABI_LIBCXX_INCLUDES=${SYSROOT}/usr/include/c++/v1 stuff
 # may need to play with -DCLANG_DEFAULT_CXX_LIB=libc++
+# may need to play with -DLIBCXXABI_ENABLE_NEW_DELETE_DEFINITIONS=ON
 
 # might want unused -DLIBCXXABI_HAS_GCC_LIB=NO
 
@@ -811,17 +812,18 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -Wno-dev -G "Ninja" \
     -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
     -DLIBCXXABI_USE_COMPILER_RT=ON \
     -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
-    -DLIBCXXABI_ENABLE_NEW_DELETE_DEFINITIONS=ON \
     -DLIBCXXABI_HAS_GCC_S_LIB=NO \
     -DLIBCXXABI_BAREMETAL=ON \
-    -DLIBCXXABI_ENABLE_STATIC=OFF \
+    -DLIBCXXABI_SHARED_OUTPUT_NAME="c++abi"
     -DLIBCXXABI_ENABLE_SHARED=ON && \
     apk del --no-cache \
         g++ \
         cmd:g++ && \
-    ls -lapr /bootstrap/llvmorg/build-libcxxabi-shared/ && \
+    ls -lapr /bootstrap/llvmorg/build-libcxxabi-shared && \
     printf "\n\n%s\n" "cat build.ninja MARK:" && \
+    printf "\n::group::%s\n" "build.ninja" && \
     cat /bootstrap/llvmorg/build-libcxxabi-shared/build.ninja && \
+    printf "\n::endgroup::\n" && \
     printf "\n\n%s\n" "CMake --build build-libcxxabi-shared MARK:" && \
     cmake --build build-libcxxabi-shared && \
     cmake --install build-libcxxabi-shared && \
