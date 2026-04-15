@@ -796,11 +796,7 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -Wno-dev -G "Ninja" \
     -DClang_DIR=/bootstrap/llvmorg/clang \
     -DLLVM_ENABLE_RUNTIMES="libcxxabi" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang-cpp \
-    -DCMAKE_LINKER=lld \
     -DCMAKE_SYSTEM_NAME=Generic \
-    -DCMAKE_CXX_COMPILER_ID="Clang" \
     -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
     -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
     -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
@@ -809,19 +805,24 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -Wno-dev -G "Ninja" \
     -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
     -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
     -DCMAKE_CXX_FLAGS="${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
-    -DLIBCXXABI_SOURCE_DIR=/bootstrap/llvmorg/libcxxabi \
-    -DLIBCXXABI_LIBCXX_PATH=/bootstrap/llvmorg/libcxx \
+    -DLIBCXXABI_SOURCE_DIR="/bootstrap/llvmorg/libcxxabi" \
+    -DLIBCXXABI_LIBCXX_PATH="/bootstrap/llvmorg/libcxx" \
+    -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
     -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
     -DLIBCXXABI_USE_COMPILER_RT=ON \
-    -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
+    -DLIBCXXABI_ENABLE_THREADS=ON \
+    -DLIBCXXABI_HAS_PTHREAD_LIB=ON \
     -DLIBCXXABI_HAS_GCC_S_LIB=NO \
     -DLIBCXXABI_BAREMETAL=ON \
-    -DLIBCXXABI_SHARED_OUTPUT_NAME="c++abi" \
-    -DLIBCXXABI_ENABLE_SHARED=ON && \
+    -DLIBCXXABI_ENABLE_SHARED=ON \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang-cpp \
+    -DCMAKE_CXX_COMPILER_ID="Clang" \
+    -DCMAKE_LINKER=lld && \
     apk del --no-cache \
         g++ \
         cmd:g++ && \
-    ls -lapr /bootstrap/llvmorg/build-libcxxabi-shared && \
+    ls -lap -r /bootstrap/llvmorg/build-libcxxabi-shared && \
     /usr/local/bin/fix_ninja.sh "/bootstrap/llvmorg/build-libcxxabi-shared" && \
     printf "\n\n%s\n" "cat build.ninja MARK:" && \
     printf "\n%s SOF\n" "build.ninja" && \
