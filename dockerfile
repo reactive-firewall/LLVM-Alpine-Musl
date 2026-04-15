@@ -632,6 +632,9 @@ COPY --from=fetcher /fetch/llvmorg /bootstrap/llvmorg
 COPY --from=sysroot /sysroot /sysroot
 COPY --from=build-unwind /stage /stage
 
+# copy the script into the image
+COPY fix_ninja.sh /usr/local/bin/fix_ninja.sh
+
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
 
@@ -721,6 +724,8 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     python3 \
     samurai \
     cmd:grep \
+    cmd:sed \
+    cmd:awk \
     pkgconfig \
     cmd:clang-cpp \
     cmd:clang++ \
@@ -730,13 +735,10 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 #    cmd:llvm-nm \
 #    cmd:llvm-strip
 
+# ensure script is usable
+RUN chmod +x /usr/local/bin/fix_ninja.sh
+
 WORKDIR /bootstrap/llvmorg
-
-# Install libc++ headers into sysroot (headers only)
-#RUN mkdir -p ${SYSROOT}/usr/include/c++/v1 && \
-#    cp -vfr /bootstrap/llvmorg/libcxx/include/* ${SYSROOT}/usr/include/c++/v1/
-
-# might cleanup with: find ${SYSROOT}/usr/include/c++/v1 -type f ! -name '*.h' -delete
 
 # WORKAROUND: cmake still thinks that clang++ requires g++
 #RUN apk add --no-cache \
@@ -804,6 +806,7 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -Wno-dev -G "Ninja" \
     -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
+    -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON \
     -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
     -DCMAKE_CXX_FLAGS="${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
     -DLIBCXXABI_SOURCE_DIR=/bootstrap/llvmorg/libcxxabi \
@@ -819,10 +822,11 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -Wno-dev -G "Ninja" \
         g++ \
         cmd:g++ && \
     ls -lapr /bootstrap/llvmorg/build-libcxxabi-shared && \
+    /usr/local/bin/fix_ninja.sh "/bootstrap/llvmorg/build-libcxxabi-shared" && \
     printf "\n\n%s\n" "cat build.ninja MARK:" && \
-    printf "\n::group::%s\n" "build.ninja" && \
+    printf "\n%s SOF\n" "build.ninja" && \
     cat /bootstrap/llvmorg/build-libcxxabi-shared/build.ninja && \
-    printf "\n::endgroup::\n" && \
+    printf "\nEOF\n" && \
     printf "\n\n%s\n" "CMake --build build-libcxxabi-shared MARK:" && \
     cmake --build build-libcxxabi-shared && \
     cmake --install build-libcxxabi-shared && \
