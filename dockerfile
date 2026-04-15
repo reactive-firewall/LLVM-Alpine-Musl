@@ -786,7 +786,7 @@ RUN printf "%s\n" "CMake Version: $(cmake --version)" && \
     printf "\n"
 
 # Build minimal static libc++abi.so (install to sysroot)
-RUN cmake -S runtimes -B build-libcxxabi -Wno-dev -G "Ninja" \
+RUN cmake -S runtimes -B build-libcxxabi-shared -Wno-dev -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
     -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm/cmake/modules \
     -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
@@ -819,10 +819,13 @@ RUN cmake -S runtimes -B build-libcxxabi -Wno-dev -G "Ninja" \
     apk del --no-cache \
         g++ \
         cmd:g++ && \
-    ls -lap /bootstrap/llvmorg/build-libcxxabi/ && \
-    cmake --build build-libcxxabi --target cxxabi && \
-    cmake --install build-libcxxabi --target install-cxxabi && \
-    rm -vfr /bootstrap/llvmorg/build-libcxxabi/
+    ls -lapr /bootstrap/llvmorg/build-libcxxabi-shared/ && \
+    printf "\n\n%s\n" "cat build.ninja MARK:" && \
+    cat /bootstrap/llvmorg/build-libcxxabi-shared/build.ninja && \
+    printf "\n\n%s\n" "CMake --build build-libcxxabi-shared MARK:" && \
+    cmake --build build-libcxxabi-shared && \
+    cmake --install build-libcxxabi-shared && \
+    rm -vfr /bootstrap/llvmorg/build-libcxxabi-shared/
 
 # Ensure we have the dynamic loader and libs present (sysroot paths)
 RUN ls -l ${SYSROOT}${MUSL_PREFIX}/lib || true \
