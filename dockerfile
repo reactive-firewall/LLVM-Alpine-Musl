@@ -806,6 +806,8 @@ RUN cmake -S runtimes -B build-libcxxabi -Wno-dev -G "Ninja" \
     -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
     -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
     -DCMAKE_CXX_FLAGS="${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
+    -DLIBCXXABI_SOURCE_DIR=/bootstrap/llvmorg/libcxxabi \
+    -DLIBCXXABI_LIBCXX_PATH=/bootstrap/llvmorg/libcxx \
     -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
     -DLIBCXXABI_USE_COMPILER_RT=ON \
     -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
@@ -818,9 +820,8 @@ RUN cmake -S runtimes -B build-libcxxabi -Wno-dev -G "Ninja" \
         g++ \
         cmd:g++ && \
     ls -lap /bootstrap/llvmorg/build-libcxxabi/ && \
-    cd /bootstrap/llvmorg/build-libcxxabi/ && ninja -t targets all && cd /bootstrap/llvmorg && \
-    cmake --build build-libcxxabi --target libcxxabi && \
-    cmake --install build-libcxxabi && \
+    cmake --build build-libcxxabi --target cxxabi && \
+    cmake --install build-libcxxabi --target install-cxxabi && \
     rm -vfr /bootstrap/llvmorg/build-libcxxabi/
 
 # Ensure we have the dynamic loader and libs present (sysroot paths)
