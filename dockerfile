@@ -771,9 +771,12 @@ WORKDIR /bootstrap/llvmorg
 
 # might want unused -DLIBCXXABI_HAS_GCC_LIB=NO
 
+# prob need -DCMAKE_CXX_COMPILER_ID="Clang"
+
 # DEBUG Mark 2
 RUN printf "%s\n" "CMake Version: $(cmake --version)" && \
     printf "%s\n" "Clang-cpp Version: $(clang-cpp --version)" && \
+    printf "%s\n" "Clang-cpp Version: $(clang++ --version)" && \
     printf "%s\n" "Installed Libraries:" && \
     ls -1 ${SYSROOT}/usr/lib/ && ls -1 ${SYSROOT}/usr/lib/generic/ && \
     printf "\n"
@@ -806,8 +809,7 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -Wno-dev -G "Ninja" \
     -DLIBCXXABI_HAS_GCC_S_LIB=NO \
     -DLIBCXXABI_ENABLE_SHARED=ON \
     -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang-cpp \
-    -DCMAKE_CXX_COMPILER_ID="Clang" \
+    -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_LINKER=lld && \
     apk del --no-cache \
         g++ \
