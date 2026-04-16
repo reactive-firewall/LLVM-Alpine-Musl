@@ -632,9 +632,6 @@ COPY --from=fetcher /fetch/llvmorg /bootstrap/llvmorg
 COPY --from=sysroot /sysroot /sysroot
 COPY --from=build-unwind /stage /stage
 
-# copy the script into the image
-COPY fix_ninja.sh /usr/local/bin/fix_ninja.sh
-
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
 
@@ -716,16 +713,12 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:clang \
     llvm \
     lld \
-    libc++ \
-    libc++-dev \
     compiler-rt \
     cmd:llvm-ar \
     cmake \
     python3 \
     samurai \
     cmd:grep \
-    cmd:sed \
-    cmd:awk \
     pkgconfig \
     cmd:clang-cpp \
     cmd:clang++ \
@@ -734,9 +727,6 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 #    cmd:llvm-otool \
 #    cmd:llvm-nm \
 #    cmd:llvm-strip
-
-# ensure script is usable
-RUN chmod +x /usr/local/bin/fix_ninja.sh
 
 WORKDIR /bootstrap/llvmorg
 
@@ -757,6 +747,9 @@ WORKDIR /bootstrap/llvmorg
 # might need -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm
 # might need -DLLVM_ENABLE_ZLIB=OFF
 # might need -DLLVM_ENABLE_ZSTD=OFF
+# might need to play with -DCLANG_DEFAULT_CXX_LIB=libc++
+# might need to play with -DLIBCXXABI_ENABLE_NEW_DELETE_DEFINITIONS=ON
+# might want to play with -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON
 
 # might want unused -DLIBCXXABI_TARGET_TRIPLE=${TARGET_TRIPLE}
 # might want unused -DLIBCXX_TARGET_TRIPLE=${TARGET_TRIPLE}
@@ -770,16 +763,16 @@ WORKDIR /bootstrap/llvmorg
 # might want -DLLVM_CONFIG_PATH=/usr/bin/llvm-config  (but need mocking implementation for sysroot)
 
 # does not use manually added -DLLVM_LIBCXXABI_LIBRARY_PATH="${SYSROOT}/usr/lib"
-
+# does not use manually added -DLIBCXXABI_HAS_GCC_LIB=NO
+# might not use manually added -DLIBCXXABI_ENABLE_SHARED=ON (always seems to build static?)
 
 # might want -fdebug-prefix-map=/include=${SYSROOT}/usr/include
 # sysroot diff hint To see what will be set, inspect the built binary with: readelf -d <bin> | grep RUNPATH or objdump -x <bin> | grep RPATH
-# may need to play with -DCMAKE_INSTALL_RPATH="/lib;/usr/lib" -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON
-# may need to play with -DCLANG_DEFAULT_CXX_LIB=libc++
-# may need to play with -DLIBCXXABI_ENABLE_NEW_DELETE_DEFINITIONS=ON
-# may want to play with -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON
 
 # might want unused -DLIBCXXABI_HAS_GCC_LIB=NO
+
+# will want -DCMAKE_CXX_COMPILER=clang-cpp \
+# -DCMAKE_CXX_COMPILER_ID="Clang" \
 
 # DEBUG Mark 2
 RUN printf "%s\n" "CMake Version: $(cmake --version)" && \
@@ -817,13 +810,11 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -Wno-dev -G "Ninja" \
     -DLIBCXXABI_ENABLE_SHARED=ON \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang-cpp \
-    -DCMAKE_CXX_COMPILER_ID="Clang" \
     -DCMAKE_LINKER=lld && \
     apk del --no-cache \
         g++ \
         cmd:g++ && \
     ls -lap -r /bootstrap/llvmorg/build-libcxxabi-shared && \
-    /usr/local/bin/fix_ninja.sh "/bootstrap/llvmorg/build-libcxxabi-shared" && \
     printf "\n\n%s\n" "cat build.ninja MARK:" && \
     printf "\n%s SOF\n" "build.ninja" && \
     cat /bootstrap/llvmorg/build-libcxxabi-shared/build.ninja && \
@@ -835,87 +826,87 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -Wno-dev -G "Ninja" \
 
 # Ensure we have the dynamic loader and libs present (sysroot paths)
 RUN ls -l ${SYSROOT}${MUSL_PREFIX}/lib || true \
-    && file ${SYSROOT}/usr/lib/* || true
+    && file ${SYSROOT}${MUSL_PREFIX}/lib/* || true
 
 # Ensure we have the libc headers present (sysroot paths)
-RUN ls -l ${SYSROOT}/usr/include || true \
-    && file ${SYSROOT}/usr/include/* || true
+RUN ls -l ${SYSROOT}${MUSL_PREFIX}/include || true \
+    && file ${SYSROOT}${MUSL_PREFIX}/include/* || true
 
 # Build minimal static libc++.a (install to sysroot)
-RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
-    -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
-    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm/cmake/modules \
-    -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
-    -DClang_DIR=/bootstrap/llvmorg/clang \
-    -DLLVM_ENABLE_RUNTIMES="libcxx" \
-    -DLIBCXX_HAS_GCC_LIB=NO \
-    -DLIBCXX_HAS_GCC_S_LIB=NO \
-    -DLIBCXX_USE_COMPILER_RT=ON \
-    -DLIBCXX_ENABLE_SHARED=OFF \
-    -DLIBCXX_ENABLE_STATIC=ON \
-    -DLIBCXX_HAS_MUSL_LIBC=ON \
-    -DLIBCXX_INCLUDE_BENCHMARKS=OFF \
-    -DLIBCXX_HARDENING_MODE=extensive \
-    -DLIBCXX_ENABLE_STATIC_ABI_LIBRARY=ON \
-    -DLIBCXX_ABI_VERSION=1 \
-    -DLIBCXX_HERMETIC_STATIC_LIBRARY=ON \
-    -DLIBCXX_CXX_ABI=libcxxabi \
-    -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
-    -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
-    -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
-    -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
-    -DLLVM_DEFAULT_TARGET_TRIPLE=${HOST_TRIPLE} \
-    -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
-    -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-    -DCMAKE_CXX_FLAGS="${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang-cpp \
-    -DCMAKE_SYSTEM_NAME=Generic \
-    -DCMAKE_LINKER=ld.lld && \
-    apk del --no-cache \
-        g++ \
-        cmd:g++ && \
-    cmake --build build-runtimes && \
-    cmake --install build-runtimes && \
-    rm -vfr /bootstrap/llvmorg/build-runtimes/
+#RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
+#    -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
+#    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm/cmake/modules \
+#    -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
+#    -DClang_DIR=/bootstrap/llvmorg/clang \
+#    -DLLVM_ENABLE_RUNTIMES="libcxx" \
+#    -DLIBCXX_HAS_GCC_LIB=NO \
+#    -DLIBCXX_HAS_GCC_S_LIB=NO \
+#    -DLIBCXX_USE_COMPILER_RT=ON \
+#    -DLIBCXX_ENABLE_SHARED=OFF \
+#    -DLIBCXX_ENABLE_STATIC=ON \
+#    -DLIBCXX_HAS_MUSL_LIBC=ON \
+#    -DLIBCXX_INCLUDE_BENCHMARKS=OFF \
+#    -DLIBCXX_HARDENING_MODE=extensive \
+#    -DLIBCXX_ENABLE_STATIC_ABI_LIBRARY=ON \
+#    -DLIBCXX_ABI_VERSION=1 \
+#    -DLIBCXX_HERMETIC_STATIC_LIBRARY=ON \
+#    -DLIBCXX_CXX_ABI=libcxxabi \
+#    -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
+#    -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
+#    -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
+#    -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
+#    -DLLVM_DEFAULT_TARGET_TRIPLE=${HOST_TRIPLE} \
+#    -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
+#    -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
+#    -DCMAKE_CXX_FLAGS="${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
+#    -DCMAKE_BUILD_TYPE=Release \
+#    -DCMAKE_C_COMPILER=clang \
+#    -DCMAKE_CXX_COMPILER=clang-cpp \
+#    -DCMAKE_SYSTEM_NAME=Generic \
+#    -DCMAKE_LINKER=ld.lld && \
+#    apk del --no-cache \
+#        g++ \
+#        cmd:g++ && \
+#    cmake --build build-runtimes && \
+#    cmake --install build-runtimes && \
+#    rm -vfr /bootstrap/llvmorg/build-runtimes/
 
 # Ensure we have the dynamic loader and libs present (sysroot paths)
-RUN ls -l ${SYSROOT}${MUSL_PREFIX}/lib || true \
-    && file ${SYSROOT}/usr/lib/* || true
+#RUN ls -l ${SYSROOT}${MUSL_PREFIX}/lib || true \
+#    && file ${SYSROOT}/usr/lib/* || true
 
 # Ensure we have the libc headers present (sysroot paths)
-RUN ls -l ${SYSROOT}/usr/include || true \
-    && file ${SYSROOT}/usr/include/* || true
+#RUN ls -l ${SYSROOT}/usr/include || true \
+#    && file ${SYSROOT}/usr/include/* || true
 
 # Build minimal clang (install to stsroot)
-RUN cmake -S llvm -B build-llvm -G "Ninja" \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
-    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg \
-    -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
-    -DClang_DIR=/bootstrap/llvmorg/clang \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ \
-    -DCMAKE_SYSTEM_NAME=Linux \
-    -DCMAKE_SYSROOT="${SYSROOT}" \
-    -DLLVM_ENABLE_PROJECTS="clang;lld" \
-    -DTARGET_TRIPLE=${TARGET_TRIPLE} \
-    -DHOST_TRIPLE=${HOST_TRIPLE} \
-    -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
-    -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
-    -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
-    -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
-    -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} ${LDFLAGS}" \
-    -DCMAKE_CXX_FLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -Qunused-arguments -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} ${LDFLAGS}" \
-    -DLLVM_ENABLE_LIBCXX=true \
-    -DLLVM_ENABLE_ZSTD=false \
-    -DLLVM_ENABLE_ZLIB=false \
-    -DCMAKE_LINKER=ld.lld \
-    -DCXX_SUPPORTS_CUSTOM_LINKER=true \
-    -DLLVM_ENABLE_LIBXML2=0 && \
-    cmake --build build-llvm && \
-    cmake --install build-llvm
+#RUN cmake -S llvm -B build-llvm -G "Ninja" \
+#    -DCMAKE_BUILD_TYPE=Release \
+#    -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
+#    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg \
+#    -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
+#    -DClang_DIR=/bootstrap/llvmorg/clang \
+#    -DCMAKE_C_COMPILER=clang \
+#    -DCMAKE_CXX_COMPILER=clang++ \
+#    -DCMAKE_SYSTEM_NAME=Linux \
+#    -DCMAKE_SYSROOT="${SYSROOT}" \
+#    -DLLVM_ENABLE_PROJECTS="clang;lld" \
+#    -DTARGET_TRIPLE=${TARGET_TRIPLE} \
+#    -DHOST_TRIPLE=${HOST_TRIPLE} \
+#    -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
+#    -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
+#    -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
+#    -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
+#    -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} ${LDFLAGS}" \
+#    -DCMAKE_CXX_FLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -Qunused-arguments -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} ${LDFLAGS}" \
+#    -DLLVM_ENABLE_LIBCXX=true \
+#    -DLLVM_ENABLE_ZSTD=false \
+#    -DLLVM_ENABLE_ZLIB=false \
+#    -DCMAKE_LINKER=ld.lld \
+#    -DCXX_SUPPORTS_CUSTOM_LINKER=true \
+#    -DLLVM_ENABLE_LIBXML2=0 && \
+#    cmake --build build-llvm && \
+#    cmake --install build-llvm
 
 # additional tools for building llvm
 RUN set -eux \
@@ -925,7 +916,7 @@ RUN set -eux \
 # check on the lib
 RUN ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/linux/ || true
 
-RUN find ${SYSROOT} -type f -iname "*.so" 2>/dev/null || true
+RUN find ${SYSROOT} -type f -iname "*.so*" 2>/dev/null || true
 RUN find ${SYSROOT} -type f -iname "*.a" 2>/dev/null || true
 RUN find ${SYSROOT} -type f -iname "clang*" 2>/dev/null || true
 
@@ -943,7 +934,7 @@ ARG TARGET_TRIPLE
 ENV TARGET_TRIPLE=${TARGET_TRIPLE}
 ARG HOST_TRIPLE
 ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
-ARG MUSL_VERSION=${MUSL_VERSION:-"1.2.5"}
+ARG MUSL_VERSION=${MUSL_VERSION:-"1.2.6"}
 ENV MUSL_VERSION=${MUSL_VERSION}
 ENV MUSL_URL="https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz"
 ENV MUSL_PREFIX="/staging/usr/"
@@ -1110,7 +1101,7 @@ LABEL org.opencontainers.image.vendor="individual"
 LABEL org.opencontainers.image.licenses="MIT"
 
 # provenance ENV (kept intentionally)
-ARG LLVM_VERSION=${LLVM_VERSION:-"22.1.2"}
+ARG LLVM_VERSION=${LLVM_VERSION:-"22.1.3"}
 ENV LLVM_VERSION=${LLVM_VERSION}
 ENV LLVM_URL="https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-${LLVM_VERSION}.tar.gz"
 ARG TARGET_TRIPLE
