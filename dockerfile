@@ -725,6 +725,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:find \
     cmd:llvm-otool \
     cmd:llvm-objdump \
+    cmd:llvm-readelf \
     cmd:llvm-nm \
     cmd:llvm-strip
 
@@ -779,14 +780,20 @@ RUN printf "%s\n" "CMake Version: $(cmake --version)" && \
     printf "%s\n" "Clang-cpp Version: $(clang++ --version)" && \
     printf "%s\n" "Installed Libraries:" && \
     ls -1 ${SYSROOT}/usr/lib/ && ls -1 ${SYSROOT}/usr/lib/generic/ && \
-    printf "\n" ; printf "libunwind RPATH (dump):\n" ;\
-    objdump -x ${SYSROOT}/usr/lib/libunwind.so.1.0 | grep -F RPATH ;\
-    printf "libc.so RPATH (dump):\n" ;\
-    objdump -x ${SYSROOT}/usr/lib/libc.so | grep -F RPATH ;\
+    printf "\n" ; printf "libunwind RPATH (dumps):\n" ;\
+    llvm-objdump -x ${SYSROOT}/usr/lib/libunwind.so.1.0 | grep -F RPATH ;\
+    llvm-readelf -d ${SYSROOT}/usr/lib/libunwind.so.1.0 | grep -F RUNPATH ;\
+    printf "libunwind RPATH (readelf -a):\n" ;\
+    llvm-readelf -a ${SYSROOT}/usr/lib/libunwind.so.1.0 ;\
+    printf "libc.so RPATH (dumps):\n" ;\
+    llvm-objdump -x ${SYSROOT}/usr/lib/libc.so | grep -F RPATH ;\
+    llvm-readelf -d ${SYSROOT}/usr/lib/libc.so | grep -F RUNPATH ;\
+    printf "libc.so RPATH (readelf -a):\n" ;\
+    llvm-readelf -a ${SYSROOT}/usr/lib/libc.so ;\
     printf "\n"
 
 # Build minimal static libc++abi.so (install to sysroot)
-RUN cmake -S runtimes -B build-libcxxabi-shared -Wno-dev -G "Ninja" \
+RUN cmake -S runtimes -B build-libcxxabi-shared -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
     -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm/cmake/modules \
     -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
