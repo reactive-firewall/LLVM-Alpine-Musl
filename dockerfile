@@ -779,11 +779,10 @@ RUN printf "%s\n" "CMake Version: $(cmake --version)" && \
     printf "%s\n" "Clang-cpp Version: $(clang++ --version)" && \
     printf "%s\n" "Installed Libraries:" && \
     ls -1 ${SYSROOT}/usr/lib/ && ls -1 ${SYSROOT}/usr/lib/generic/ && \
-    printf "\n" && \
-    { printf "libunwind RPATH (dump):\n" && \
-      objdump -x ${SYSROOT}/usr/lib/libunwind.so.1.0 | grep RPATH ;} && \
-    { printf "libc.so RPATH (dump):\n" && \
-      objdump -x ${SYSROOT}/usr/lib/libc.so | grep RPATH ;} && \
+    printf "\n" ; printf "libunwind RPATH (dump):\n" ;\
+    objdump -x ${SYSROOT}/usr/lib/libunwind.so.1.0 | grep -F RPATH ;\
+    printf "libc.so RPATH (dump):\n" ;\
+    objdump -x ${SYSROOT}/usr/lib/libc.so | grep -F RPATH ;\
     printf "\n"
 
 # Build minimal static libc++abi.so (install to sysroot)
