@@ -731,8 +731,8 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 WORKDIR /bootstrap/llvmorg
 
 # WORKAROUND: cmake still thinks that clang++ requires g++
-#RUN apk add --no-cache \
-#    cmd:g++
+RUN apk add --no-cache \
+    cmd:g++
 # but we remove it anyway afterwards
 
 # might want -DLIBCXX_ENABLE_THREADS=ON
