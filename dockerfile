@@ -722,11 +722,11 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     pkgconfig \
     cmd:clang-cpp \
     cmd:clang++ \
-    cmd:find
-
-#    cmd:llvm-otool \
-#    cmd:llvm-nm \
-#    cmd:llvm-strip
+    cmd:find \
+    cmd:llvm-otool \
+    cmd:llvm-objdump \
+    cmd:llvm-nm \
+    cmd:llvm-strip
 
 WORKDIR /bootstrap/llvmorg
 
@@ -779,6 +779,11 @@ RUN printf "%s\n" "CMake Version: $(cmake --version)" && \
     printf "%s\n" "Clang-cpp Version: $(clang++ --version)" && \
     printf "%s\n" "Installed Libraries:" && \
     ls -1 ${SYSROOT}/usr/lib/ && ls -1 ${SYSROOT}/usr/lib/generic/ && \
+    printf "\n" && \
+    { printf "libunwind RPATH (dump):\n" && \
+      objdump -x ${SYSROOT}/usr/lib/libunwind.so.1.0 | grep RPATH ;} && \
+    { printf "libc.so RPATH (dump):\n" && \
+      objdump -x ${SYSROOT}/usr/lib/libc.so | grep RPATH ;} && \
     printf "\n"
 
 # Build minimal static libc++abi.so (install to sysroot)
@@ -815,6 +820,8 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -Wno-dev -G "Ninja" \
         g++ \
         cmd:g++ && \
     ls -lap -r /bootstrap/llvmorg/build-libcxxabi-shared && \
+    ls -lap -r /bootstrap/llvmorg/build-libcxxabi-shared/libcxxabi && \
+    ls -lap -r /bootstrap/llvmorg/build-libcxxabi-shared/CMakeFiles && \
     printf "\n\n%s\n" "CMake --build build-libcxxabi-shared MARK:" && \
     cmake --build build-libcxxabi-shared && \
     cmake --install build-libcxxabi-shared && \
