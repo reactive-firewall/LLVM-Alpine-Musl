@@ -771,9 +771,6 @@ WORKDIR /bootstrap/llvmorg
 
 # might want unused -DLIBCXXABI_HAS_GCC_LIB=NO
 
-# will want -DCMAKE_CXX_COMPILER=clang-cpp \
-# -DCMAKE_CXX_COMPILER_ID="Clang" \
-
 # DEBUG Mark 2
 RUN printf "%s\n" "CMake Version: $(cmake --version)" && \
     printf "%s\n" "Clang-cpp Version: $(clang-cpp --version)" && \
@@ -796,6 +793,7 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -Wno-dev -G "Ninja" \
     -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
+    -DBUILD_SHARED_LIBS=ON \
     -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
     -DCMAKE_CXX_FLAGS="${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
     -DLIBCXXABI_SOURCE_DIR="/bootstrap/llvmorg/libcxxabi" \
@@ -806,19 +804,15 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -Wno-dev -G "Ninja" \
     -DLIBCXXABI_ENABLE_THREADS=ON \
     -DLIBCXXABI_HAS_PTHREAD_LIB=ON \
     -DLIBCXXABI_HAS_GCC_S_LIB=NO \
-    -DLIBCXXABI_BAREMETAL=ON \
     -DLIBCXXABI_ENABLE_SHARED=ON \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang-cpp \
+    -DCMAKE_CXX_COMPILER_ID="Clang" \
     -DCMAKE_LINKER=lld && \
     apk del --no-cache \
         g++ \
         cmd:g++ && \
     ls -lap -r /bootstrap/llvmorg/build-libcxxabi-shared && \
-    printf "\n\n%s\n" "cat build.ninja MARK:" && \
-    printf "\n%s SOF\n" "build.ninja" && \
-    cat /bootstrap/llvmorg/build-libcxxabi-shared/build.ninja && \
-    printf "\nEOF\n" && \
     printf "\n\n%s\n" "CMake --build build-libcxxabi-shared MARK:" && \
     cmake --build build-libcxxabi-shared && \
     cmake --install build-libcxxabi-shared && \
