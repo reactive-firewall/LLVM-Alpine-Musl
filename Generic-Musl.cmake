@@ -48,6 +48,7 @@ if(NOT DEFINED CLANG_RT_PATH AND _GENERIC_MUSL_HAVE_CLANG)
   get_filename_component(_clang_parent_dir "${_clang_bin_dir}" PATH)
   set(_try_paths
     "${CMAKE_SYSROOT}/lib/generic"
+    "${CMAKE_INSTALL_PREFIX}/lib/generic"
     "/lib/generic"
     "/usr/lib/generic"
     "${_clang_parent_dir}/lib/clang"
@@ -142,15 +143,23 @@ endif()
 # Detect available linkers (ld.lld, ld.clang, lld/llvm-lld as proxy)
 find_program(LD_LLD ld.lld)
 find_program(LD_CLANG ld.clang)
-find_program(LLVM_LDD llvm-lld)
+find_program(LLVM_LLD llvm-lld)
 find_program(LLD_LINK lld)  # generic lld
-find_program(LLD lld)
 
 # Shared library support: require musl loader + a linker capable of producing shared libs
 set(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS OFF)
 if(_musl_loader)
-  if(LD_LLD OR LD_CLANG OR LLD_LINK OR LLVM_LDD OR LLD)
+  if(NOT DEFINED CMAKE_LINKER)
+    set(CMAKE_LINKER "")
+  endif()
+  if(LD_LLD OR LD_CLANG OR LLD_LINK OR LLVM_LLD)
     set(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS ON)
+  else()
+    if(NOT DEFINED CMAKE_LINKER)
+      set(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS OFF)
+    else()
+      set(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS ON)
+    endif()
   endif()
 endif()
 
@@ -162,7 +171,7 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
   set(CMAKE_SHARED_MODULE_LINK_CXX_FLAGS "-shared")
 
   # Prefer LLD where available
-  if(LD_LLD OR LLD_LINK OR LLVM_LDD OR LLD)
+  if(LD_LLD OR LLD_LINK OR LLVM_LLD)
     set(_use_lld ON)
     if(LD_LLD)
       set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=ld.lld")
