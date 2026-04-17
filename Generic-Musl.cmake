@@ -11,6 +11,10 @@ if(NOT DEFINED CMAKE_SYSROOT)
   set(CMAKE_SYSROOT "")
 endif()
 
+if(NOT DEFINED CMAKE_INSTALL_PREFIX)
+  set(CMAKE_INSTALL_PREFIX "")
+endif()
+
 include(Platform/UNIX_SV-Initialize)
 include(Platform/UnixPaths)
 
@@ -70,6 +74,8 @@ endif()
 set(_libc_candidates
   "${CMAKE_SYSROOT}/lib/libc.so"
   "${CMAKE_SYSROOT}/lib64/libc.so"
+  "${CMAKE_INSTALL_PREFIX}/lib/libc.so"
+  "${CMAKE_INSTALL_PREFIX}/lib64/libc.so"
   "/lib/libc.so"
   "/lib64/libc.so"
   "/usr/lib/libc.so"
@@ -101,6 +107,9 @@ if(_musl_loader)
     "${CMAKE_SYSROOT}/lib"
     "${CMAKE_SYSROOT}/lib64"
     "${CMAKE_SYSROOT}/usr/lib"
+    "${CMAKE_INSTALL_PREFIX}/lib"
+    "${CMAKE_INSTALL_PREFIX}/lib64"
+    "${CMAKE_INSTALL_PREFIX}/usr/lib"
   )
   foreach(_d IN LISTS _search_dirs)
     if(EXISTS "${_d}")
@@ -130,17 +139,17 @@ else()
   endforeach()
 endif()
 
-# Detect available linkers (ld.lld, ld.clang, ldd/llvm-ldd as proxy)
+# Detect available linkers (ld.lld, ld.clang, lld/llvm-lld as proxy)
 find_program(LD_LLD ld.lld)
 find_program(LD_CLANG ld.clang)
-find_program(LLVM_LDD llvm-ldd)
+find_program(LLVM_LDD llvm-lld)
 find_program(LLD_LINK lld)  # generic lld
-find_program(LDD ldd)
+find_program(LLD lld)
 
 # Shared library support: require musl loader + a linker capable of producing shared libs
 set(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS OFF)
 if(_musl_loader)
-  if(LD_LLD OR LD_CLANG OR LLD_LINK OR LLVM_LDD OR LDD)
+  if(LD_LLD OR LD_CLANG OR LLD_LINK OR LLVM_LDD OR LLD)
     set(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS ON)
   endif()
 endif()
@@ -153,10 +162,15 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
   set(CMAKE_SHARED_MODULE_LINK_CXX_FLAGS "-shared")
 
   # Prefer LLD where available
-  if(LD_LLD OR LLD_LINK)
+  if(LD_LLD OR LLD_LINK OR LLVM_LDD OR LLD)
     set(_use_lld ON)
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
+    if(LD_LLD)
+      set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=ld.lld")
+      set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=ld.lld")
+    else()
+      set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
+      set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
+    endif()
   endif()
 
   # Set dynamic linker path for musl
