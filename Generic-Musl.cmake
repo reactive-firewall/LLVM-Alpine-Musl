@@ -2,12 +2,17 @@
 # Platform file for System-V style embedded targets using musl libc and Clang/LLVM.
 # Use: -DCMAKE_SYSTEM_NAME=Generic-Musl -DCMAKE_C_COMPILER=... -DCMAKE_CXX_COMPILER=...
 
+include(Platform/Generic)
+
 set(CMAKE_SYSTEM_NAME "Generic-Musl")
-set(CMAKE_SYSTEM_VERSION 1)
+# set(CMAKE_SYSTEM_VERSION 1)
 
 if(NOT DEFINED CMAKE_SYSROOT)
   set(CMAKE_SYSROOT "")
 endif()
+
+include(Platform/UNIX_SV-Initialize)
+include(Platform/UnixPaths)
 
 set(CMAKE_STATIC_LIBRARY_SUFFIX ".a")
 set(CMAKE_SHARED_LIBRARY_SUFFIX ".so")

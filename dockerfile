@@ -734,7 +734,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 
 # Install into Alpine cmake's Platform dir as PlatformGeneric-Musl.cmake
 RUN mkdir -p /usr/share/cmake/Modules/Platform \
- && install -m 0644 /tmp/Generic-Musl.cmake /usr/share/cmake/Modules/Platform/PlatformGeneric-Musl.cmake \
+ && install -m 0644 /tmp/Generic-Musl.cmake /usr/share/cmake/Modules/Platform/Generic-Musl.cmake \
  && rm /tmp/Generic-Musl.cmake \
  && chmod -R a+rX /usr/share/cmake/Modules/Platform
 
