@@ -773,7 +773,7 @@ RUN apk add --no-cache \
 # might want unused -DLIBCXXABI_HAS_GCC_LIB=NO
 
 # prob need -DCMAKE_CXX_COMPILER_ID="Clang"
-# prob need -DCMAKE_CXX_COMPILER_VERSION=$(${CXX} --version 2>/dev/null | head -n1 | grep -m1 --color=never -oE "[1-9][0-9]*.[0-9]+[\.0-9]*" | head -n1 ) \
+# prob need -DCMAKE_CXX_COMPILER_VERSION=$(${CXX} --version 2>/dev/null | head -n1 | grep -m1 --color=never -oE "[1-9][0-9]*.[0-9]+[\.0-9]*" | head -n1 )
 
 
 # DEBUG Mark 2
@@ -812,9 +812,7 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -G "Ninja" \
     -DLIBCXXABI_HAS_GCC_S_LIB=NO \
     -DLIBCXXABI_ENABLE_SHARED=ON \
     -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang-cpp \
-    -DCMAKE_CXX_COMPILER_VERSION=$(${CXX} --version 2>/dev/null | head -n1 | grep -m1 --color=never -oE "[1-9][0-9]*.[0-9]+[\.0-9]*" | head -n1 ) \
-    -DCMAKE_CXX_COMPILER_ID="Clang" \
+    -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_LINKER=lld && \
     apk del --no-cache \
         g++ \
