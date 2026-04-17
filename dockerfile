@@ -632,6 +632,9 @@ COPY --from=fetcher /fetch/llvmorg /bootstrap/llvmorg
 COPY --from=sysroot /sysroot /sysroot
 COPY --from=build-unwind /stage /stage
 
+# Copy your Generic-Musl.cmake into the image build context before building the image
+COPY Generic-Musl.cmake /tmp/Generic-Musl.cmake
+
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
 
@@ -729,6 +732,12 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:llvm-nm \
     cmd:llvm-strip
 
+# Install into Alpine cmake's Platform dir as PlatformGeneric-Musl.cmake
+RUN mkdir -p /usr/share/cmake/Modules/Platform \
+ && install -m 0644 /tmp/Generic-Musl.cmake /usr/share/cmake/Modules/Platform/PlatformGeneric-Musl.cmake \
+ && rm /tmp/Generic-Musl.cmake \
+ && chmod -R a+rX /usr/share/cmake/Modules/Platform
+
 WORKDIR /bootstrap/llvmorg
 
 # WORKAROUND: cmake still thinks that clang++ requires g++
@@ -792,7 +801,7 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -G "Ninja" \
     -DClang_DIR=/bootstrap/llvmorg/clang \
     -DLLVM_ENABLE_RUNTIMES="libcxxabi" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_SYSTEM_NAME=FreeBSD \
+    -DCMAKE_SYSTEM_NAME=Generic-Musl \
     -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
     -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
     -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
