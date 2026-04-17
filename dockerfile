@@ -773,23 +773,15 @@ RUN apk add --no-cache \
 # might want unused -DLIBCXXABI_HAS_GCC_LIB=NO
 
 # prob need -DCMAKE_CXX_COMPILER_ID="Clang"
+# prob need -DCMAKE_CXX_COMPILER_VERSION=$(${CXX} --version 2>/dev/null | head -n1 | grep -m1 --color=never -oE "[1-9][0-9]*.[0-9]+[\.0-9]*" | head -n1 ) \
+
 
 # DEBUG Mark 2
 RUN printf "%s\n" "CMake Version: $(cmake --version)" && \
     printf "%s\n" "Clang-cpp Version: $(clang-cpp --version)" && \
-    printf "%s\n" "Clang-cpp Version: $(clang++ --version)" && \
+    printf "%s\n" "Clang++ Version: $(clang++ --version)" && \
     printf "%s\n" "Installed Libraries:" && \
     ls -1 ${SYSROOT}/usr/lib/ && ls -1 ${SYSROOT}/usr/lib/generic/ && \
-    printf "\n" ; printf "libunwind RPATH (dumps):\n" ;\
-    llvm-objdump -x ${SYSROOT}/usr/lib/libunwind.so.1.0 | grep -F RPATH ;\
-    llvm-readelf -d ${SYSROOT}/usr/lib/libunwind.so.1.0 | grep -F RUNPATH ;\
-    printf "libunwind RPATH (readelf -a):\n" ;\
-    llvm-readelf -a ${SYSROOT}/usr/lib/libunwind.so.1.0 ;\
-    printf "libc.so RPATH (dumps):\n" ;\
-    llvm-objdump -x ${SYSROOT}/usr/lib/libc.so | grep -F RPATH ;\
-    llvm-readelf -d ${SYSROOT}/usr/lib/libc.so | grep -F RUNPATH ;\
-    printf "libc.so RPATH (readelf -a):\n" ;\
-    llvm-readelf -a ${SYSROOT}/usr/lib/libc.so ;\
     printf "\n"
 
 # Build minimal static libc++abi.so (install to sysroot)
@@ -800,7 +792,7 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -G "Ninja" \
     -DClang_DIR=/bootstrap/llvmorg/clang \
     -DLLVM_ENABLE_RUNTIMES="libcxxabi" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_SYSTEM_NAME=Generic \
+    -DCMAKE_SYSTEM_NAME=FreeBSD \
     -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
     -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
     -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
@@ -820,7 +812,9 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -G "Ninja" \
     -DLIBCXXABI_HAS_GCC_S_LIB=NO \
     -DLIBCXXABI_ENABLE_SHARED=ON \
     -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_CXX_COMPILER=clang-cpp \
+    -DCMAKE_CXX_COMPILER_VERSION=$(${CXX} --version 2>/dev/null | head -n1 | grep -m1 --color=never -oE "[1-9][0-9]*.[0-9]+[\.0-9]*" | head -n1 ) \
+    -DCMAKE_CXX_COMPILER_ID="Clang" \
     -DCMAKE_LINKER=lld && \
     apk del --no-cache \
         g++ \
