@@ -182,6 +182,7 @@ RUN mkdir -pv ${MUSL_PREFIX} && \
     mkdir -pv "${SYSROOT}"/share && \
     mkdir -pv "${SYSROOT}"/man && \
     mkdir -pv "${SYSROOT}"/tmp && \
+    mkdir -pv "${SYSROOT}"/etc && \
     mkdir -pv "${SYSROOT}/usr/lib" && \
     mkdir -pv "${SYSROOT}/usr/libexec" && \
     mkdir -pv "${SYSROOT}/usr/bin" && \
@@ -190,6 +191,7 @@ RUN mkdir -pv ${MUSL_PREFIX} && \
     ln -sfv usr/sbin "${SYSROOT}/sbin" && \
     ln -sfv usr/lib "${SYSROOT}/lib" && \
     ln -sfv usr/lib "${SYSROOT}/libexec" && \
+    ln -sfv ../etc "${SYSROOT}/usr/etc" && \
     ln -sfv ../share "${SYSROOT}/usr/share" && \
     ln -sfv ../man "${SYSROOT}/usr/man"
 
@@ -334,6 +336,36 @@ RUN set -eux \
          find ${SYSROOT}${MUSL_PREFIX}/lib -type f -name "*.o*" -exec strip --strip-unneeded {} + || true; \
        fi
 
+# Ensure the dynamic loader is configured to search paths correctly
+COPY ld-musl-x86_64.path /etc/ld-musl-x86_64.path
+RUN set -eux; \
+    if [ "$(uname -m)" = "x86_64" ]; then \
+      [ -L "${SYSROOT}"/etc/ld-musl-i486.path ] || ln -svf ld-musl-x86_64.path "${SYSROOT}"/etc/ld-musl-i486.path; \
+      [ -L "${SYSROOT}"/etc/ld-musl-i586.path ] || ln -svf ld-musl-x86_64.path "${SYSROOT}"/etc/ld-musl-i586.path; \
+      [ -L "${SYSROOT}"/etc/ld-musl-i686.path ] || ln -svf ld-musl-x86_64.path "${SYSROOT}"/etc/ld-musl-i686.path; \
+      [ -L "${SYSROOT}"/etc/ld-musl-x86h.path ] || ln -svf ld-musl-x86_64.path "${SYSROOT}"/etc/ld-musl-x86_64h.path; \
+      [ -L "${SYSROOT}"/etc/ld-musl-generic.path ] || ln -svf ld-musl-x86_64.path "${SYSROOT}"/etc/ld-musl-generic.path; \
+    fi ;
+
+COPY ld-musl-aarch64.path /etc/ld-musl-aarch64.path
+RUN set -eux; \
+    if [ "$(uname -m)" = "aarch64" ]; then \
+      [ -L "${SYSROOT}"/etc/ld-musl-generic.path ] || ln -svf ld-musl-aarch64.path "${SYSROOT}"/etc/ld-musl-generic.path; \
+    fi; \
+    if [ "${TARGETARCH}" = "arm64" ]; then \
+      [ -L "${SYSROOT}"/etc/ld-musl-arm64.path ] || ln -svf ld-musl-aarch64.path "${SYSROOT}"/etc/ld-musl-arm64.path; \
+      [ -L "${SYSROOT}"/etc/ld-musl-generic.path ] || ln -svf ld-musl-arm64.path "${SYSROOT}"/etc/ld-musl-generic.path; \
+    fi ;
+
+COPY ld-musl-arm.path /etc/ld-musl-arm.path
+RUN set -eux; \
+    if [ "${TARGETARCH}" = "arm" ]; then \
+      [ -L "${SYSROOT}"/etc/ld-musl-generic.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-generic.path; \
+    fi ; \
+    [ -L "${SYSROOT}"/etc/ld-musl-armv7.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-armv7.path; \
+    [ -L "${SYSROOT}"/etc/ld-musl-armv8.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-armv8.path;
+
+
 # Ensure loader has canonical name (example: /lib/libc.so ->/lib/ld-musl-x86_64.so.1)
 RUN set -eux \
     && ln -fns libc.so "${SYSROOT}${MUSL_PREFIX}/lib/${MUSL_LDLIB}" \
@@ -343,7 +375,8 @@ RUN set -eux \
 RUN find ${SYSROOT}${MUSL_PREFIX}/lib -type f -name "*.so" -exec touch -d "${SOME_DATE_EPOCH}" {} + || true; \
     find ${SYSROOT}${MUSL_PREFIX}/lib -type f -name "*.o" -exec touch -d "${SOME_DATE_EPOCH}" {} + || true; \
     find ${SYSROOT}${MUSL_PREFIX}/lib -type f -name "*.a" -exec touch -d "${SOME_DATE_EPOCH}" {} + || true; \
-    find ${SYSROOT}${MUSL_PREFIX}/include -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true;
+    find ${SYSROOT}${MUSL_PREFIX}/include -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true; \
+    find ${SYSROOT}${MUSL_PREFIX}/bin -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true;
 
 # Ensure we have the dynamic loader and libs present (sysroot paths)
 RUN ls -l ${SYSROOT}${MUSL_PREFIX}/lib || true && \
@@ -352,6 +385,10 @@ RUN ls -l ${SYSROOT}${MUSL_PREFIX}/lib || true && \
 # Ensure we have the libc headers present (sysroot paths)
 RUN ls -l ${SYSROOT}${MUSL_PREFIX}/include || true && \
     file ${SYSROOT}${MUSL_PREFIX}/include/* || true
+
+# Ensure we have the libc linking wrapper present (sysroot paths)
+RUN ls -l ${SYSROOT}${MUSL_PREFIX}/bin || true && \
+    file ${SYSROOT}${MUSL_PREFIX}/bin/* || true
 
 # purge transient packages
 RUN set -eux \
