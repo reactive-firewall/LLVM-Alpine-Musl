@@ -869,7 +869,7 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -G "Ninja" \
     -DLIBCXXABI_HAS_GCC_S_LIB=NO \
     -DLIBCXXABI_ENABLE_SHARED=ON \
     -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang-cpp \
+    -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_CXX_COMPILER_ID="Clang" \
     -DCMAKE_LINKER=lld && \
     apk del --no-cache \
