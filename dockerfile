@@ -336,29 +336,6 @@ RUN set -eux \
          find ${SYSROOT}${MUSL_PREFIX}/lib -type f -name "*.o*" -exec strip --strip-unneeded {} + || true; \
        fi
 
-# Ensure the dynamic loader is configured to search paths correctly
-COPY ld-musl-x86_64.path /etc/ld-musl-x86_64.path
-RUN set -eux; \
-    if [ "$(uname -m)" = "x86_64" ]; then \
-      [ -L "${SYSROOT}"/etc/ld-musl-i486.path ] || ln -svf ld-musl-x86_64.path "${SYSROOT}"/etc/ld-musl-i486.path; \
-      [ -L "${SYSROOT}"/etc/ld-musl-i586.path ] || ln -svf ld-musl-x86_64.path "${SYSROOT}"/etc/ld-musl-i586.path; \
-      [ -L "${SYSROOT}"/etc/ld-musl-i686.path ] || ln -svf ld-musl-x86_64.path "${SYSROOT}"/etc/ld-musl-i686.path; \
-      [ -L "${SYSROOT}"/etc/ld-musl-x86h.path ] || ln -svf ld-musl-x86_64.path "${SYSROOT}"/etc/ld-musl-x86_64h.path; \
-      [ -L "${SYSROOT}"/etc/ld-musl-generic.path ] || ln -svf ld-musl-x86_64.path "${SYSROOT}"/etc/ld-musl-generic.path; \
-    fi ;
-
-COPY ld-musl-aarch64.path /etc/ld-musl-aarch64.path
-RUN set -eux; \
-    if [ "$(uname -m)" = "aarch64" ]; then \
-      [ -L "${SYSROOT}"/etc/ld-musl-generic.path ] || ln -svf ld-musl-aarch64.path "${SYSROOT}"/etc/ld-musl-generic.path; \
-    fi;
-
-COPY ld-musl-arm.path /etc/ld-musl-arm.path
-RUN set -eux; \
-    [ -L "${SYSROOT}"/etc/ld-musl-armv7.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-armv7.path; \
-    [ -L "${SYSROOT}"/etc/ld-musl-armv8.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-armv8.path;
-
-
 # Ensure loader has canonical name (example: /lib/libc.so ->/lib/ld-musl-x86_64.so.1)
 RUN set -eux \
     && ln -fns libc.so "${SYSROOT}${MUSL_PREFIX}/lib/${MUSL_LDLIB}" \
@@ -390,6 +367,29 @@ RUN set -eux \
         perl \
         paxctl \
         cmd:find
+
+# Ensure the dynamic loader is configured to search paths correctly
+COPY ld-musl-x86_64.path /etc/ld-musl-x86_64.path
+RUN set -eux; \
+    if [ "$(uname -m)" = "x86_64" ]; then \
+      [ -L "${SYSROOT}"/etc/ld-musl-i486.path ] || ln -svf ld-musl-x86_64.path "${SYSROOT}"/etc/ld-musl-i486.path; \
+      [ -L "${SYSROOT}"/etc/ld-musl-i586.path ] || ln -svf ld-musl-x86_64.path "${SYSROOT}"/etc/ld-musl-i586.path; \
+      [ -L "${SYSROOT}"/etc/ld-musl-i686.path ] || ln -svf ld-musl-x86_64.path "${SYSROOT}"/etc/ld-musl-i686.path; \
+      [ -L "${SYSROOT}"/etc/ld-musl-x86h.path ] || ln -svf ld-musl-x86_64.path "${SYSROOT}"/etc/ld-musl-x86_64h.path; \
+      [ -L "${SYSROOT}"/etc/ld-musl-generic.path ] || ln -svf ld-musl-x86_64.path "${SYSROOT}"/etc/ld-musl-generic.path; \
+    fi ;
+
+COPY ld-musl-aarch64.path /etc/ld-musl-aarch64.path
+RUN set -eux; \
+    if [ "$(uname -m)" = "aarch64" ]; then \
+      [ -L "${SYSROOT}"/etc/ld-musl-generic.path ] || ln -svf ld-musl-aarch64.path "${SYSROOT}"/etc/ld-musl-generic.path; \
+    fi;
+
+COPY ld-musl-arm.path /etc/ld-musl-arm.path
+RUN set -eux; \
+    [ -L "${SYSROOT}"/etc/ld-musl-armv7.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-armv7.path; \
+    [ -L "${SYSROOT}"/etc/ld-musl-armv8.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-armv8.path;
+
 
 # --- unwind-base: bootstrap unwind using distro clang/llvm to compile a minimal unwind library ---
 FROM --platform="linux/${TARGETARCH}" alpine:latest AS build-unwind-base
