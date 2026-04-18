@@ -129,7 +129,7 @@ if(libc_path)
         -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
         -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
       OUTPUT_VARIABLE _out
-      C
+      LANGUAGE C
     )
     if(_res)
       list(APPEND _known_features "${feature_name}")
