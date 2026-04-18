@@ -5,7 +5,7 @@
 include(Platform/Generic)
 
 set(CMAKE_SYSTEM_NAME "Generic" CACHE STRING "Target system")
-set(CMAKE_SYSTEM_VERSION 1 CACHE NUMBER "Target ABI Version")
+set(CMAKE_SYSTEM_VERSION 1)
 
 # Provide a SYSROOT fallback from env if still not set
 if(NOT DEFINED SYSROOT OR SYSROOT STREQUAL "")
@@ -89,7 +89,7 @@ set(_musl_loader "")
 
 foreach(_c IN LISTS _libc_candidates)
   if(EXISTS "${_c}")
-    set(libc_path "${_c}" PARENT_SCOPE)
+    set(libc_path "${_c}")
     # try to guess loader name in same dir: ld-musl-*.so
     get_filename_component(_c_dir "${_c}" DIRECTORY)
     file(GLOB _ldcandidates "${_c_dir}/ld-musl-*.so")
@@ -146,7 +146,7 @@ endif()
 
 # Detect available linkers (ld.lld, ld.clang, lld/llvm-lld as proxy)
 find_program(LD_LLD ld.lld)
-find_program(LD_CLANG ld.clang)
+find_program(LD_CLANG ld.musl-clang)
 find_program(LLVM_LLD llvm-lld)
 find_program(LLD_LINK lld)  # generic lld
 
