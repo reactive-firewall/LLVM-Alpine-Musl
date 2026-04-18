@@ -86,7 +86,10 @@ set(_libc_candidates
   "/usr/lib/libc.so"
 )
 
-set(_musl_loader "")
+# search must have set libc_path to the path of musl libc.so (or empty if not detecting musl)
+if(NOT DEFINED libc_path)
+  set(libc_path "")
+endif()
 
 foreach(_c IN LISTS _libc_candidates)
   if(EXISTS "${_c}")
@@ -100,6 +103,61 @@ foreach(_c IN LISTS _libc_candidates)
     break()
   endif()
 endforeach()
+
+# check for c99 compliance of detected libc.so
+# Preserve any existing known features
+set(_known_features "${CMAKE_C_KNOWN_FEATURES}")
+
+if(libc_path)
+  # If musl libc is present, assume at least C99 support and probe related features.
+  list(APPEND _known_features "c_std_99")
+
+  # Helper macro: try_compile a small snippet, optionally adding -D flags for feature test macros
+  macro(_probe_feature feature_name code)
+    set(_probe_src "${CMAKE_BINARY_DIR}/cmake_probe_${feature_name}.c")
+    file(WRITE "${_probe_src}" "${code}\n")
+    try_compile(_res
+      "${CMAKE_BINARY_DIR}"                 # BIN dir for try_compile
+      "${_probe_src}"
+      CMAKE_FLAGS
+        -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+        -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
+      OUTPUT_VARIABLE _out
+    )
+    if(_res)
+      list(APPEND _known_features "${feature_name}")
+    endif()
+  endmacro()
+
+  # Probe: function prototypes (C89/90 prototypes supported in C99+)
+  _probe_feature("c_function_prototypes"
+"#if defined(__STDC__)
+  /* ensure stdc is enabled */
+#endif
+int f(int a); /* prototype */
+int f(int a) { return a+1; }
+int main(void) { return f(1) - 2; }")
+
+  # Probe: restrict keyword (C99)
+  _probe_feature("c_restrict"
+"#ifndef restrict
+  /* allow compilers that use __restrict */
+  #define restrict restrict
+#endif
+int fn(int * restrict p) { return p ? *p : 0; }
+int main(void) { int x = 0; return fn(&x); }")
+
+  # Probe: variadic macros (C99)
+  _probe_feature("c_variadic_macros"
+"#define TEST(fmt, ...) fmt \"\\n\"
+int main(void) { (void)TEST(\"x\", 1); return 0; }")
+
+endif()
+
+# Remove duplicates and set cached variable
+list(REMOVE_DUPLICATES _known_features)
+set(CMAKE_C_KNOWN_FEATURES "${_known_features}" CACHE STRING "Detected C known features" FORCE)
+message(STATUS "C known features: ${CMAKE_C_KNOWN_FEATURES}")
 
 # Detect libpthread / libm near libc
 set(CMAKE_PLATFORM_HAS_PTHREADS OFF)
@@ -246,7 +304,7 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   # i.e. platform supports projects:
   # option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
   # OR:
-  # set(BUILD_SHARED_LIBS ON CACHE BOOL "Build libraries as shared libraries")
+  # set(BUILD_SHARED_LIBS ON)
 else()
   if(DEFINED _musl_loader)
     message(STATUS "Detected musl dynamic loader: ${_musl_loader}")
@@ -263,4 +321,7 @@ endif()
 
 # CMP0164: add_library() rejects SHARED libraries when not supported by the platform.
 # New in CMake 3.30: https://cmake.org/cmake/help/latest/policy/CMP0164.html
+if(POLICY CMP0164)
+  cmake_policy(SET CMP0164 NEW)
+endif()
 set(TARGET_SUPPORTS_SHARED_LIBS ${CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS} CACHE BOOL "Target platform supports shared libs" FORCE)
