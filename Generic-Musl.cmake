@@ -115,50 +115,15 @@ endforeach()
 set(_known_features "${CMAKE_C_KNOWN_FEATURES}")
 
 if(libc_path)
+  # Musl libc trys to be strict ISO 9899:1999 Aligned
   # If musl libc is present, assume at least C99 support and probe related features.
   list(APPEND _known_features "c_std_99")
-
-  # Helper macro: try_compile a small snippet, optionally adding -D flags for feature test macros
-  macro(_probe_feature feature_name code)
-    set(_probe_src "${CMAKE_BINARY_DIR}/cmake_probe_${feature_name}.c")
-    file(WRITE "${_probe_src}" "${code}\n")
-    try_compile(_res
-      "${CMAKE_BINARY_DIR}"                 # BIN dir for try_compile
-      "${_probe_src}"
-      CMAKE_FLAGS
-        -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-        -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
-      OUTPUT_VARIABLE _out
-      LANGUAGE C
-    )
-    if(_res)
-      list(APPEND _known_features "${feature_name}")
-    endif()
-  endmacro()
-
-  # Probe: function prototypes (C89/90 prototypes supported in C99+)
-  _probe_feature("c_function_prototypes"
-"#if defined(__STDC__)
-  /* ensure stdc is enabled */
-#endif
-int f(int a); /* prototype */
-int f(int a) { return a+1; }
-int main(void) { return f(1) - 2; }")
-
-  # Probe: restrict keyword (C99)
-  _probe_feature("c_restrict"
-"#ifndef restrict
-  /* allow compilers that use __restrict */
-  #define restrict restrict
-#endif
-int fn(int * restrict p) { return p ? *p : 0; }
-int main(void) { int x = 0; return fn(&x); }")
-
-  # Probe: variadic macros (C99)
-  _probe_feature("c_variadic_macros"
-"#define TEST(fmt, ...) fmt \"\\n\"
-int main(void) { (void)TEST(\"x\", 1); return 0; }")
-
+  # function prototypes (C89/90 prototypes supported in C99+)
+  list(APPEND _known_features "c_function_prototypes")
+  # restrict keyword (C99)
+  list(APPEND _known_features "c_restrict")
+  # variadic macros (C99)
+  list(APPEND _known_features "c_variadic_macros")
 endif()
 
 # Remove duplicates and set cached variable
