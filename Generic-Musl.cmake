@@ -2,7 +2,11 @@
 # Platform file for System-V style embedded targets using musl libc and Clang/LLVM.
 # Use: -DCMAKE_SYSTEM_NAME=Generic-Musl -DCMAKE_C_COMPILER=... -DCMAKE_CXX_COMPILER=...
 
-include(Platform/Generic)
+# To help the find_xxx() commands, set at least the following so CMAKE_FIND_ROOT_PATH
+# works at least for some simple cases:
+set(CMAKE_SYSTEM_INCLUDE_PATH /include )
+set(CMAKE_SYSTEM_LIBRARY_PATH /lib )
+set(CMAKE_SYSTEM_PROGRAM_PATH /bin )
 
 set(CMAKE_SYSTEM_NAME "Generic" CACHE STRING "Target system")
 set(CMAKE_SYSTEM_VERSION 1)
@@ -18,16 +22,18 @@ if(NOT DEFINED CMAKE_INSTALL_PREFIX)
   set(CMAKE_INSTALL_PREFIX "")
 endif()
 
-include(Platform/UNIX_SV-Initialize)
+set(UNIX 1)
 include(Platform/UnixPaths)
 
+# musl dos not care about .exe nor .elf (and does not support .app)
+# set(CMAKE_EXECUTABLE_SUFFIX "")
 set(CMAKE_STATIC_LIBRARY_SUFFIX ".a")
 set(CMAKE_SHARED_LIBRARY_SUFFIX ".so")
 set(CMAKE_SHARED_MODULE_SUFFIX ".so")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON CACHE BOOL "Position independent code for shared libs" FORCE)
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU")
-  message(FATAL_ERROR "Generic-Musl platform must not be used with GNU toolchains.")
+  message(FATAL_ERROR "Generic-Musl platform can not be used with GNU toolchains.")
 endif()
 
 set(_GENERIC_MUSL_HAVE_CLANG OFF)
@@ -159,6 +165,12 @@ list(REMOVE_DUPLICATES _known_features)
 set(CMAKE_C_KNOWN_FEATURES "${_known_features}" CACHE STRING "Detected C known features" FORCE)
 message(STATUS "C known features: ${CMAKE_C_KNOWN_FEATURES}")
 
+# this option needs more testing
+#set(CMAKE_DL_LIBS "") # or static libdl.a stub
+# support position independance
+set(CMAKE_C_COMPILE_OPTIONS_PIC "-fPIC")
+set(CMAKE_C_COMPILE_OPTIONS_PIE "-fPIE")
+
 # Detect libpthread / libm near libc
 set(CMAKE_PLATFORM_HAS_PTHREADS OFF)
 set(CMAKE_PLATFORM_HAS_MATH_LIB OFF)
@@ -213,6 +225,7 @@ find_program(LLD_LINK lld)  # generic lld
 # set(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS OFF)
 if(_musl_loader)
   if(LD_LLD OR LD_CLANG OR LLD_LINK OR LLVM_LLD)
+    set(_CMAKE_SYSTEM_LINKER_TYPE LLD CACHE INTERNAL "System linker type")
     set(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS ON CACHE BOOL "Should the flag -shared be used" FORCE)
   else()
     if(NOT DEFINED CMAKE_LINKER)
@@ -301,10 +314,42 @@ endif()
 
 if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   message(STATUS "Shared libraries supported (musl loader and linker detected).")
-  # i.e. platform supports projects:
-  # option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
-  # OR:
-  # set(BUILD_SHARED_LIBS ON)
+  # (musl) support shared libraries
+  set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)
+
+  # PIE link options are managed in Compiler/<compiler>.cmake file
+  set(CMAKE_SHARED_LIBRARY_C_FLAGS "-fPIC")            # -pic
+  set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS "-shared")       # -shared
+  set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")         # +s, flag for exe link to use shared lib
+
+  # Not sure if rpaths are used by musl (ld-musl-ARCH.so.1 is hardcoded when linking to musl)
+  set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "-Wl,-rpath,")       # -rpath
+  # probably works like FreeBSD
+  # set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG_SEP ":")   # : or empty
+  # Not sure about -z origin with musl
+  #set(CMAKE_SHARED_LIBRARY_RPATH_ORIGIN_TOKEN "\$ORIGIN")
+  set(CMAKE_SHARED_LIBRARY_RPATH_LINK_C_FLAG "-Wl,-rpath-link,")
+  set(CMAKE_SHARED_LIBRARY_SONAME_C_FLAG "-Wl,-soname,")
+  set(CMAKE_EXE_EXPORTS_C_FLAG "-Wl,--export-dynamic")
+
+  # Shared libraries with no builtin soname may not be linked safely by
+  # specifying the file path.
+  set(CMAKE_PLATFORM_USES_PATH_WHEN_NO_SONAME 1)
+
+  # Initialize C link type selection flags.  These flags are used when
+  # building a shared library, shared module, or executable that links
+  # to other libraries to select whether to use the static or shared
+  # versions of the libraries.
+  foreach(type SHARED_LIBRARY SHARED_MODULE EXE)
+    set(CMAKE_${type}_LINK_STATIC_C_FLAGS "-Wl,-Bstatic")
+    set(CMAKE_${type}_LINK_DYNAMIC_C_FLAGS "-Wl,-Bdynamic")
+  endforeach()
+
+  include(Platform/Linker/Generic-Musl-Linker.cmake)
+  if(_GENERIC_MUSL_HAVE_CLANG)
+    __musl_linker_clang(C)
+    __musl_linker_clang(CXX)
+  endif()
 else()
   if(DEFINED _musl_loader)
     message(STATUS "Detected musl dynamic loader: ${_musl_loader}")
@@ -317,6 +362,8 @@ else()
     message(STATUS "Dynamic linker id not auto-detected! ; set -DCMAKE_LINKER=/path/to/linker to override.")
   endif()
   message(STATUS "Shared libraries disabled (missing musl loader or suitable linker).")
+  # (musl) targets without hardcoded linkers don't support shared libraries
+  set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS FALSE)
 endif()
 
 # CMP0164: add_library() rejects SHARED libraries when not supported by the platform.
@@ -324,4 +371,3 @@ endif()
 if(POLICY CMP0164)
   cmake_policy(SET CMP0164 NEW)
 endif()
-set(TARGET_SUPPORTS_SHARED_LIBS ${CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS} CACHE BOOL "Target platform supports shared libs" FORCE)

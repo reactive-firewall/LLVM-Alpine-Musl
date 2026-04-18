@@ -46,7 +46,8 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
   apk add \
     ca-certificates \
     curl \
-    cmd:bsdtar
+    cmd:bsdtar && \
+  update-ca-certificates
 
 # just need a place to fetch
 RUN mkdir -p /fetch
@@ -54,20 +55,32 @@ WORKDIR /fetch
 
 # Fetch the signed release tarballs (or supply via build-args)
 # Download musl
-RUN curl -fsSLo musl-${MUSL_VERSION}.tar.gz \
+RUN curl -fSLo musl-${MUSL_VERSION}.tar.gz \
+      --retry 5 \
+      --retry-connrefused \
+      --retry-delay 2 \
+      --ssl-no-revoke \
     --url "$MUSL_URL" && \
     bsdtar -xzf musl-${MUSL_VERSION}.tar.gz && \
     rm musl-${MUSL_VERSION}.tar.gz && \
     mv /fetch/musl-${MUSL_VERSION} /fetch/musl
 # get libexecinfo (patched mirror)
-RUN curl -fsSLo libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2 \
+RUN curl -fSLo libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2 \
+    --retry 3 \
+    --retry-connrefused \
+    --retry-delay 2 \
+    --ssl-no-revoke \
     --url "$LIBEXECINFO_URL" && \
     bsdtar -xzf libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2 && \
     rm libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2 && \
     mv /fetch/libexecinfo-${LIBEXECINFO_VERSION}r /fetch/libexecinfo && \
     rm /fetch/libexecinfo/patches.tar.bz2
 # get llvm-project
-RUN curl -fsSLo llvmorg-${LLVM_VERSION}.tar.gz \
+RUN curl -fSLo llvmorg-${LLVM_VERSION}.tar.gz \
+    --retry 3 \
+    --retry-connrefused \
+    --retry-delay 2 \
+    --ssl-no-revoke \
     --url "$LLVM_URL" && \
     bsdtar -xzf llvmorg-${LLVM_VERSION}.tar.gz && \
     rm llvmorg-${LLVM_VERSION}.tar.gz && \
@@ -664,6 +677,7 @@ COPY --from=build-unwind /stage /stage
 
 # Copy your Generic-Musl.cmake into the image build context before building the image
 COPY Generic-Musl.cmake /tmp/Generic-Musl.cmake
+COPY Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
 
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
@@ -758,7 +772,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:find \
     cmd:llvm-otool \
     cmd:llvm-objdump \
-    cmd:llvm-readelf \
+    cmd:llvm-ranlib \
     cmd:llvm-nm \
     cmd:llvm-strip
 
@@ -766,7 +780,11 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 RUN mkdir -p /usr/share/cmake/Modules/Platform \
  && install -m 0644 /tmp/Generic-Musl.cmake /usr/share/cmake/Modules/Platform/Generic-Musl.cmake \
  && rm /tmp/Generic-Musl.cmake \
- && chmod -R a+rX /usr/share/cmake/Modules/Platform
+ && chmod -R a+rX /usr/share/cmake/Modules/Platform \
+ && mkdir -p /usr/share/cmake/Modules/Platform/Linker \
+ && install -m 0644 /tmp/Generic-Musl-Linker.cmake /usr/share/cmake/Modules/Platform/Linker/Generic-Musl-Linker.cmake \
+ && rm /tmp/Generic-Musl-Linker.cmake \
+ && chmod -R a+rX /usr/share/cmake/Modules/Platform/Linker
 
 WORKDIR /bootstrap/llvmorg
 
