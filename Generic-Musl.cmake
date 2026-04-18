@@ -77,11 +77,8 @@ endif()
 # Candidate libc paths relative to sysroot or absolute
 set(_libc_candidates
   "${CMAKE_SYSROOT}/lib/libc.so"
-  "${CMAKE_SYSROOT}/lib64/libc.so"
   "${CMAKE_INSTALL_PREFIX}/lib/libc.so"
-  "${CMAKE_INSTALL_PREFIX}/lib64/libc.so"
   "/lib/libc.so"
-  "/lib64/libc.so"
   "/usr/lib/libc.so"
 )
 
@@ -90,9 +87,9 @@ set(_musl_loader "")
 foreach(_c IN LISTS _libc_candidates)
   if(EXISTS "${_c}")
     set(libc_path "${_c}")
-    # try to guess loader name in same dir: ld-musl-*.so
+    # try to guess loader name in same dir: ld-musl-*.so.1
     get_filename_component(_c_dir "${_c}" DIRECTORY)
-    file(GLOB _ldcandidates "${_c_dir}/ld-musl-*.so")
+    file(GLOB _ldcandidates "${_c_dir}/ld-musl-*.so.1")
     if(_ldcandidates)
       list(GET _ldcandidates 0 _musl_loader)
     endif()
