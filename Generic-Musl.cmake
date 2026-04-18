@@ -311,7 +311,7 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
     set(CMAKE_${type}_LINK_DYNAMIC_C_FLAGS "-Wl,-Bdynamic")
   endforeach()
 
-  include(Platform/Linker/Generic-Musl-Linker.cmake)
+  include(Platform/Linker/Generic-Musl-Linker)
   if(_GENERIC_MUSL_HAVE_CLANG)
     __musl_linker_clang(C)
     __musl_linker_clang(CXX)
