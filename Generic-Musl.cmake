@@ -38,9 +38,13 @@ endif()
 # Infer C++ driver if plausible
 if(_GENERIC_MUSL_HAVE_CLANG)
   if(NOT DEFINED CMAKE_CXX_COMPILER)
-    get_filename_component(_cbin "${CMAKE_C_COMPILER}" NAME_WE)
-    if(_cbin MATCHES "clang$")
-      set(CMAKE_CXX_COMPILER "${CMAKE_C_COMPILER}++" CACHE FILEPATH "Inferred clang++" FORCE)
+    if(DEFINED ENV{CXX})
+      set(CMAKE_CXX_COMPILER "$ENV{CXX}" CACHE STRING "Environment C++ compiler" FORCE)
+    else()
+      get_filename_component(_cbin "${CMAKE_C_COMPILER}" NAME_WE)
+      if(_cbin MATCHES "clang$")
+        set(CMAKE_CXX_COMPILER "${CMAKE_C_COMPILER}++" CACHE FILEPATH "Inferred clang++" FORCE)
+      endif()
     endif()
   endif()
 endif()
@@ -239,8 +243,10 @@ endif()
 
 if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   message(STATUS "Shared libraries supported (musl loader and linker detected).")
-  set(CMAKE_C_CREATE_SHARED_LIBRARY "<CMAKE_C_COMPILER> -shared <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
-  set(CMAKE_CXX_CREATE_SHARED_LIBRARY "<CMAKE_CXX_COMPILER> -shared <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
+  # i.e. platform supports projects:
+  # option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
+  # OR:
+  # set(BUILD_SHARED_LIBS ON CACHE BOOL "Build libraries as shared libraries")
 else()
   if(DEFINED _musl_loader)
     message(STATUS "Detected musl dynamic loader: ${_musl_loader}")
@@ -254,3 +260,7 @@ else()
   endif()
   message(STATUS "Shared libraries disabled (missing musl loader or suitable linker).")
 endif()
+
+# CMP0164: add_library() rejects SHARED libraries when not supported by the platform.
+# New in CMake 3.30: https://cmake.org/cmake/help/latest/policy/CMP0164.html
+set(TARGET_SUPPORTS_SHARED_LIBS ${CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS} CACHE BOOL "Target platform supports shared libs" FORCE)
