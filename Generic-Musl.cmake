@@ -239,6 +239,8 @@ endif()
 
 if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   message(STATUS "Shared libraries supported (musl loader and linker detected).")
+  set(CMAKE_C_CREATE_SHARED_LIBRARY "<CMAKE_C_COMPILER> -shared <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
+  set(CMAKE_CXX_CREATE_SHARED_LIBRARY "<CMAKE_CXX_COMPILER> -shared <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
 else()
   if(DEFINED _musl_loader)
     message(STATUS "Detected musl dynamic loader: ${_musl_loader}")
