@@ -351,17 +351,10 @@ COPY ld-musl-aarch64.path /etc/ld-musl-aarch64.path
 RUN set -eux; \
     if [ "$(uname -m)" = "aarch64" ]; then \
       [ -L "${SYSROOT}"/etc/ld-musl-generic.path ] || ln -svf ld-musl-aarch64.path "${SYSROOT}"/etc/ld-musl-generic.path; \
-    fi; \
-    if [ "${TARGETARCH}" = "arm64" ]; then \
-      [ -L "${SYSROOT}"/etc/ld-musl-arm64.path ] || ln -svf ld-musl-aarch64.path "${SYSROOT}"/etc/ld-musl-arm64.path; \
-      [ -L "${SYSROOT}"/etc/ld-musl-generic.path ] || ln -svf ld-musl-arm64.path "${SYSROOT}"/etc/ld-musl-generic.path; \
-    fi ;
+    fi;
 
 COPY ld-musl-arm.path /etc/ld-musl-arm.path
 RUN set -eux; \
-    if [ "${TARGETARCH}" = "arm" ]; then \
-      [ -L "${SYSROOT}"/etc/ld-musl-generic.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-generic.path; \
-    fi ; \
     [ -L "${SYSROOT}"/etc/ld-musl-armv7.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-armv7.path; \
     [ -L "${SYSROOT}"/etc/ld-musl-armv8.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-armv8.path;
 
