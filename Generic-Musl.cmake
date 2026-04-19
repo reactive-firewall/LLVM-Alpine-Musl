@@ -26,8 +26,10 @@ set(UNIX 1)
 include(Platform/UnixPaths)
 
 # musl dos not care about .exe nor .elf (and does not support .app)
-# set(CMAKE_EXECUTABLE_SUFFIX "")
+set(CMAKE_EXECUTABLE_SUFFIX "")
+set(CMAKE_EXECUTABLE_FORMAT "ELF" CACHE STRING "Executable format")
 set(CMAKE_STATIC_LIBRARY_SUFFIX ".a")
+set(CMAKE_STATIC_LIBRARY_FORMAT "ELF" CACHE STRING "Static Library format")
 set(CMAKE_SHARED_LIBRARY_SUFFIX ".so")
 set(CMAKE_SHARED_MODULE_SUFFIX ".so")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON CACHE BOOL "Position independent code for shared libs" FORCE)
@@ -131,8 +133,7 @@ list(REMOVE_DUPLICATES _known_features)
 set(CMAKE_C_KNOWN_FEATURES "${_known_features}" CACHE STRING "Detected C known features" FORCE)
 message(STATUS "C known features: ${CMAKE_C_KNOWN_FEATURES}")
 
-# this option needs more testing
-#set(CMAKE_DL_LIBS "") # or static libdl.a stub
+set(CMAKE_DL_LIBS "" CACHE STRING "dl linker flags") # or static libdl.a stub
 # support position independance
 set(CMAKE_C_COMPILE_OPTIONS_PIC "-fPIC")
 set(CMAKE_C_COMPILE_OPTIONS_PIE "-fPIE")
@@ -282,7 +283,8 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   message(STATUS "Shared libraries supported (musl loader and linker detected).")
   # (musl) support shared libraries
   set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)
-
+  set(CMAKE_SHARED_LIBRARY_FORMAT "ELF" CACHE STRING "Shared lib format")
+  set(CMAKE_SHARED_MODULE_FORMAT "ELF" CACHE STRING "Shared module format")
   # PIE link options are managed in Compiler/<compiler>.cmake file
   set(CMAKE_SHARED_LIBRARY_C_FLAGS "-fPIC")            # -pic
   set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS "-shared")       # -shared
