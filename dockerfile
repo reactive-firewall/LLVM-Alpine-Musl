@@ -850,7 +850,7 @@ RUN set -eux; \
 # Quick, trivial compile-time test that the headers are usable:
 # compile-only (no linking) a small C++ snippet using the installed headers.
 RUN set -eux; \
-    cat > /tmp/test.cpp <<'CPP'; \
+    cat > /tmp/test.cpp <<'CPPHERE'; \
     #include <vector> \
     #include <string> \
     int main() { \
@@ -858,12 +858,13 @@ RUN set -eux; \
       v.push_back(\"ok\"); \
       return (int)v.size(); \
     } \
-    CPP; \
-    clang++ -fsyntax-only -std=c++17 -isystem /headers/usr/include /tmp/test.cpp
+    CPPHERE; \
+    clang++ -fsyntax-only -std=c++17 -isystem /headers/usr/include /tmp/test.cpp ;
+
 
 # Cleanup build packages and intermediate files to keep this stage small
 RUN apk del --no-cache cmd:clang++ make cmake samuri python3 && \
-    rm -rf /bootstrap/build-libcxx-config /bootstrap/build-libcxxabi-config /tmp/test.cpp &&\
+    rm -rf /bootstrap/build-libcxx-config /bootstrap/build-libcxxabi-config /tmp/test.cpp && \
     find /headers/usr/include -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true ;
 
 # The resulting "headers" sysroot:
