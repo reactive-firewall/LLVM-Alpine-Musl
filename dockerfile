@@ -832,6 +832,9 @@ RUN apk add --no-cache \
 # prob need -DCMAKE_CXX_COMPILER_ID="Clang"
 # prob need -DCMAKE_CXX_COMPILER_VERSION=$(${CXX} --version 2>/dev/null | head -n1 | grep -m1 --color=never -oE "[1-9][0-9]*.[0-9]+[\.0-9]*" | head -n1 )
 
+# copy all the libc++ headers into the sysroot
+RUN cp -a llvm-project/libcxx/include/c++/v1/* "$SYSROOT/usr/include/c++/v1/" || true
+
 
 # DEBUG Mark 2
 RUN printf "%s\n" "CMake Version: $(cmake --version)" && \
