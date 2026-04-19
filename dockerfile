@@ -718,7 +718,7 @@ ENV LDFLAGS="-v -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/l
 # may require -D__ELF__
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT} -iwithsysroot /usr/include"
 # might need -nostdinc++
-ENV CXXFLAGS="-unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
+ENV CXXFLAGS="-iwithsysroot /usr/include/c++/v1 -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
@@ -802,6 +802,7 @@ RUN apk add --no-cache \
 # might need -DLIBCXXABI_HAS_CXA_THREAD_ATEXIT_IMPL=false
 # might need -DLIBCXXABI_HAS_PTHREAD_API=ON
 # might need -DLIBCXXABI_HAS_PTHREAD_LIB=ON
+# might need -DLIBCXXABI_ENABLE_EXCEPTIONS=ON
 # might need -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm
 # might need -DLLVM_ENABLE_ZLIB=OFF
 # might need -DLLVM_ENABLE_ZSTD=OFF
@@ -813,10 +814,7 @@ RUN apk add --no-cache \
 # might want unused -DLIBCXX_TARGET_TRIPLE=${TARGET_TRIPLE}
 # might want unused -DTARGET_TRIPLE=${TARGET_TRIPLE}
 # might want unused -DHOST_TRIPLE=${HOST_TRIPLE}
-# migth want -DLIBCXX_HERMETIC_STATIC_LIBRARY=ON
 # might want unused -DLIBCXX_HAS_C_LIB=ON
-
-# might want -DCMAKE_LINKER=ld.lld
 
 # might want -DLLVM_CONFIG_PATH=/usr/bin/llvm-config  (but need mocking implementation for sysroot)
 
@@ -870,6 +868,7 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -G "Ninja" \
     -DLIBCXXABI_USE_COMPILER_RT=ON \
     -DLIBCXXABI_ENABLE_THREADS=ON \
     -DLIBCXXABI_HAS_PTHREAD_LIB=ON \
+    -DLIBCXXABI_HAS_CXA_THREAD_ATEXIT_IMPL=false \
     -DLIBCXXABI_HAS_GCC_S_LIB=NO \
     -DLIBCXXABI_ENABLE_SHARED=ON \
     -DCMAKE_C_COMPILER=clang \
