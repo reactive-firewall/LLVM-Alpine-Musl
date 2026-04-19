@@ -677,7 +677,7 @@ RUN for UNWIND_FILE_ARTIFACT in usr/lib/libunwind.so.1.0 ; do \
          llvm-strip --strip-unneeded /stage/usr/lib/libunwind.so.1.0 + || true; \
       else \
          strip --strip-unneeded /stage/usr/lib/libunwind.so.1.0 + || true; \
-      fi \
+      fi ; \
       touch -d "${SOME_DATE_EPOCH}" /stage/usr/lib/libunwind.so.1.0 || true ; \
     fi
 
@@ -740,7 +740,7 @@ ENV LDFLAGS="-v -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/l
 # may require -D__ELF__
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT} -iwithsysroot /usr/include"
 # might need -nostdinc++
-ENV CXXFLAGS="-iwithsysroot /usr/include/c++/v1 -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
+ENV CXXFLAGS="-iwithsysroot /usr/include/'c++'/v1 -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
@@ -916,7 +916,7 @@ ENV MUSL_PREFIX="/usr"
 
 ENV LDFLAGS="-v -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic"
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT} -iwithsysroot /usr/include"
-ENV CXXFLAGS="-iwithsysroot /usr/include/c++/v1 -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
+ENV CXXFLAGS="-iwithsysroot /usr/include/'c++'/v1 -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
