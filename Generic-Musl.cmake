@@ -293,9 +293,9 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   # Not sure if rpaths are used by musl (ld-musl-ARCH.so.1 is hardcoded when linking to musl)
   set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "-Wl,-rpath,")       # -rpath
   # probably works like FreeBSD
-  # set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG_SEP ":")   # : or empty
+  set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG_SEP ":")   # : or empty
   # Not sure about -z origin with musl
-  #set(CMAKE_SHARED_LIBRARY_RPATH_ORIGIN_TOKEN "\$ORIGIN")
+  set(CMAKE_SHARED_LIBRARY_RPATH_ORIGIN_TOKEN "\$ORIGIN")
   set(CMAKE_SHARED_LIBRARY_RPATH_LINK_C_FLAG "-Wl,-rpath-link,")
   set(CMAKE_SHARED_LIBRARY_SONAME_C_FLAG "-Wl,-soname,")
   set(CMAKE_EXE_EXPORTS_C_FLAG "-Wl,--export-dynamic")
