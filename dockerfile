@@ -718,7 +718,7 @@ ENV LDFLAGS="-v -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/l
 # may require -D__ELF__
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT} -iwithsysroot /usr/include"
 # might need -nostdinc++
-ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
+ENV CXXFLAGS="-unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
@@ -861,7 +861,7 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -G "Ninja" \
     -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
     -DBUILD_SHARED_LIBS=ON \
     -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-    -DCMAKE_CXX_FLAGS="${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
+    -DCMAKE_CXX_FLAGS="${CFLAGS} ${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
     -DLIBCXXABI_SOURCE_DIR="/bootstrap/llvmorg/libcxxabi" \
     -DLIBCXXABI_LIBCXX_PATH="/bootstrap/llvmorg/libcxx" \
     -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
