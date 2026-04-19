@@ -437,6 +437,11 @@ ENV ASM=clang
 ENV RANLIB=llvm-ranlib
 ENV LD=lld
 
+# epoch is passed through by Docker.
+# shellcheck disable=SC2154
+ARG SOME_DATE_EPOCH
+ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
+
 ENV SYSROOT="/sysroot"
 ENV MUSL_PREFIX="/usr"
 
@@ -500,6 +505,11 @@ ENV ASM=clang
 ENV RANLIB=llvm-ranlib
 ENV LD=lld
 
+# epoch is passed through by Docker.
+# shellcheck disable=SC2154
+ARG SOME_DATE_EPOCH
+ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
+
 ENV SYSROOT="/sysroot"
 ENV MUSL_PREFIX="/usr"
 
@@ -551,10 +561,10 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     rm -vfr /bootstrap/llvmorg/build-libunwind/
 
 # check on the lib
-RUN printf "%s\n" "Bootstrapped Libs (static):" && \
-    ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true ; \
-    printf "%s\n" "Bootstrapped Headers:" && \
-    ls -lapr ${SYSROOT}/usr/include/ || true
+#RUN printf "%s\n" "Bootstrapped Libs (static):" && \
+#    ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true ; \
+#    printf "%s\n" "Bootstrapped Headers:" && \
+#    ls -lapr ${SYSROOT}/usr/include/ || true
 
 # move the changed files out to stage
 
@@ -568,6 +578,7 @@ RUN mkdir -pv /stage-static/usr/include/mach-o && mkdir -pv /stage-static/usr/li
         usr/include/unwind.h \
         usr/lib/libunwind.a ; do \
           cp -vn ${SYSROOT}/${UNWIND_FILE_ARTIFACT} /stage-static/${UNWIND_FILE_ARTIFACT} || true ; \
+          touch -d "${SOME_DATE_EPOCH}" /stage-static/${UNWIND_FILE_ARTIFACT} || true ; \
     done ;
 
 # --- build-unwind: bootstrap unwind using distro clang/llvm to compile a minimal unwind library ---
@@ -595,6 +606,11 @@ ENV AS="clang -integrated-as -c"
 ENV ASM=clang
 ENV RANLIB=llvm-ranlib
 ENV LD=lld
+
+# epoch is passed through by Docker.
+# shellcheck disable=SC2154
+ARG SOME_DATE_EPOCH
+ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
 
 ENV SYSROOT="/sysroot"
 ENV MUSL_PREFIX="/usr"
@@ -643,12 +659,11 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     cmake --install build-libunwind && \
     rm -vfr /bootstrap/llvmorg/build-libunwind/
 
-
 # check on the lib
-RUN printf "%s\n" "Bootstrapped Libs (dynamic):" && \
-    ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true ; \
-    printf "%s\n" "Bootstrapped Headers:" && \
-    ls -lapr ${SYSROOT}/usr/include/ || true
+#RUN printf "%s\n" "Bootstrapped Libs (dynamic):" && \
+#    ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true ; \
+#    printf "%s\n" "Bootstrapped Headers:" && \
+#    ls -lapr ${SYSROOT}/usr/include/ || true
 
 # bring in the staged files from static
 COPY --from=build-unwind-static /stage-static /stage
@@ -663,14 +678,16 @@ RUN for UNWIND_FILE_ARTIFACT in usr/lib/libunwind.so.1.0 ; do \
       else \
          strip --strip-unneeded /stage/usr/lib/libunwind.so.1.0 + || true; \
       fi \
+      touch -d "${SOME_DATE_EPOCH}" /stage/usr/lib/libunwind.so.1.0 || true ; \
     fi
 
-# --- bootstrap: bootstrap environment using distro clang/llvm to compile a minimal clang toolchain ---
-FROM --platform="linux/${TARGETARCH}" alpine:latest AS bootstrap
+
+# --- Lib C++ headers ---
+FROM --platform="linux/${TARGETARCH}" alpine:latest AS libcxxheaders
 
 WORKDIR /bootstrap
 
-# copy sources
+# copy sources (llvmorg is the llvm-project checkout root)
 COPY --from=fetcher /fetch/llvmorg /bootstrap/llvmorg
 COPY --from=sysroot /sysroot /sysroot
 COPY --from=build-unwind /stage /stage
@@ -708,6 +725,11 @@ ENV LD=lld
 # will use /sysroot/usr/bin/ld.musl-clang later
 #ENV LD=/sysroot/usr/bin/ld.musl-clang
 
+# epoch is passed through by Docker.
+# shellcheck disable=SC2154
+ARG SOME_DATE_EPOCH
+ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
+
 ENV SYSROOT="/sysroot"
 ENV MUSL_PREFIX="/usr"
 
@@ -732,6 +754,190 @@ RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
         usr/lib/libunwind.a \
         usr/lib/libunwind.so.1.0 ; do \
           cp -vf /stage/${UNWIND_FILE_ARTIFACT} ${SYSROOT}/${UNWIND_FILE_ARTIFACT} || true ; \
+          touch -d "${SOME_DATE_EPOCH}" ${SYSROOT}/${UNWIND_FILE_ARTIFACT} || true ; \
+    done ;
+
+# Ensure unwind has canonical name (example: /usr/lib/libunwind.so -> /usr/lib/libunwind.so.1.0)
+RUN set -eux \
+    && ln -fns libunwind.so.1.0 ${SYSROOT}/lib/libunwind.so.1 && \
+    ln -fns libunwind.so.1 ${SYSROOT}/lib/libunwind.so
+
+# Ensure we have the unwinder and libc headers present (sysroot paths)
+RUN ls -l ${SYSROOT}${MUSL_PREFIX}/include || true \
+    && file ${SYSROOT}${MUSL_PREFIX}/include/* || true
+
+#check the lib directories too
+# check on the lib
+RUN printf "%s\n" "Bootstrapped Libs (pre-c++):" && \
+    ls -lap ${SYSROOT}/lib/ && file ${SYSROOT}/lib/generic/* || true ;\
+    ls -lap ${SYSROOT}/lib/generic/ && file ${SYSROOT}/lib/generic/* || true ;\
+    printf "%s\n" "Bootstrapped Headers:" && \
+    ls -lapr ${SYSROOT}/usr/include/ || true
+
+# install minimal build tooling (musl-based; no libstdc++/glibc packages used)
+RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
+  apk update && \
+  apk add --no-cache \
+    cmd:bash \
+    cmd:dash \
+    cmd:clang \
+    cmake \
+    python3 \
+    samurai \
+    cmd:grep \
+    cmd:clang-cpp \
+    cmd:clang++ \
+    musl-dev \
+    clang-dev \
+    cmd:lld \
+    cmd:llvm-ar \
+    cmd:find
+
+# Install into Alpine cmake's Platform dir as PlatformGeneric-Musl.cmake
+RUN mkdir -p /usr/share/cmake/Modules/Platform \
+ && install -m 0644 /tmp/Generic-Musl.cmake /usr/share/cmake/Modules/Platform/Generic-Musl.cmake \
+ && rm /tmp/Generic-Musl.cmake \
+ && chmod -R a+rX /usr/share/cmake/Modules/Platform \
+ && mkdir -p /usr/share/cmake/Modules/Platform/Linker \
+ && install -m 0644 /tmp/Generic-Musl-Linker.cmake /usr/share/cmake/Modules/Platform/Linker/Generic-Musl-Linker.cmake \
+ && rm /tmp/Generic-Musl-Linker.cmake \
+ && chmod -R a+rX /usr/share/cmake/Modules/Platform/Linker
+
+WORKDIR /bootstrap/llvmorg
+
+# Configure/install libc++ headers only into a "headers" sysroot
+# -> install prefix is /headers/usr so final headers appear under /headers/usr/include
+RUN set -eux; \
+    mkdir -p build-libcxx-config; \
+    cd build-libcxx-config; \
+    cmake -G Ninja \
+      ../llvmorg/libcxx \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_SYSTEM_NAME=Generic-Musl \
+      -DCMAKE_INSTALL_PREFIX=/headers/usr \
+      -DLIBCXX_INSTALL_HEADERS=ON \
+      -DLIBCXX_ENABLE_SHARED=OFF \
+      -DLIBCXX_ENABLE_STATIC=OFF \
+      -DLIBCXX_CXX_ABI=libcxxabi \
+      -DLLVM_PATH=/bootstrap/llvmorg \
+      -DCMAKE_C_COMPILER=clang \
+      -DCMAKE_CXX_COMPILER=clang++ \
+      -DLLVM_ENABLE_RUNTIMES= \
+      -DLIBCXX_INCLUDE_TESTS=OFF \
+    ; \
+    cmake --build . --target install
+
+# Install libcxxabi headers too (ABI types required by libc++ headers)
+RUN set -eux; \
+    mkdir -p build-libcxxabi-config; \
+    cd build-libcxxabi-config; \
+    cmake -G Ninja \
+      ../llvmorg/libcxxabi \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_SYSTEM_NAME=Generic-Musl \
+      -DCMAKE_INSTALL_PREFIX=/headers/usr \
+      -DLIBCXXABI_INSTALL_HEADERS=ON \
+      -DLIBCXXABI_ENABLE_SHARED=OFF \
+      -DLIBCXXABI_ENABLE_STATIC=OFF \
+      -DLLVM_PATH=/bootstrap/llvmorg \
+      -DCMAKE_C_COMPILER=clang \
+      -DCMAKE_CXX_COMPILER=clang++ \
+      -DLLVM_ENABLE_RUNTIMES= \
+      -DLIBCXXABI_INCLUDE_TESTS=OFF \
+    ; \
+    cmake --build . --target install
+
+# Quick, trivial compile-time test that the headers are usable:
+# compile-only (no linking) a small C++ snippet using the installed headers.
+RUN set -eux; \
+    cat > /tmp/test.cpp <<'CPP'; \
+    #include <vector> \
+    #include <string> \
+    int main() { \
+      std::vector<std::string> v; \
+      v.push_back(\"ok\"); \
+      return (int)v.size(); \
+    } \
+    CPP; \
+    clang++ -fsyntax-only -std=c++17 -isystem /headers/usr/include /tmp/test.cpp
+
+# Cleanup build packages and intermediate files to keep this stage small
+RUN apk del --no-cache cmd:clang++ make cmake samuri python3 && \
+    rm -rf /bootstrap/build-libcxx-config /bootstrap/build-libcxxabi-config /tmp/test.cpp &&\
+    find /headers/usr/include -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true ;
+
+# The resulting "headers" sysroot:
+# /headers/usr/include    <-- contains libc++ and libcxxabi headers and generated config headers
+# Keep them in this stage so a later stage can COPY --from=libcxxheaders /headers /headers
+
+# Ensure we have the libc headers present (sysroot paths)
+RUN ls -l /headers/usr/include || true \
+    && file /headers/usr/include/* || true
+
+# --- bootstrap: bootstrap environment using distro clang/llvm to compile a minimal clang toolchain ---
+FROM --platform="linux/${TARGETARCH}" alpine:latest AS bootstrap
+
+WORKDIR /bootstrap
+
+# copy sources
+COPY --from=fetcher /fetch/llvmorg /bootstrap/llvmorg
+COPY --from=sysroot /sysroot /sysroot
+COPY --from=build-unwind /stage /stage
+COPY --from=libcxxheaders /headers /stage-cxx
+
+# Copy your Generic-Musl.cmake into the image build context before building the image
+COPY Generic-Musl.cmake /tmp/Generic-Musl.cmake
+COPY Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
+
+ARG MUSL_LDLIB
+ENV MUSL_LDLIB="${MUSL_LDLIB}"
+
+ARG LLVM_RTLIB_STUB
+ENV LLVM_RTLIB_STUB="${LLVM_RTLIB_STUB}"
+
+ARG LLVM_RTLIB
+ENV LLVM_RTLIB="${LLVM_RTLIB:-lib${LLVM_RTLIB_STUB}.a}"
+
+ARG TARGET_FOR_LLVM
+ENV TARGET_FOR_LLVM=${TARGET_FOR_LLVM}
+
+ARG TARGET_TRIPLE
+ENV TARGET_TRIPLE=${TARGET_TRIPLE}
+
+ARG HOST_TRIPLE
+ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
+
+ENV CC=clang
+ENV CXX=clang-cpp
+ENV CPP=clang-cpp
+ENV AR=llvm-ar
+ENV AS="clang -integrated-as -c"
+ENV ASM=clang
+ENV RANLIB=llvm-ranlib
+ENV LD=lld
+# will use /sysroot/usr/bin/ld.musl-clang later
+#ENV LD=/sysroot/usr/bin/ld.musl-clang
+
+ENV SYSROOT="/sysroot"
+ENV MUSL_PREFIX="/usr"
+
+ENV LDFLAGS="-v -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic"
+ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT} -iwithsysroot /usr/include"
+ENV CXXFLAGS="-iwithsysroot /usr/include/c++/v1 -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
+
+# overlay the unwinder
+RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
+    for UNWIND_FILE_ARTIFACT in usr/include/__libunwind_config.h \
+        usr/include/libunwind.h \
+        usr/include/libunwind.modulemap \
+        usr/include/mach-o/compact_unwind_encoding.h \
+        usr/include/unwind_arm_ehabi.h \
+        usr/include/unwind_itanium.h \
+        usr/include/unwind.h \
+        usr/lib/libunwind.a \
+        usr/lib/libunwind.so.1.0 ; do \
+          cp -vf /stage/${UNWIND_FILE_ARTIFACT} ${SYSROOT}/${UNWIND_FILE_ARTIFACT} || true ; \
+          touch -d "${SOME_DATE_EPOCH}" ${SYSROOT}/${UNWIND_FILE_ARTIFACT} || true ; \
     done ;
 
 # Ensure unwind has canonical name (example: /usr/lib/libunwind.so -> /usr/lib/libunwind.so.1.0)
@@ -832,7 +1038,7 @@ RUN apk add --no-cache \
 
 # copy all the libc++ headers into the sysroot
 RUN mkdir -vp "$SYSROOT/usr/include/c++/v1/" && \
-    cp -av /bootstrap/llvmorg/libcxx/include/* "$SYSROOT/usr/include/c++/v1/" || true
+    cp -HRnp /stage-cxx/include/* "$SYSROOT"/usr/include || true
 
 
 # DEBUG Mark 2
