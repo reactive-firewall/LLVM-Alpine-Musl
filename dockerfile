@@ -876,7 +876,9 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -G "Ninja" \
         g++ \
         cmd:g++ && \
     ls -lap -r /bootstrap/llvmorg/build-libcxxabi-shared && \
+    ls -lap -r /bootstrap/llvmorg/build-libcxxabi-shared/lib && \
     ls -lap -r /bootstrap/llvmorg/build-libcxxabi-shared/libcxxabi && \
+    ls -lap -r /bootstrap/llvmorg/build-libcxxabi-shared/libcxxabi/include && \
     ls -lap -r /bootstrap/llvmorg/build-libcxxabi-shared/CMakeFiles && \
     printf "\n\n%s\n" "CMake --build build-libcxxabi-shared MARK:" && \
     cmake --build build-libcxxabi-shared && \

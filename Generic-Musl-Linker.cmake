@@ -7,6 +7,7 @@ include_guard()
 macro(__musl_linker_clang lang)
     set(CMAKE_${lang}_PLATFORM_LINKER_ID Clang)
     set(CMAKE_${lang}_LINK_LIBRARIES_PROCESSING ORDER=REVERSE DEDUPLICATION=ALL)
+    set(CMAKE_${lang}_COMPILE_OPTIONS_VISIBILITY "-fvisibility=")
 
     # Features for LINK_LIBRARY generator expression
     ## WHOLE_ARCHIVE: Force loading all members of an archive
