@@ -850,15 +850,7 @@ RUN set -eux; \
 # Quick, trivial compile-time test that the headers are usable:
 # compile-only (no linking) a small C++ snippet using the installed headers.
 RUN set -eux; \
-    cat > /tmp/test.cpp <<'CPPHERE'; \
-    #include <vector> \
-    #include <string> \
-    int main() { \
-      std::vector<std::string> v; \
-      v.push_back(\"ok\"); \
-      return (int)v.size(); \
-    } \
-    CPPHERE; \
+    printf '%s\n' '#include <vector>' '#include <string>' 'int main() {' '  std::vector<std::string> v;' '  v.push_back("ok");' '  return (int)v.size();' '}' > /tmp/test.cpp; \
     clang++ -fsyntax-only -std=c++17 -isystem /headers/usr/include /tmp/test.cpp ;
 
 
