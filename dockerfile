@@ -786,7 +786,6 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     samurai \
     cmd:grep \
     cmd:clang-cpp \
-    cmd:clang++ \
     cmd:lld \
     cmd:llvm-ar \
     cmd:find
@@ -800,6 +799,14 @@ RUN mkdir -p /usr/share/cmake/Modules/Platform \
  && install -m 0644 /tmp/Generic-Musl-Linker.cmake /usr/share/cmake/Modules/Platform/Linker/Generic-Musl-Linker.cmake \
  && rm /tmp/Generic-Musl-Linker.cmake \
  && chmod -R a+rX /usr/share/cmake/Modules/Platform/Linker
+
+# WORKAROUND: cmake still thinks that clang++ requires g++
+RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
+  apk update && \
+  apk add --no-cache \
+    cmd:clang++ \
+    cmd:g++
+# but we remove it anyway afterwards
 
 WORKDIR /bootstrap/llvmorg
 
@@ -878,7 +885,7 @@ RUN set -eux; \
 
 
 # Cleanup build packages and intermediate files to keep this stage small
-RUN apk del --no-cache cmd:clang++ make cmake samuri python3 && \
+RUN apk del --no-cache cmd:g++ cmd:clang++ make cmake samuri python3 && \
     rm -rf /bootstrap/build-libcxx-config /bootstrap/build-libcxxabi-config /tmp/test.cpp && \
     find /headers/usr/include -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true ;
 
