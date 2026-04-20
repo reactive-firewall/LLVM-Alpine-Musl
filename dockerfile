@@ -828,7 +828,7 @@ RUN mkdir -pv /headers && \
             touch -d "${SOME_DATE_EPOCH}" /headers/${MUSL_SDK_FILE_ARTIFACT} || true ; \
           fi ; \
     done ; \
-    find /headers/usr/include -type f -iname "*.h" -depth 1 -exec ln -svf {} /headers/usr/include/$(basename {}) + || true;
+    find /headers/usr/include -type f -iname "*.h" -depth 1 -exec ln -svf {} /headers/usr/include/$(basename {}) || true;
 
 # WORKAROUND: cmake still thinks that clang++ requires g++
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
