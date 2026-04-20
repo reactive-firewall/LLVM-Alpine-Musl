@@ -849,7 +849,7 @@ RUN set -eux; \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
       -DCMAKE_INSTALL_PREFIX=/headers/usr \
-      -DLIBCXX_INSTALL_INCLUDE_TARGET_DIR=include/c++/v1
+      -DLIBCXX_INSTALL_INCLUDE_TARGET_DIR=include/c++/v1 \
       -DLIBCXX_INSTALL_HEADERS=ON \
       -DLIBCXX_ENABLE_SHARED=OFF \
       -DLIBCXX_ENABLE_STATIC=OFF \
