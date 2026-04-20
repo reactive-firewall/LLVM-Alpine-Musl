@@ -827,8 +827,12 @@ RUN mkdir -pv /headers && \
             ln -svf ${SYSROOT}/${MUSL_SDK_FILE_ARTIFACT} /headers/${MUSL_SDK_FILE_ARTIFACT} || true ; \
             touch -d "${SOME_DATE_EPOCH}" /headers/${MUSL_SDK_FILE_ARTIFACT} || true ; \
           fi ; \
-    done ; \
-    sh -c 'for f in $(find /headers/usr/include -type f -iname "*.h" -depth 1 -print 2>/dev/null); do ln -svf "$f" /headers/usr/include/$(basename "$f") || true ; done' ;
+    done ;
+
+# WORKAROUND: for loops break ln with docker sometimes
+RUN for f in $(find /headers/usr/include -type f -iname "*.h" -depth 1 -print 2>/dev/null); do \
+    ln -svf "$f" /headers/usr/include/$(basename "$f") || true ; \
+  done ;
 
 # WORKAROUND: cmake still thinks that clang++ requires g++
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
