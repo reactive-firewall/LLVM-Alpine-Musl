@@ -787,8 +787,6 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:grep \
     cmd:clang-cpp \
     cmd:clang++ \
-    musl-dev \
-    clang-dev \
     cmd:lld \
     cmd:llvm-ar \
     cmd:find
@@ -822,6 +820,7 @@ RUN set -eux; \
       -DLLVM_PATH=/bootstrap/llvmorg \
       -DCMAKE_C_COMPILER=clang \
       -DCMAKE_CXX_COMPILER=clang++ \
+      -DCMAKE_LINKER=lld \
       -DLLVM_ENABLE_RUNTIMES= \
       -DLIBCXX_INCLUDE_TESTS=OFF \
     ; \
@@ -842,6 +841,7 @@ RUN set -eux; \
       -DLLVM_PATH=/bootstrap/llvmorg \
       -DCMAKE_C_COMPILER=clang \
       -DCMAKE_CXX_COMPILER=clang++ \
+      -DCMAKE_LINKER=lld \
       -DLLVM_ENABLE_RUNTIMES= \
       -DLIBCXXABI_INCLUDE_TESTS=OFF \
     ; \
