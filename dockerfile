@@ -740,7 +740,7 @@ ENV LDFLAGS="-v -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/l
 # may require -D__ELF__
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT} -iwithsysroot /usr/include"
 # might need -nostdinc++
-ENV CXXFLAGS="-iwithsysroot /usr/include/'c++'/v1 -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
+ENV CXXFLAGS="-iwithsysroot /usr/include/c++/v1 -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
@@ -939,7 +939,7 @@ ENV MUSL_PREFIX="/usr"
 
 ENV LDFLAGS="-v -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic"
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT} -iwithsysroot /usr/include"
-ENV CXXFLAGS="-iwithsysroot /usr/include/'c++'/v1 -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
+ENV CXXFLAGS="-iwithsysroot /usr/include/c++/v1 -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
@@ -1271,7 +1271,7 @@ RUN ln -sf /opt/llvm-bootstrap/include/clang /sysroot/usr/include/clang && \
     ln -sf /opt/llvm-bootstrap/include/lld /sysroot/usr/include/lld && \
     ln -sf /opt/llvm-bootstrap/include/llvm /sysroot/usr/include/llvm && \
     ln -sf /opt/llvm-bootstrap/include/llvm-c /sysroot/usr/include/llvm-c && \
-    ln -sf /usr/include/'c++' /sysroot/usr/include/'c++' && \
+    ln -sf /usr/include/c++ /sysroot/usr/include/c++ && \
     mkdir -pv /sysroot/usr/lib/ && \
     ln -sf /usr/lib/'libc++.so.1.0' /sysroot/usr/lib/'libc++.so.1.0' && \
     ln -sf /usr/lib/'libc++abi.so.1.0' /sysroot/usr/lib/'libc++abi.so.1.0' && \
@@ -1296,9 +1296,9 @@ RUN for SOME_FILE in \
     /sysroot/usr/lib \
     /sysroot/usr/include \
     /usr/include \
-    /sysroot/usr/include/'c++' \
-    /usr/include/'c++' \
-    /sysroot/usr/include/'c++'/./ ; do \
+    /sysroot/usr/include/c++ \
+    /usr/include/c++ \
+    /sysroot/usr/include/c++/./ ; do \
       printf '\nListing %s:\n' "${SOME_FILE}" && \
       ls -lap "${SOME_FILE}" ; done ;
 
