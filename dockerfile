@@ -781,6 +781,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:bash \
     cmd:dash \
     cmd:clang \
+    compiler-rt \
     cmake \
     python3 \
     samurai \
@@ -823,18 +824,16 @@ RUN set -eux; \
       -DLIBCXX_ENABLE_SHARED=OFF \
       -DLIBCXX_ENABLE_STATIC=OFF \
       -DLIBCXX_CXX_ABI=libcxxabi \
-      -DLLVM_PATH=/bootstrap/llvmorg \
-      -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm/cmake/modules \
-      -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
-      -DClang_DIR=/bootstrap/llvmorg/clang \
-      -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
-      -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
-      -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DLIBCXX_HAS_GCC_LIB=NO \
+      -DLIBCXX_HAS_GCC_S_LIB=NO \
+      -DLIBCXX_USE_COMPILER_RT=ON \
+      -DLIBCXX_HAS_MUSL_LIBC=ON \
+      -DLIBCXX_INCLUDE_BENCHMARKS=OFF \
+      -DLIBCXX_HARDENING_MODE=extensive \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
-      -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_CXX_FLAGS="${CFLAGS} -D_LIBCPP_HAS_THREAD_API_PTHREAD=1 ${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
+      -DCMAKE_CXX_FLAGS="${CFLAGS} ${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
       -DCMAKE_C_COMPILER=clang \
       -DCMAKE_CXX_COMPILER=clang++ \
       -DCMAKE_LINKER=lld \
