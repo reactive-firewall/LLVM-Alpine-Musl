@@ -808,8 +808,7 @@ WORKDIR /bootstrap/llvmorg
 RUN set -eux; \
     mkdir -p build-libcxx-config; \
     cd build-libcxx-config; \
-    cmake -G Ninja \
-      ../libcxx \
+    cmake -G Ninja ../libcxx -Wno-dev \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
       -DCMAKE_INSTALL_PREFIX=/headers/usr \
@@ -818,8 +817,20 @@ RUN set -eux; \
       -DLIBCXX_ENABLE_STATIC=OFF \
       -DLIBCXX_CXX_ABI=libcxxabi \
       -DLLVM_PATH=/bootstrap/llvmorg \
+      -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm/cmake/modules \
+      -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
+      -DClang_DIR=/bootstrap/llvmorg/clang \
+      -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
+      -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
+      -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
+      -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
+      -DCMAKE_CXX_FLAGS="${CFLAGS} ${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
       -DCMAKE_C_COMPILER=clang \
       -DCMAKE_CXX_COMPILER=clang++ \
+      -DCMAKE_CXX_COMPILER_ID="Clang" \
       -DCMAKE_LINKER=lld \
       -DLLVM_ENABLE_RUNTIMES= \
       -DLIBCXX_INCLUDE_TESTS=OFF \
@@ -839,8 +850,20 @@ RUN set -eux; \
       -DLIBCXXABI_ENABLE_SHARED=OFF \
       -DLIBCXXABI_ENABLE_STATIC=OFF \
       -DLLVM_PATH=/bootstrap/llvmorg \
+      -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm/cmake/modules \
+      -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
+      -DClang_DIR=/bootstrap/llvmorg/clang \
+      -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
+      -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
+      -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
+      -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
+      -DCMAKE_CXX_FLAGS="${CFLAGS} ${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
       -DCMAKE_C_COMPILER=clang \
       -DCMAKE_CXX_COMPILER=clang++ \
+      -DCMAKE_CXX_COMPILER_ID="Clang" \
       -DCMAKE_LINKER=lld \
       -DLLVM_ENABLE_RUNTIMES= \
       -DLIBCXXABI_INCLUDE_TESTS=OFF \
