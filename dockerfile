@@ -818,7 +818,7 @@ RUN set -eux; \
     cmake -G Ninja ../libcxx -Wno-dev \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
-      -DCMAKE_INSTALL_PREFIX=${SYSROOT}/usr \
+      -DCMAKE_INSTALL_PREFIX=/headers/usr \
       -DLIBCXX_INSTALL_HEADERS=ON \
       -DLIBCXX_ENABLE_SHARED=OFF \
       -DLIBCXX_ENABLE_STATIC=OFF \
@@ -837,7 +837,6 @@ RUN set -eux; \
       -DCMAKE_CXX_FLAGS="${CFLAGS} ${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
       -DCMAKE_C_COMPILER=clang \
       -DCMAKE_CXX_COMPILER=clang++ \
-      -DCMAKE_CXX_COMPILER_ID="Clang" \
       -DCMAKE_LINKER=lld \
       -DLLVM_ENABLE_RUNTIMES= \
       -DLIBCXX_INCLUDE_TESTS=OFF \
@@ -870,7 +869,6 @@ RUN set -eux; \
       -DCMAKE_CXX_FLAGS="${CFLAGS} ${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
       -DCMAKE_C_COMPILER=clang \
       -DCMAKE_CXX_COMPILER=clang++ \
-      -DCMAKE_CXX_COMPILER_ID="Clang" \
       -DCMAKE_LINKER=lld \
       -DLLVM_ENABLE_RUNTIMES= \
       -DLIBCXXABI_INCLUDE_TESTS=OFF \
