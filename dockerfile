@@ -203,7 +203,7 @@ RUN mkdir -pv ${MUSL_PREFIX} && \
     ln -sfv usr/bin "${SYSROOT}/bin" && \
     ln -sfv usr/sbin "${SYSROOT}/sbin" && \
     ln -sfv usr/lib "${SYSROOT}/lib" && \
-    ln -sfv usr/lib "${SYSROOT}/libexec" && \
+    ln -sfv usr/libexec "${SYSROOT}/libexec" && \
     ln -sfv ../etc "${SYSROOT}/usr/etc" && \
     ln -sfv ../share "${SYSROOT}/usr/share" && \
     ln -sfv ../man "${SYSROOT}/usr/man"
@@ -801,6 +801,35 @@ RUN mkdir -p /usr/share/cmake/Modules/Platform \
  && rm /tmp/Generic-Musl-Linker.cmake \
  && chmod -R a+rX /usr/share/cmake/Modules/Platform/Linker
 
+RUN mkdir -pv /headers && \
+    mkdir -pv /headers/dev && \
+    mkdir -pv /headers/proc && \
+    mkdir -pv /headers/run && \
+    mkdir -pv /headers/sys && \
+    mkdir -pv /headers/share && \
+    mkdir -pv /headers/man && \
+    mkdir -pv /headers/tmp && \
+    mkdir -pv /headers/etc && \
+    mkdir -pv /headers/usr/include && \
+    for MUSL_SDK_FILE_ARTIFACT in bin sbin lib libexec \
+        usr/bin usr/sbin usr/lib usr/libexec \
+        usr/share usr/man \
+        usr/include/arpa \
+        usr/include/bits \
+        usr/include/generic \
+        usr/include/mach-o \
+        usr/include/net \
+        usr/include/netinet \
+        usr/include/netpacket \
+        usr/include/scsi \
+        usr/include/sys ; do \
+          if [ -d ${SYSROOT}/${MUSL_SDK_FILE_ARTIFACT} ] ; then
+            ln -svf ${SYSROOT}/${MUSL_SDK_FILE_ARTIFACT} /headers/${MUSL_SDK_FILE_ARTIFACT} || true ; \
+            touch -d "${SOME_DATE_EPOCH}" /headers/${MUSL_SDK_FILE_ARTIFACT} || true ; \
+          fi ; \
+    done ; \
+    find /headers/usr/include -type f -iname "*.h" -depth 1 -exec ln -svf {} /headers/usr/include/$(basename {}) + || true;
+
 # WORKAROUND: cmake still thinks that clang++ requires g++
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
   apk update && \
@@ -819,15 +848,16 @@ RUN set -eux; \
     cmake -G Ninja ../libcxx -Wno-dev \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
-      -DCMAKE_INSTALL_PREFIX=${SYSROOT}/usr \
+      -DCMAKE_INSTALL_PREFIX=/headers/usr \
+      -DLIBCXX_INSTALL_INCLUDE_TARGET_DIR=include/c++/v1
       -DLIBCXX_INSTALL_HEADERS=ON \
       -DLIBCXX_ENABLE_SHARED=OFF \
       -DLIBCXX_ENABLE_STATIC=OFF \
-      -DLIBCXX_CXX_ABI=libcxxabi \
+      -DLIBCXX_CXX_ABI=none \
       -DLIBCXX_HAS_GCC_LIB=NO \
       -DLIBCXX_HAS_GCC_S_LIB=NO \
-      -DLIBCXX_USE_COMPILER_RT=ON \
       -DLIBCXX_HAS_MUSL_LIBC=ON \
+      -DLIBCXX_ABI_FORCE_ITANIUM=True \
       -DLIBCXX_INCLUDE_BENCHMARKS=OFF \
       -DLIBCXX_HARDENING_MODE=extensive \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
