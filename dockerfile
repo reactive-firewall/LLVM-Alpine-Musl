@@ -818,7 +818,7 @@ RUN set -eux; \
     cmake -G Ninja ../libcxx -Wno-dev \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
-      -DCMAKE_INSTALL_PREFIX=/headers/usr \
+      -DCMAKE_INSTALL_PREFIX=${SYSROOT}/usr \
       -DLIBCXX_INSTALL_HEADERS=ON \
       -DLIBCXX_ENABLE_SHARED=OFF \
       -DLIBCXX_ENABLE_STATIC=OFF \
