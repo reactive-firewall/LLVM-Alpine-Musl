@@ -811,7 +811,7 @@ RUN set -eux; \
     mkdir -p build-libcxx-config; \
     cd build-libcxx-config; \
     cmake -G Ninja \
-      ../llvmorg/libcxx \
+      ../libcxx \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
       -DCMAKE_INSTALL_PREFIX=/headers/usr \
@@ -832,7 +832,7 @@ RUN set -eux; \
     mkdir -p build-libcxxabi-config; \
     cd build-libcxxabi-config; \
     cmake -G Ninja \
-      ../llvmorg/libcxxabi \
+      ../libcxxabi \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
       -DCMAKE_INSTALL_PREFIX=/headers/usr \
