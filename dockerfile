@@ -834,7 +834,7 @@ RUN set -eux; \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_CXX_FLAGS="${CFLAGS} ${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
+      -DCMAKE_CXX_FLAGS="${CFLAGS} -D_LIBCPP_HAS_THREAD_API_PTHREAD=1 ${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
       -DCMAKE_C_COMPILER=clang \
       -DCMAKE_CXX_COMPILER=clang++ \
       -DCMAKE_LINKER=lld \
