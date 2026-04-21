@@ -251,11 +251,54 @@ endif()
 # Prefer llvm-ar/llvm-strip if present
 find_program(LLVM_AR llvm-ar)
 if(LLVM_AR)
-  set(CMAKE_AR "${LLVM_AR} rc")
+  # Choose archiver and default format
+  set(CMAKE_AR "${LLVM_AR}" CACHE FILEPATH "Archiver")
+  set(AR_FORMAT "default" CACHE STRING "llvm-ar --format selection (default|bsd|darwin)")
+
+  # Helpers to read possible target identifiers
+  if(DEFINED CMAKE_C_COMPILER_TARGET)
+    set(_target_id "${CMAKE_C_COMPILER_TARGET}")
+  else()
+    set(_target_id "${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
+  endif()
+
+  # Prefer explicit target triple containing apple/darwin (include checking override system name)
+  if(_target_id MATCHES "apple" OR _target_id MATCHES "darwin" \
+     OR CMAKE_SYSTEM_NAME MATCHES "Darwin" OR CMAKE_HOST_SYSTEM_NAME MATCHES "Darwin")
+    set(AR_FORMAT "darwin")
+  elseif(_target_id MATCHES "freebsd|netbsd|openbsd|bsd" OR CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
+    set(AR_FORMAT "bsd")
+  else()
+    # fallback based on shared-lib suffix (.dylib => darwin, .so => bsd)
+    if(DEFINED CMAKE_SHARED_LIBRARY_SUFFIX)
+      if(CMAKE_SHARED_LIBRARY_SUFFIX STREQUAL ".dylib")
+        set(AR_FORMAT "darwin")
+      elseif(CMAKE_SHARED_LIBRARY_SUFFIX STREQUAL ".so")
+        set(AR_FORMAT "bsd")
+      endif()
+    endif()
+  endif()
+  # Expose for debugging if needed
+  set(CMAKE_MESSAGE_LOG_LEVEL "STATUS")
+  message(STATUS "Selected llvm-ar format: ${AR_FORMAT}")
+
+  # Override the archive commands so CMake calls llvm-ar with the chosen --format
+  # Use the per-language variables; here for C and CXX (repeat for other languages if needed).
+  set(CMAKE_C_ARCHIVE_CREATE
+      "<CMAKE_AR> rc --format=${AR_FORMAT} <TARGET> <OBJECTS>")
+  set(CMAKE_C_ARCHIVE_APPEND
+      "<CMAKE_AR> q --format=${AR_FORMAT} <TARGET> <OBJECTS>")
+
+  set(CMAKE_CXX_ARCHIVE_CREATE "${CMAKE_C_ARCHIVE_CREATE}")
+  set(CMAKE_CXX_ARCHIVE_APPEND "${CMAKE_C_ARCHIVE_APPEND}")
 endif()
-find_program(LLVM_AR llvm-ar)
+find_program(LLVM_AR llvm-ranlib)
 if(LLVM_AR)
   set(CMAKE_RANLIB "${LLVM_RANLIB}")
+  # Use the per-language variables; here for C and CXX (repeat for other languages if needed).
+  # uses CMAKE_RANLIB if set; keep default behaviour
+  set(CMAKE_C_ARCHIVE_FINISH "<CMAKE_RANLIB> -c <TARGET>")
+  set(CMAKE_CXX_ARCHIVE_FINISH "${CMAKE_C_ARCHIVE_FINISH}")
 endif()
 find_program(LLVM_STRIP llvm-strip)
 if(LLVM_STRIP)
