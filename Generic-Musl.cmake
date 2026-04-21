@@ -102,8 +102,9 @@ endif()
 foreach(_c IN LISTS _libc_candidates)
   if(EXISTS "${_c}")
     set(libc_path "${_c}")
-    # try to guess loader name in same dir: ld-musl-*.so.1
+    # try to guess loader name in same dir: ld-musl-*.so.${CMAKE_SYSTEM_VERSION:-1}
     get_filename_component(_c_dir "${_c}" DIRECTORY)
+    # only support v1 for musl
     file(GLOB _ldcandidates "${_c_dir}/ld-musl-*.so.1")
     if(_ldcandidates)
       list(GET _ldcandidates 0 _musl_loader)
@@ -126,6 +127,8 @@ if(libc_path)
   list(APPEND _known_features "c_restrict")
   # variadic macros (C99)
   list(APPEND _known_features "c_variadic_macros")
+  # If musl libc is present, assume at least C11 support and probe related features.
+  list(APPEND _known_features "c_std_11")
 endif()
 
 # Remove duplicates and set cached variable
@@ -146,12 +149,9 @@ if(_musl_loader)
   # search sibling dirs (lib, lib64, usr/lib) for libpthread/libm
   set(_search_dirs
     "${loader_dir}"
-    "${loader_dir}/.."
     "${CMAKE_SYSROOT}/lib"
-    "${CMAKE_SYSROOT}/lib64"
     "${CMAKE_SYSROOT}/usr/lib"
     "${CMAKE_INSTALL_PREFIX}/lib"
-    "${CMAKE_INSTALL_PREFIX}/lib64"
     "${CMAKE_INSTALL_PREFIX}/usr/lib"
   )
   foreach(_d IN LISTS _search_dirs)
@@ -170,11 +170,11 @@ else()
   # fallback: attempt to find libs relative to CMAKE_SYSROOT or /lib
   foreach(_d IN LISTS "${CMAKE_SYSROOT}/lib" "/lib" "/usr/lib")
     if(EXISTS "${_d}")
-      file(GLOB _pthreads_candidates "${_d}/libpthread.*" "${_d}/libpthread.so" "${_d}/libpthread.a")
+      file(GLOB _pthreads_candidates "${_d}/libpthread.*" "${_d}/libpthread.a")
       if(_pthreads_candidates)
         set(CMAKE_PLATFORM_HAS_PTHREADS ON CACHE BOOL "Does the platform provide libpthreads")
       endif()
-      file(GLOB _math_candidates "${_d}/libm.*" "${_d}/libm.so" "${_d}/libm.a")
+      file(GLOB _math_candidates "${_d}/libm.*" "${_d}/libm.a")
       if(_math_candidates)
         set(CMAKE_PLATFORM_HAS_MATH_LIB ON CACHE BOOL "Does the platform provide libm (math)")
       endif()
@@ -225,6 +225,10 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--unique -Wl,--dynamic-linker=${_musl_loader}")
   endif()
 
+  # From Musl's own documentation:
+  #   It is recommended that distributions build GCC with multilib disabled,
+  #   and use library directories named lib.
+
   # Conservative security flags
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-z,relro -Wl,-z,now")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,relro -Wl,-z,now")
@@ -262,9 +266,8 @@ if(LLVM_AR)
     set(_target_id "${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
   endif()
 
-  # Prefer explicit target triple containing apple/darwin (include checking override system name)
-  if(_target_id MATCHES "apple" OR _target_id MATCHES "darwin" \
-     OR CMAKE_SYSTEM_NAME MATCHES "Darwin" OR CMAKE_HOST_SYSTEM_NAME MATCHES "Darwin")
+  # Support explicit target triple containing apple/darwin
+  if(_target_id MATCHES "apple" OR _target_id MATCHES "darwin")
     set(AR_FORMAT "darwin")
   elseif(_target_id MATCHES "freebsd|netbsd|openbsd|bsd" OR CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
     set(AR_FORMAT "bsd")
@@ -307,7 +310,9 @@ endif()
 
 # Defaults and hints
 set(CMAKE_SKIP_RPATH OFF)
+# POSIX -std=c99 -lm is supported with an empty archive by musl
 set(CMAKE_PLATFORM_HAS_MATH_LIB ${CMAKE_PLATFORM_HAS_MATH_LIB})
+# POSIX -std=c99 -lpthread is supported with an empty archive by musl
 set(CMAKE_PLATFORM_HAS_PTHREADS ${CMAKE_PLATFORM_HAS_PTHREADS})
 
 message(STATUS "Configured Generic-Musl platform (musl libc, Clang/LLVM preferred).")
@@ -316,10 +321,10 @@ if(_GENERIC_MUSL_HAVE_CLANG)
   if(DEFINED CLANG_RT_PATH)
     message(STATUS "clang_rt builtins: ${CLANG_RT_PATH}")
   else()
-    message(STATUS "clang_rt builtins not auto-detected; set -DCLANG_RT_PATH=/path/to/clang_rt.builtins.a to link it.")
+    message(STATUS "clang_rt builtins not auto-detected; set -DCLANG_RT_PATH=/path/to/libclang_rt.builtins.a to link it.")
   endif()
 else()
-  message(STATUS "No Clang detected; leaving most toolchain variables unchanged (GNU toolchains are forbidden).")
+  message(STATUS "No Clang detected; leaving most toolchain variables unchanged (GNU toolchains are unsupported).")
 endif()
 
 if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
@@ -337,11 +342,17 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "-Wl,-rpath,")       # -rpath
   # probably works like FreeBSD
   set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG_SEP ":")   # : or empty
-  # Not sure about -z origin with musl
+  # Not sure about '-z' (including '-z origin') with musl linker
   set(CMAKE_SHARED_LIBRARY_RPATH_ORIGIN_TOKEN "\$ORIGIN")
   set(CMAKE_SHARED_LIBRARY_RPATH_LINK_C_FLAG "-Wl,-rpath-link,")
   set(CMAKE_SHARED_LIBRARY_SONAME_C_FLAG "-Wl,-soname,")
   set(CMAKE_EXE_EXPORTS_C_FLAG "-Wl,--export-dynamic")
+
+  # From Musl's own documentation:
+  #   Since 1.1.21, musl supports increasing the default thread
+  #   stack size via the PT_GNU_STACK program header, which can
+  #   be set at link time via -Wl,-z,stack-size=N.
+
 
   # Shared libraries with no builtin soname may not be linked safely by
   # specifying the file path.
