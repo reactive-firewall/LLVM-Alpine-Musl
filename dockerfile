@@ -707,7 +707,7 @@ RUN apk del --no-cache \
         compiler-rt \
         llvm-runtimes \
         cmake \
-        samuri \
+        samurai \
         python3 ;
 
 # --- Lib C++ headers ---
@@ -955,7 +955,7 @@ RUN apk del --no-cache \
         g++ \
         cmd:g++ \
         cmake \
-        samuri \
+        samurai \
         python3 && \
     rm -rf /bootstrap/build-libcxx-config /bootstrap/build-libcxxabi-config /tmp/test.cpp && \
     find /headers/usr/include -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true ;
