@@ -699,6 +699,16 @@ RUN for UNWIND_FILE_ARTIFACT in usr/lib/libunwind.so.1.0 ; do \
       touch -d "${SOME_DATE_EPOCH}" /stage/usr/lib/libunwind.so.1.0 || true ; \
     fi
 
+# Cleanup build packages and intermediate files to keep this stage small
+RUN apk del --no-cache \
+        llvm \
+        libc++ \
+        libc++-dev \
+        compiler-rt \
+        llvm-runtimes \
+        cmake \
+        samuri \
+        python3 ;
 
 # --- Lib C++ headers ---
 FROM --platform="linux/${TARGETARCH}" alpine:latest AS libcxxheaders
@@ -825,6 +835,7 @@ RUN mkdir -p /usr/share/cmake/Modules/Platform \
  && rm /tmp/Generic-Musl-Linker.cmake \
  && chmod -R a+rX /usr/share/cmake/Modules/Platform/Linker
 
+# mock the sysroot for headers
 RUN mkdir -pv /headers && \
     mkdir -pv /headers/dev && \
     mkdir -pv /headers/proc && \
@@ -864,10 +875,13 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 
 WORKDIR /bootstrap/llvmorg
 
+# may want unused -DLIBCXX_HAS_GCC_LIB=NO
+# may want unused -DLIBCXX_HAS_GCC_S_LIB=NO
+# Should keep unused '-DLLVM_ENABLE_RUNTIMES= ' to ensure headers focused build
+
 # Configure/install libc++ headers only into a "headers" sysroot
 # -> install prefix is /headers/usr so final headers appear under /headers/usr/include
-RUN set -eux; \
-    mkdir -p build-libcxx-config; \
+RUN mkdir -p build-libcxx-config && \
     cd build-libcxx-config; \
     cmake -G Ninja ../libcxx -Wno-dev \
       -DCMAKE_BUILD_TYPE=Release \
@@ -880,8 +894,6 @@ RUN set -eux; \
       -DLIBCXX_CXX_ABI=none \
       -DLIBCXX_ABI_VERSION=1 \
       -DLIBCXX_USE_COMPILER_RT=ON \
-      -DLIBCXX_HAS_GCC_LIB=NO \
-      -DLIBCXX_HAS_GCC_S_LIB=NO \
       -DLIBCXX_HAS_MUSL_LIBC=ON \
       -DLIBCXX_ENABLE_THREADS=ON \
       -DLIBCXX_HAS_PTHREAD_API=ON \
@@ -890,7 +902,7 @@ RUN set -eux; \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_CXX_FLAGS="${CFLAGS} ${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
+      -DCMAKE_CXX_FLAGS="${CFLAGS} ${CXXFLAGS} -Qunused-arguments" \
       -DCMAKE_C_COMPILER=clang \
       -DCMAKE_CXX_COMPILER=clang++ \
       -DCMAKE_LINKER=lld \
@@ -902,9 +914,8 @@ RUN set -eux; \
 WORKDIR /bootstrap/llvmorg
 
 # Install libcxxabi headers too (ABI types required by libc++ headers)
-RUN set -eux; \
-    mkdir -p build-libcxxabi-config; \
-    cd build-libcxxabi-config; \
+RUN mkdir -p build-libcxxabi-config && \
+    cd build-libcxxabi-config && \
     cmake -G Ninja \
       ../libcxxabi \
       -DCMAKE_BUILD_TYPE=Release \
@@ -912,7 +923,7 @@ RUN set -eux; \
       -DCMAKE_INSTALL_PREFIX=/headers/usr \
       -DLIBCXXABI_INSTALL_HEADERS=ON \
       -DLIBCXXABI_ENABLE_SHARED=OFF \
-      -DLIBCXXABI_ENABLE_STATIC=OFF \
+      -DLIBCXXABI_ENABLE_STATIC=ON \
       -DLIBCXXABI_INSTALL_INCLUDE_TARGET_DIR=include/c++/v1 \
       -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
       -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
@@ -924,7 +935,7 @@ RUN set -eux; \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_CXX_FLAGS="${CFLAGS} ${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
+      -DCMAKE_CXX_FLAGS="${CFLAGS} ${CXXFLAGS} -Qunused-arguments" \
       -DCMAKE_C_COMPILER=clang \
       -DCMAKE_CXX_COMPILER=clang++ \
       -DCMAKE_LINKER=lld \
@@ -939,19 +950,42 @@ RUN set -eux; \
     printf '%s\n' '#include <vector>' '#include <string>' 'int main() {' '  std::vector<std::string> v;' '  v.push_back("ok");' '  return (int)v.size();' '}' > /tmp/test.cpp; \
     clang++ -fsyntax-only -std=c++17 -isystem /headers/usr/include /tmp/test.cpp ;
 
-
 # Cleanup build packages and intermediate files to keep this stage small
-RUN apk del --no-cache cmd:g++ cmd:clang++ make cmake samuri python3 && \
+RUN apk del --no-cache \
+        g++ \
+        cmd:g++ \
+        cmake \
+        samuri \
+        python3 && \
     rm -rf /bootstrap/build-libcxx-config /bootstrap/build-libcxxabi-config /tmp/test.cpp && \
     find /headers/usr/include -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true ;
+
+# unlink mocking of /sysroot in /headers
+RUN for MUSL_SDK_FILE_ARTIFACT in bin sbin lib libexec \
+        usr/bin usr/sbin usr/lib usr/libexec \
+        usr/share usr/man \
+        usr/include/arpa \
+        usr/include/bits \
+        usr/include/generic \
+        usr/include/mach-o \
+        usr/include/net \
+        usr/include/netinet \
+        usr/include/netpacket \
+        usr/include/scsi \
+        usr/include/sys ; do \
+          if [ -L ${SYSROOT}/${MUSL_SDK_FILE_ARTIFACT} ] ; then \
+            rm -vf -- /headers/${MUSL_SDK_FILE_ARTIFACT} || true ; \
+          fi ; \
+    done ; \
+    find /headers/usr/include -type l -iname "*.h" -depth 1 -exec rm -vf -- {} + || true;
 
 # The resulting "headers" sysroot:
 # /headers/usr/include    <-- contains libc++ and libcxxabi headers and generated config headers
 # Keep them in this stage so a later stage can COPY --from=libcxxheaders /headers /headers
 
 # Ensure we have the libc headers present (sysroot paths)
-RUN ls -l /headers/usr/include || true \
-    && file /headers/usr/include/* || true
+RUN ls -l -r /headers/usr/include || true && \
+    find /headers/usr/include -type f -print -exec file {} + || true;
 
 # --- bootstrap: bootstrap environment using distro clang/llvm to compile a minimal clang toolchain ---
 FROM --platform="linux/${TARGETARCH}" alpine:latest AS bootstrap
@@ -985,6 +1019,17 @@ ENV TARGET_TRIPLE=${TARGET_TRIPLE}
 
 ARG HOST_TRIPLE
 ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
+
+# musl libc checks TZ
+# format is
+# [SUS/POSIX](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html#tag_08_03)
+# Set TZ to UTC
+ENV TZ='UTC+0'
+
+# epoch is passed through by Docker.
+# shellcheck disable=SC2154
+ARG SOME_DATE_EPOCH
+ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
 
 ENV CC=clang
 ENV CXX=clang-cpp
@@ -1173,11 +1218,11 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -G "Ninja" \
     cmake --install build-libcxxabi-shared && \
     rm -vfr /bootstrap/llvmorg/build-libcxxabi-shared/
 
-# Ensure we have the dynamic loader and libs present (sysroot paths)
+# Ensure we have the c++abi lib and headers present (sysroot paths)
 RUN ls -l ${SYSROOT}${MUSL_PREFIX}/lib || true \
     && file ${SYSROOT}${MUSL_PREFIX}/lib/* || true
 
-# Ensure we have the libc headers present (sysroot paths)
+# Ensure we have the libc++ headers present (sysroot paths)
 RUN ls -l ${SYSROOT}${MUSL_PREFIX}/include || true \
     && file ${SYSROOT}${MUSL_PREFIX}/include/* || true
 
@@ -1322,11 +1367,11 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 # - headers
 COPY --from=sysroot /sysroot /sysroot
 # Copy bootstrap compiler and sources
-COPY --from=bootstrap /opt/llvm-bootstrap/bin/* /sysroot/bin/
-COPY --from=bootstrap /opt/llvm-bootstrap/lib/* /sysroot/lib/
-COPY --from=bootstrap /opt/llvm-bootstrap/libexec/* /sysroot/libexec/
+COPY --from=bootstrap /sysroot/bin/* /sysroot/bin/
+COPY --from=bootstrap /sysroot/lib/* /sysroot/lib/
+COPY --from=bootstrap /sysroot/libexec/* /sysroot/libexec/
 COPY --from=fetcher /fetch/llvmorg /build/llvmorg
-COPY --from=bootstrap /opt/llvm-bootstrap/include/* /sysroot/usr/include/
+COPY --from=bootstrap /sysroot/include/* /sysroot/usr/include/
 
 # map clang bootstrap to sysroot headers
 RUN ln -sf /opt/llvm-bootstrap/include/clang /sysroot/usr/include/clang && \
