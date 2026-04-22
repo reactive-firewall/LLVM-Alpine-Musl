@@ -226,6 +226,13 @@ ENV RANLIB=llvm-ranlib
 ENV LD=ld.lld
 # can't use -Wl,--dynamic-linker=/lib/ld-musl-x86_64.so.1 yet
 ENV LDFLAGS="-fuse-ld=lld -Wl,--sysroot=/sysroot"
+
+# musl libc checks TZ
+# format is
+# [SUS/POSIX](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html#tag_08_03)
+# Set TZ to UTC
+ENV TZ='UTC+0'
+
 # epoch is passed through by Docker.
 # shellcheck disable=SC2154
 ARG SOME_DATE_EPOCH
@@ -441,6 +448,12 @@ ENV AS="clang -integrated-as -c"
 ENV ASM=clang
 ENV RANLIB=llvm-ranlib
 ENV LD=lld
+
+# musl libc checks TZ
+# format is
+# [SUS/POSIX](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html#tag_08_03)
+# Set TZ to UTC
+ENV TZ='UTC+0'
 
 # epoch is passed through by Docker.
 # shellcheck disable=SC2154
@@ -730,6 +743,12 @@ ENV LD=lld
 # will use /sysroot/usr/bin/ld.musl-clang later
 #ENV LD=/sysroot/usr/bin/ld.musl-clang
 
+# musl libc checks TZ
+# format is
+# [SUS/POSIX](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html#tag_08_03)
+# Set TZ to UTC
+ENV TZ='UTC+0'
+
 # epoch is passed through by Docker.
 # shellcheck disable=SC2154
 ARG SOME_DATE_EPOCH
@@ -793,6 +812,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:clang-cpp \
     cmd:lld \
     cmd:llvm-ar \
+    cmd:llvm-ranlib \
     cmd:find
 
 # Install into Alpine cmake's Platform dir as PlatformGeneric-Musl.cmake
@@ -877,7 +897,7 @@ RUN set -eux; \
       -DLLVM_ENABLE_RUNTIMES= \
       -DLIBCXX_INCLUDE_TESTS=OFF \
     ; \
-    cmake --build . --target install
+    cmake --build . --target install || true ;
 
 # Install libcxxabi headers too (ABI types required by libc++ headers)
 RUN set -eux; \

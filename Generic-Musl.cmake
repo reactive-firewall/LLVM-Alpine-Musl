@@ -26,7 +26,7 @@ set(UNIX 1)
 include(Platform/UnixPaths)
 
 # musl dos not care about .exe nor .elf (and does not support .app)
-set(CMAKE_EXECUTABLE_SUFFIX "")
+# set(CMAKE_EXECUTABLE_SUFFIX "")
 set(CMAKE_EXECUTABLE_FORMAT "ELF" CACHE STRING "Executable format")
 set(CMAKE_STATIC_LIBRARY_SUFFIX ".a")
 set(CMAKE_STATIC_LIBRARY_FORMAT "ELF" CACHE STRING "Static Library format")
@@ -334,7 +334,7 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   set(CMAKE_SHARED_LIBRARY_FORMAT "ELF" CACHE STRING "Shared lib format")
   set(CMAKE_SHARED_MODULE_FORMAT "ELF" CACHE STRING "Shared module format")
   # PIE link options are managed in Compiler/<compiler>.cmake file
-  set(CMAKE_SHARED_LIBRARY_C_FLAGS "-fPIC")            # -pic
+  set(CMAKE_SHARED_LIBRARY_C_FLAGS "-fseparate-named-sections -fPIC")            # -pic
   set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS "-shared")       # -shared
   set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")         # +s, flag for exe link to use shared lib
 
@@ -357,6 +357,9 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   # Shared libraries with no builtin soname may not be linked safely by
   # specifying the file path.
   set(CMAKE_PLATFORM_USES_PATH_WHEN_NO_SONAME 1)
+
+  # Musl does NOT support versioned sonames
+  set(CMAKE_PLATFORM_NO_VERSIONED_SONAME TRUE)
 
   # Initialize C link type selection flags.  These flags are used when
   # building a shared library, shared module, or executable that links
