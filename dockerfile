@@ -899,6 +899,8 @@ RUN set -eux; \
     ; \
     cmake --build . --target install || true ;
 
+WORKDIR /bootstrap/llvmorg
+
 # Install libcxxabi headers too (ABI types required by libc++ headers)
 RUN set -eux; \
     mkdir -p build-libcxxabi-config; \
@@ -911,16 +913,16 @@ RUN set -eux; \
       -DLIBCXXABI_INSTALL_HEADERS=ON \
       -DLIBCXXABI_ENABLE_SHARED=OFF \
       -DLIBCXXABI_ENABLE_STATIC=OFF \
-      -DLLVM_PATH=/bootstrap/llvmorg \
-      -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm/cmake/modules \
-      -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
-      -DClang_DIR=/bootstrap/llvmorg/clang \
-      -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
-      -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
-      -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DLIBCXXABI_INSTALL_INCLUDE_TARGET_DIR=include/c++/v1 \
+      -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
+      -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
+      -DLIBCXXABI_USE_COMPILER_RT=ON \
+      -DLIBCXXABI_ENABLE_THREADS=ON \
+      -DLIBCXXABI_HAS_PTHREAD_LIB=ON \
+      -DLIBCXXABI_HAS_CXA_THREAD_ATEXIT_IMPL=FALSE \
+      -DLIBCXXABI_HAS_GCC_S_LIB=NO \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
-      -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CFLAGS} ${CXXFLAGS} -Qunused-arguments -Wl,--verbose" \
       -DCMAKE_C_COMPILER=clang \
