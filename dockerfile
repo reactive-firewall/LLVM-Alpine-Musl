@@ -864,7 +864,7 @@ RUN mkdir -pv /headers && \
             ln -svf ${SYSROOT}/${MUSL_SDK_FILE_ARTIFACT} /headers/${MUSL_SDK_FILE_ARTIFACT} || true ; \
             touch -d "${SOME_DATE_EPOCH}" /headers/${MUSL_SDK_FILE_ARTIFACT} || true ; \
           fi ; \
-    done ; \
+    done ;\
     find /headers/usr/include -type f -iname "*.h" -depth 1 -exec sh -c 'for f; do ln -svf "$f" /headers/usr/include/$(basename "$f"); done' _ {} + || true;
 
 # WORKAROUND: cmake still thinks that clang++ requires g++
@@ -910,12 +910,12 @@ RUN mkdir -p build-libcxx-config && \
       -DCMAKE_LINKER=lld \
       -DLLVM_ENABLE_RUNTIMES= \
       -DLIBCXX_INCLUDE_TESTS=OFF \
-    ; \
+    ;\
     cmake --build . --target install || true ;
 
 WORKDIR /bootstrap/llvmorg
 
-ENV CXXFLAGS="-iwithsysroot /usr/include/c++/v1 -ffunction-sections -fdata-sections -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
+ENV CXXFLAGS="-ffunction-sections -fdata-sections -unwindlib=/sysroot/usr/lib/libunwind.so.1.0 -cxx-isystem /headers/usr/include/c++/v1"
 
 # Install libcxxabi headers too (ABI types required by libc++ headers)
 RUN mkdir -p build-libcxxabi-config && \
@@ -945,8 +945,10 @@ RUN mkdir -p build-libcxxabi-config && \
       -DCMAKE_LINKER=lld \
       -DLLVM_ENABLE_RUNTIMES= \
       -DLIBCXXABI_INCLUDE_TESTS=OFF \
-    ; \
-    cmake --build . --target install
+    ;\
+    cmake --build . --target install || true ;\
+    [ -d /headers/usr/include/c++/v1 ] && \
+    [ -f /headers/usr/include/c++/v1/__config ] || exit 125 ;
 
 # Quick, trivial compile-time test that the headers are usable:
 # compile-only (no linking) a small C++ snippet using the installed headers.

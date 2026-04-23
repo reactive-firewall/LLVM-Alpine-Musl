@@ -291,20 +291,25 @@ if(LLVM_AR)
   # Override the archive commands so CMake calls llvm-ar with the chosen --format
   # Use the per-language variables; here for C and CXX (repeat for other languages if needed).
   set(CMAKE_C_ARCHIVE_CREATE
-      "<CMAKE_AR> rc --format=${AR_FORMAT} <TARGET> <OBJECTS>")
+      "<CMAKE_AR> --format=${AR_FORMAT} rc <TARGET> <OBJECTS>")
   set(CMAKE_C_ARCHIVE_APPEND
-      "<CMAKE_AR> q --format=${AR_FORMAT} <TARGET> <OBJECTS>")
+      "<CMAKE_AR> --format=${AR_FORMAT} q <TARGET> <OBJECTS>")
 
   set(CMAKE_CXX_ARCHIVE_CREATE "${CMAKE_C_ARCHIVE_CREATE}")
   set(CMAKE_CXX_ARCHIVE_APPEND "${CMAKE_C_ARCHIVE_APPEND}")
 endif()
-find_program(LLVM_AR llvm-ranlib)
-if(LLVM_AR)
+find_program(LLVM_RANLIB llvm-ranlib)
+if(LLVM_RANLIB)
   set(CMAKE_RANLIB "${LLVM_RANLIB}")
   # Use the per-language variables; here for C and CXX (repeat for other languages if needed).
   # uses CMAKE_RANLIB if set; keep default behaviour
-  set(CMAKE_C_ARCHIVE_FINISH "<CMAKE_RANLIB> -c <TARGET>")
+  set(CMAKE_C_ARCHIVE_FINISH "<CMAKE_RANLIB> -D <TARGET>")
   set(CMAKE_CXX_ARCHIVE_FINISH "${CMAKE_C_ARCHIVE_FINISH}")
+else()
+  if(LLVM_AR)
+    set(CMAKE_C_ARCHIVE_FINISH "<CMAKE_AR> sD <TARGET>")
+    set(CMAKE_CXX_ARCHIVE_FINISH "${CMAKE_C_ARCHIVE_FINISH}")
+  endif()
 endif()
 find_program(LLVM_STRIP llvm-strip)
 if(LLVM_STRIP)
@@ -350,7 +355,7 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   # Not sure if rpaths are used by musl (ld-musl-ARCH.so.1 is hardcoded when linking to musl)
   set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "-Wl,-rpath,")       # -rpath
   # probably works like FreeBSD
-  set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG_SEP "")   # : or empty
+  set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG_SEP ":")   # : or empty
   # Not sure about '-z' (including '-z origin') with musl linker
   set(CMAKE_SHARED_LIBRARY_RPATH_ORIGIN_TOKEN "\$ORIGIN")
   set(CMAKE_SHARED_LIBRARY_RPATH_LINK_C_FLAG "-Wl,-rpath-link,")
@@ -377,6 +382,16 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
     set(CMAKE_${type}_LINK_STATIC_C_FLAGS "-Wl,-Bstatic")
     set(CMAKE_${type}_LINK_DYNAMIC_C_FLAGS "-Wl,-Bdynamic")
   endforeach()
+
+  set(CMAKE_SHARED_LIBRARY_CXX_FLAGS "${CMAKE_SHARED_LIBRARY_C_FLAGS}")
+  set(CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS "${CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS}")
+  set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "${CMAKE_SHARED_LIBRARY_LINK_C_FLAGS}")
+  set(CMAKE_SHARED_LIBRARY_RUNTIME_CXX_FLAG "${CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG}")
+  # probably works like FreeBSD
+  set(CMAKE_SHARED_LIBRARY_RUNTIME_CXX_FLAG_SEP "${CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG_SEP}")   # : or empty
+  set(CMAKE_SHARED_LIBRARY_RPATH_LINK_CXX_FLAG "${CMAKE_SHARED_LIBRARY_RPATH_LINK_C_FLAG}")
+  set(CMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG "${CMAKE_SHARED_LIBRARY_SONAME_C_FLAG}")
+  set(CMAKE_EXE_EXPORTS_CXX_FLAG "${CMAKE_EXE_EXPORTS_C_FLAG}")
 
   include(Platform/Linker/Generic-Musl-Linker)
   if(_GENERIC_MUSL_HAVE_CLANG)
