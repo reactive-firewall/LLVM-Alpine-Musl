@@ -136,7 +136,10 @@ list(REMOVE_DUPLICATES _known_features)
 set(CMAKE_C_KNOWN_FEATURES "${_known_features}" CACHE STRING "Detected C known features" FORCE)
 message(STATUS "C known features: ${CMAKE_C_KNOWN_FEATURES}")
 
-set(CMAKE_DL_LIBS "" CACHE STRING "dl linker flags") # or static libdl.a stub
+set(CMAKE_DL_LIBS "" CACHE STRING "dl linker flags") # or empty static dl (libdl.a) stub
+set(CMAKE_FIND_LIBRARY_PREFIXES "lib")
+set(CMAKE_FIND_LIBRARY_SUFFIXES ".so" ".a")
+
 # support position independance
 set(CMAKE_C_COMPILE_OPTIONS_PIC "-fPIC")
 set(CMAKE_C_COMPILE_OPTIONS_PIE "-fPIE")
@@ -331,6 +334,12 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   message(STATUS "Shared libraries supported (musl loader and linker detected).")
   # (musl) support shared libraries
   set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)
+
+  # Define feature "DEFAULT" as supported. This special feature generates the
+  # default option to link a library
+  # This feature is intended to be used in LINK_LIBRARY_OVERRIDE and
+  # LINK_LIBRARY_OVERRIDE_<LIBRARY> target properties
+  set(CMAKE_LINK_LIBRARY_USING_DEFAULT_SUPPORTED TRUE)
   set(CMAKE_SHARED_LIBRARY_FORMAT "ELF" CACHE STRING "Shared lib format")
   set(CMAKE_SHARED_MODULE_FORMAT "ELF" CACHE STRING "Shared module format")
   # PIE link options are managed in Compiler/<compiler>.cmake file
@@ -341,7 +350,7 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   # Not sure if rpaths are used by musl (ld-musl-ARCH.so.1 is hardcoded when linking to musl)
   set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "-Wl,-rpath,")       # -rpath
   # probably works like FreeBSD
-  set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG_SEP ":")   # : or empty
+  set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG_SEP "")   # : or empty
   # Not sure about '-z' (including '-z origin') with musl linker
   set(CMAKE_SHARED_LIBRARY_RPATH_ORIGIN_TOKEN "\$ORIGIN")
   set(CMAKE_SHARED_LIBRARY_RPATH_LINK_C_FLAG "-Wl,-rpath-link,")
@@ -352,7 +361,6 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   #   Since 1.1.21, musl supports increasing the default thread
   #   stack size via the PT_GNU_STACK program header, which can
   #   be set at link time via -Wl,-z,stack-size=N.
-
 
   # Shared libraries with no builtin soname may not be linked safely by
   # specifying the file path.

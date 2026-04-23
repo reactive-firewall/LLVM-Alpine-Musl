@@ -415,6 +415,8 @@ RUN set -eux; \
     [ -L "${SYSROOT}"/etc/ld-musl-armv7.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-armv7.path; \
     [ -L "${SYSROOT}"/etc/ld-musl-armv8.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-armv8.path;
 
+RUN printf '#! /bin/sh --norc\n%s\n' "no_op_cmd() { return 0; } ; no_op_cmd ;" >"${SYSROOT}/bin/:" && \
+    chmod -v 755 "${SYSROOT}/bin/:"
 
 # --- unwind-base: bootstrap unwind using distro clang/llvm to compile a minimal unwind library ---
 FROM --platform="linux/${TARGETARCH}" alpine:latest AS build-unwind-base
@@ -770,7 +772,7 @@ ENV MUSL_PREFIX="/usr"
 # may need -Wl,--sysroot=/sysroot
 # may want linker flag -Wl,--nostdlib to prevent linking to any std c++
 ENV LDFLAGS="-v -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic"
-# Does NOT may require -D__ELF__
+# Does NOT require -D__ELF__
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT} -iwithsysroot /usr/include"
 # might need -nostdinc++
 ENV CXXFLAGS="-iwithsysroot /usr/include/c++/v1 -ffunction-sections -fdata-sections -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
@@ -912,6 +914,8 @@ RUN mkdir -p build-libcxx-config && \
     cmake --build . --target install || true ;
 
 WORKDIR /bootstrap/llvmorg
+
+ENV CXXFLAGS="-iwithsysroot /usr/include/c++/v1 -ffunction-sections -fdata-sections -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
 
 # Install libcxxabi headers too (ABI types required by libc++ headers)
 RUN mkdir -p build-libcxxabi-config && \
