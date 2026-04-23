@@ -10,7 +10,7 @@ FROM --platform="linux/${TARGETARCH}" alpine:latest AS fetcher
 ARG LIBEXECINFO_VERSION=${LIBEXECINFO_VERSION:-"1.3"}
 ENV LIBEXECINFO_VERSION=${LIBEXECINFO_VERSION}
 ENV LIBEXECINFO_URL="https://github.com/reactive-firewall/libexecinfo/raw/refs/tags/v${LIBEXECINFO_VERSION}/libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2"
-ARG LLVM_VERSION=${LLVM_VERSION:-"22.1.3"}
+ARG LLVM_VERSION=${LLVM_VERSION:-"22.1.4"}
 ENV LLVM_VERSION=${LLVM_VERSION}
 ENV LLVM_URL="https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-${LLVM_VERSION}.tar.gz"
 ARG MUSL_VERSION=${MUSL_VERSION:-"1.2.6"}
@@ -825,6 +825,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:lld \
     cmd:llvm-ar \
     cmd:llvm-ranlib \
+    file \
     cmd:find
 
 # Install into Alpine cmake's Platform dir as PlatformGeneric-Musl.cmake
@@ -1103,6 +1104,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     samurai \
     cmd:grep \
     pkgconfig \
+    file \
     cmd:clang-cpp \
     cmd:clang++ \
     cmd:find \
@@ -1168,7 +1170,7 @@ RUN apk add --no-cache \
 
 # copy all the libc++ headers into the sysroot
 RUN mkdir -vp "$SYSROOT/usr/include/c++/v1/" && \
-    cp -HRnp /stage-cxx/include/* "$SYSROOT"/usr/include || true
+    cp -HRnp /stage-cxx/usr/include/* "$SYSROOT"/usr/include || true
 
 
 # DEBUG Mark 2
@@ -1501,7 +1503,7 @@ LABEL org.opencontainers.image.vendor="individual"
 LABEL org.opencontainers.image.licenses="MIT"
 
 # provenance ENV (kept intentionally)
-ARG LLVM_VERSION=${LLVM_VERSION:-"22.1.3"}
+ARG LLVM_VERSION=${LLVM_VERSION:-"22.1.4"}
 ENV LLVM_VERSION=${LLVM_VERSION}
 ENV LLVM_URL="https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-${LLVM_VERSION}.tar.gz"
 ARG TARGET_TRIPLE
