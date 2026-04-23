@@ -797,18 +797,6 @@ RUN set -eux \
     && ln -fns libunwind.so.1.0 ${SYSROOT}/lib/libunwind.so.1 && \
     ln -fns libunwind.so.1 ${SYSROOT}/lib/libunwind.so
 
-# Ensure we have the unwinder and libc headers present (sysroot paths)
-RUN ls -l ${SYSROOT}${MUSL_PREFIX}/include || true \
-    && file ${SYSROOT}${MUSL_PREFIX}/include/* || true
-
-#check the lib directories too
-# check on the lib
-RUN printf "%s\n" "Bootstrapped Libs (pre-c++):" && \
-    ls -lap ${SYSROOT}/lib/ && file ${SYSROOT}/lib/generic/* || true ;\
-    ls -lap ${SYSROOT}/lib/generic/ && file ${SYSROOT}/lib/generic/* || true ;\
-    printf "%s\n" "Bootstrapped Headers:" && \
-    ls -lapr ${SYSROOT}/usr/include/ || true
-
 # install minimal build tooling (musl-based; no libstdc++/glibc packages used)
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
   apk update && \
@@ -912,11 +900,12 @@ RUN mkdir -p build-libcxx-config && \
       -DLLVM_ENABLE_RUNTIMES= \
       -DLIBCXX_INCLUDE_TESTS=OFF \
     ;\
-    cmake --build . --target install || true ;
+    cmake --build . --target install ;
 
 WORKDIR /bootstrap/llvmorg
 
-ENV CXXFLAGS="-ffunction-sections -fdata-sections -unwindlib=/sysroot/usr/lib/libunwind.so.1.0 -cxx-isystem /headers/usr/include/c++/v1"
+ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot /headers -iwithsysroot /usr/include -iwithsysroot /usr/include/c++/v1"
+ENV CXXFLAGS="-unwindlib=/sysroot/usr/lib/libunwind.so.1.0 -cxx-isystem /headers/usr/include/c++/v1"
 
 # Install libcxxabi headers too (ABI types required by libc++ headers)
 RUN mkdir -p build-libcxxabi-config && \
@@ -940,7 +929,7 @@ RUN mkdir -p build-libcxxabi-config && \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_CXX_FLAGS="${CFLAGS} ${CXXFLAGS} -Qunused-arguments" \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
       -DCMAKE_C_COMPILER=clang \
       -DCMAKE_CXX_COMPILER=clang++ \
       -DCMAKE_LINKER=lld \
@@ -954,6 +943,7 @@ RUN mkdir -p build-libcxxabi-config && \
 # Quick, trivial compile-time test that the headers are usable:
 # compile-only (no linking) a small C++ snippet using the installed headers.
 RUN set -eux; \
+    printf "%s\n" "Test Headers:" && \
     printf '%s\n' '#include <vector>' '#include <string>' 'int main() {' '  std::vector<std::string> v;' '  v.push_back("ok");' '  return (int)v.size();' '}' > /tmp/test.cpp; \
     clang++ -fsyntax-only -std=c++17 -isystem /headers/usr/include /tmp/test.cpp ;
 
@@ -1054,7 +1044,7 @@ ENV MUSL_PREFIX="/usr"
 
 ENV LDFLAGS="-v -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic"
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT} -iwithsysroot /usr/include"
-ENV CXXFLAGS="-iwithsysroot /usr/include/c++/v1 -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
+ENV CXXFLAGS="-cxx-isystem /sysroot/usr/include/c++/v1 -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
@@ -1216,11 +1206,6 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -G "Ninja" \
     apk del --no-cache \
         g++ \
         cmd:g++ && \
-    ls -lap -r /bootstrap/llvmorg/build-libcxxabi-shared && \
-    ls -lap -r /bootstrap/llvmorg/build-libcxxabi-shared/lib && \
-    ls -lap -r /bootstrap/llvmorg/build-libcxxabi-shared/libcxxabi && \
-    ls -lap -r /bootstrap/llvmorg/build-libcxxabi-shared/libcxxabi/include && \
-    ls -lap -r /bootstrap/llvmorg/build-libcxxabi-shared/CMakeFiles && \
     printf "\n\n%s\n" "CMake --build build-libcxxabi-shared MARK:" && \
     cmake --build build-libcxxabi-shared && \
     cmake --install build-libcxxabi-shared && \
