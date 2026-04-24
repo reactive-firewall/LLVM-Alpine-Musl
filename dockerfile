@@ -723,7 +723,7 @@ RUN apk del --no-cache \
         samurai \
         python3 ;
 
-# --- MARK for libcxxrt ---
+# --- build-libcxxrt: bootstrap libcxxrt using distro clang/llvm to compile a libcxxrt library ---
 FROM --platform="linux/${TARGETARCH}" alpine:latest AS build-libcxxrt
 
 WORKDIR /bootstrap
@@ -1064,7 +1064,8 @@ RUN mkdir -p build-libcxx-config && \
       -DLLVM_ENABLE_RUNTIMES= \
       -DLIBCXX_INCLUDE_TESTS=OFF \
     ;\
-    cmake --build . --target install || true ;
+    cmake --build . || true ;\
+    cmake --install . || true ;
 
 WORKDIR /bootstrap/llvmorg
 
@@ -1100,7 +1101,8 @@ RUN mkdir -p build-libcxxabi-config && \
       -DLLVM_ENABLE_RUNTIMES= \
       -DLIBCXXABI_INCLUDE_TESTS=OFF \
     ;\
-    cmake --build . --target install || true ;\
+    cmake --build . || true ;\
+    cmake --install . || true ;\
     [ -d /headers/usr/include/c++/v1 ] && \
     [ -f /headers/usr/include/c++/v1/__config ] || true ;
 
@@ -1146,7 +1148,7 @@ RUN for MUSL_SDK_FILE_ARTIFACT in bin sbin lib libexec \
 
 # Ensure we have the libc headers present (sysroot paths)
 RUN ls -l -r /headers/usr/include || true && \
-    find /headers/usr/include -type f -print -exec file {} + || true;
+    find /headers/usr/include -type f -exec file {} + || true;
 
 # --- bootstrap: bootstrap environment using distro clang/llvm to compile a minimal clang toolchain ---
 FROM --platform="linux/${TARGETARCH}" alpine:latest AS bootstrap
@@ -1157,6 +1159,7 @@ WORKDIR /bootstrap
 COPY --from=fetcher /fetch/llvmorg /bootstrap/llvmorg
 COPY --from=sysroot /sysroot /sysroot
 COPY --from=build-unwind /stage /stage
+COPY --from=build-libcxxrt /sysroot /stage-libcxxrt
 COPY --from=libcxxheaders /headers /stage-cxx
 
 # Copy your Generic-Musl.cmake into the image build context before building the image
