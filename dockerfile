@@ -848,7 +848,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 # but we remove it anyway afterwards
 
 RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
-  cmake -S . -B ../libcxxrt-project -G Ninja \
+  cmake -S . -B ../libcxxrt -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
@@ -867,11 +867,12 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
     -DLIBCXXRT_USE_COMPILER_RT=ON \
     -DCMAKE_INSTALL_PREFIX=/usr \
     -DCMAKE_LINKER=lld && \
-    apk del --no-cache \
+  apk del --no-cache \
         g++ \
         cmd:g++ && \
-  cmake --build ../libcxxrt -- -j$(nproc) && \
-  DESTDIR=${SYSROOT} cmake --install ../libcxxrt
+  cd /bootstrap && \
+  cmake --build libcxxrt -- -j$(nproc) && \
+  DESTDIR=${SYSROOT} cmake --install libcxxrt ;
 
 RUN llvm-readelf -l ${SYSROOT}/usr/lib/libcxxrt.so | grep INTERP
 
