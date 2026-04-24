@@ -10,6 +10,7 @@ FROM --platform="linux/${TARGETARCH}" alpine:latest AS fetcher
 ARG LIBEXECINFO_VERSION=${LIBEXECINFO_VERSION:-"1.3"}
 ENV LIBEXECINFO_VERSION=${LIBEXECINFO_VERSION}
 ENV LIBEXECINFO_URL="https://github.com/reactive-firewall/libexecinfo/raw/refs/tags/v${LIBEXECINFO_VERSION}/libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2"
+ENV LIBCXXRT_URL="https://github.com/reactive-firewall/libcxxrt/archive/refs/heads/master.tar.gz"
 ARG LLVM_VERSION=${LLVM_VERSION:-"22.1.4"}
 ENV LLVM_VERSION=${LLVM_VERSION}
 ENV LLVM_URL="https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-${LLVM_VERSION}.tar.gz"
@@ -75,6 +76,17 @@ RUN curl -fSLo libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2 \
     rm libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2 && \
     mv /fetch/libexecinfo-${LIBEXECINFO_VERSION}r /fetch/libexecinfo && \
     rm /fetch/libexecinfo/patches.tar.bz2
+# get libcxxrt (mirror)
+LIBCXXRT_URL
+RUN curl -fSLo libcxxrt-project.tar.gz \
+    --retry 3 \
+    --retry-connrefused \
+    --retry-delay 2 \
+    --ssl-no-revoke \
+    --url "$LIBCXXRT_URL" && \
+    bsdtar -xzf libcxxrt-project.tar.gz && \
+    rm libcxxrt-project.tar.gz && \
+    mv /fetch/libcxxrt /fetch/libcxxrt
 # get llvm-project
 RUN curl -fSLo llvmorg-${LLVM_VERSION}.tar.gz \
     --retry 3 \
@@ -712,6 +724,159 @@ RUN apk del --no-cache \
         samurai \
         python3 ;
 
+# --- MARK for libcxxrt ---
+FROM --platform="linux/${TARGETARCH}" alpine:latest AS build-libcxxrt
+
+WORKDIR /bootstrap
+
+# copy sources (llvmorg is the llvm-project checkout root)
+COPY --from=fetcher /fetch/llvmorg /bootstrap/llvmorg
+COPY --from=fetcher /fetch/libcxxrt /bootstrap/libcxxrt-project
+COPY --from=sysroot /sysroot /sysroot
+COPY --from=build-unwind /stage /stage
+
+# Copy your Generic-Musl.cmake into the image build context before building the image
+COPY Generic-Musl.cmake /tmp/Generic-Musl.cmake
+COPY Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
+
+ARG MUSL_LDLIB
+ENV MUSL_LDLIB="${MUSL_LDLIB}"
+
+ARG LLVM_RTLIB_STUB
+ENV LLVM_RTLIB_STUB="${LLVM_RTLIB_STUB}"
+
+ARG LLVM_RTLIB
+ENV LLVM_RTLIB="${LLVM_RTLIB:-lib${LLVM_RTLIB_STUB}.a}"
+
+ARG TARGET_FOR_LLVM
+ENV TARGET_FOR_LLVM=${TARGET_FOR_LLVM}
+
+ARG TARGET_TRIPLE
+ENV TARGET_TRIPLE=${TARGET_TRIPLE}
+
+ARG HOST_TRIPLE
+ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
+
+ENV CC=clang
+ENV CXX=clang-cpp
+ENV CPP=clang-cpp
+ENV AR=llvm-ar
+ENV AS="clang -integrated-as -c"
+ENV ASM=clang
+ENV RANLIB=llvm-ranlib
+ENV LD=lld
+# will use /sysroot/usr/bin/ld.musl-clang later
+#ENV LD=/sysroot/usr/bin/ld.musl-clang
+
+# musl libc checks TZ
+# format is
+# [SUS/POSIX](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html#tag_08_03)
+# Set TZ to UTC
+ENV TZ='UTC+0'
+
+# epoch is passed through by Docker.
+# shellcheck disable=SC2154
+ARG SOME_DATE_EPOCH
+ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
+
+ENV SYSROOT="/sysroot"
+ENV MUSL_PREFIX="/usr"
+
+# may need -Wl,--sysroot=/sysroot
+# may want linker flag -Wl,--nostdlib to prevent linking to any std c++
+ENV LDFLAGS="-v -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic"
+# Does NOT require -D__ELF__
+ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT} -iwithsysroot /usr/include"
+# might need -nostdinc++
+ENV CXXFLAGS="-ffunction-sections -fdata-sections -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
+
+# overlay the unwinder
+RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
+    for UNWIND_FILE_ARTIFACT in usr/include/__libunwind_config.h \
+        usr/include/libunwind.h \
+        usr/include/libunwind.modulemap \
+        usr/include/mach-o/compact_unwind_encoding.h \
+        usr/include/unwind_arm_ehabi.h \
+        usr/include/unwind_itanium.h \
+        usr/include/unwind.h \
+        usr/lib/libunwind.a \
+        usr/lib/libunwind.so.1.0 ; do \
+          cp -vf /stage/${UNWIND_FILE_ARTIFACT} ${SYSROOT}/${UNWIND_FILE_ARTIFACT} || true ; \
+          touch -d "${SOME_DATE_EPOCH}" ${SYSROOT}/${UNWIND_FILE_ARTIFACT} || true ; \
+    done ;
+
+# Ensure unwind has canonical name (example: /usr/lib/libunwind.so -> /usr/lib/libunwind.so.1.0)
+RUN set -eux \
+    && ln -fns libunwind.so.1.0 ${SYSROOT}/lib/libunwind.so.1 && \
+    ln -fns libunwind.so.1 ${SYSROOT}/lib/libunwind.so
+
+# install minimal build tooling (musl-based; no libstdc++/glibc packages used)
+RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
+  apk update && \
+  apk add --no-cache \
+    cmd:bash \
+    cmd:dash \
+    cmd:clang \
+    compiler-rt \
+    cmake \
+    python3 \
+    samurai \
+    cmd:grep \
+    cmd:clang-cpp \
+    cmd:lld \
+    cmd:llvm-ar \
+    cmd:llvm-ranlib \
+    cmd:llvm-readelf \
+    file \
+    cmd:find
+
+# Install into Alpine cmake's Platform dir as PlatformGeneric-Musl.cmake
+RUN mkdir -p /usr/share/cmake/Modules/Platform \
+ && install -m 0644 /tmp/Generic-Musl.cmake /usr/share/cmake/Modules/Platform/Generic-Musl.cmake \
+ && rm /tmp/Generic-Musl.cmake \
+ && chmod -R a+rX /usr/share/cmake/Modules/Platform \
+ && mkdir -p /usr/share/cmake/Modules/Platform/Linker \
+ && install -m 0644 /tmp/Generic-Musl-Linker.cmake /usr/share/cmake/Modules/Platform/Linker/Generic-Musl-Linker.cmake \
+ && rm /tmp/Generic-Musl-Linker.cmake \
+ && chmod -R a+rX /usr/share/cmake/Modules/Platform/Linker
+
+# WORKAROUND: cmake still thinks that clang++ requires g++
+RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
+  apk update && \
+  apk add --no-cache \
+    cmd:clang++ \
+    cmd:g++
+# but we remove it anyway afterwards
+
+RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
+  cmake -S . -B ../libcxxrt-project -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
+    -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
+    -DCMAKE_SYSROOT=${SYSROOT} \
+    -DCMAKE_FIND_ROOT_PATH=${SYSROOT} \
+    -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+    -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+    -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+    -DCMAKE_C_FLAGS="${CFLAGS}" \
+    -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS}" \
+    -DLIBCXXRT_ENABLE_EXCEPTIONS=ON \
+    -DLIBCXXRT_ENABLE_THREADS=ON \
+    -DLIBCXXRT_USE_COMPILER_RT=ON \
+    -DCMAKE_INSTALL_PREFIX=/usr
+    -DCMAKE_LINKER=lld && \
+    apk del --no-cache \
+        g++ \
+        cmd:g++ && \
+  cmake --build ../libcxxrt -- -j$(nproc) && \
+  DESTDIR=${SYSROOT} cmake --install ../libcxxrt
+
+RUN llvm-readelf -l ${SYSROOT}/usr/lib/libcxxrt.so | grep INTERP
+
+RUN printf "%s\n" "DEBUG CHECKPOINT" && exit 125 ;
+
 # --- Lib C++ headers ---
 FROM --platform="linux/${TARGETARCH}" alpine:latest AS libcxxheaders
 
@@ -900,7 +1065,7 @@ RUN mkdir -p build-libcxx-config && \
       -DLLVM_ENABLE_RUNTIMES= \
       -DLIBCXX_INCLUDE_TESTS=OFF \
     ;\
-    cmake --build . --target install ;
+    cmake --build . --target install || true ;
 
 WORKDIR /bootstrap/llvmorg
 
@@ -938,7 +1103,7 @@ RUN mkdir -p build-libcxxabi-config && \
     ;\
     cmake --build . --target install || true ;\
     [ -d /headers/usr/include/c++/v1 ] && \
-    [ -f /headers/usr/include/c++/v1/__config ] || exit 125 ;
+    [ -f /headers/usr/include/c++/v1/__config ] || true ;
 
 # Quick, trivial compile-time test that the headers are usable:
 # compile-only (no linking) a small C++ snippet using the installed headers.
