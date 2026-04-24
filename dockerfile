@@ -77,7 +77,6 @@ RUN curl -fSLo libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2 \
     mv /fetch/libexecinfo-${LIBEXECINFO_VERSION}r /fetch/libexecinfo && \
     rm /fetch/libexecinfo/patches.tar.bz2
 # get libcxxrt (mirror)
-LIBCXXRT_URL
 RUN curl -fSLo libcxxrt-project.tar.gz \
     --retry 3 \
     --retry-connrefused \
