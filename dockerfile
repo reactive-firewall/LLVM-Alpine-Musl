@@ -85,7 +85,7 @@ RUN curl -fSLo libcxxrt-project.tar.gz \
     --url "$LIBCXXRT_URL" && \
     bsdtar -xzf libcxxrt-project.tar.gz && \
     rm libcxxrt-project.tar.gz && \
-    mv /fetch/libcxxrt /fetch/libcxxrt
+    mv /fetch/libcxxrt-master /fetch/libcxxrt
 # get llvm-project
 RUN curl -fSLo llvmorg-${LLVM_VERSION}.tar.gz \
     --retry 3 \
