@@ -864,7 +864,7 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
     -DLIBCXXRT_ENABLE_EXCEPTIONS=ON \
     -DLIBCXXRT_ENABLE_THREADS=ON \
     -DLIBCXXRT_USE_COMPILER_RT=ON \
-    -DCMAKE_INSTALL_PREFIX=/usr
+    -DCMAKE_INSTALL_PREFIX=/usr \
     -DCMAKE_LINKER=lld && \
     apk del --no-cache \
         g++ \
