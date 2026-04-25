@@ -783,7 +783,7 @@ ENV MUSL_PREFIX="/usr"
 
 # may need -Wl,--sysroot=/sysroot
 # may want linker flag -Wl,--nostdlib to prevent linking to any std c++
-ENV LDFLAGS="-v -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic"
+ENV LDFLAGS="-v -fuse-ld=lld -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic"
 # Does NOT require -D__ELF__
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT} -iwithsysroot /usr/include"
 # might need -nostdinc++
@@ -850,6 +850,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
   cmake -S . -B ../libcxxrt -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_SYSTEM_NAME=Generic-Musl \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
@@ -860,16 +861,16 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
     -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
     -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
     -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-    -DCMAKE_C_FLAGS="${CFLAGS}" \
-    -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS}" \
+    -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
+    -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
     -DLIBCXXRT_ENABLE_EXCEPTIONS=ON \
     -DLIBCXXRT_ENABLE_THREADS=ON \
     -DLIBCXXRT_USE_COMPILER_RT=ON \
     -DCMAKE_INSTALL_PREFIX=/usr \
     -DCMAKE_LINKER=lld && \
   apk del --no-cache \
-        g++ \
-        cmd:g++ && \
+    g++ \
+    cmd:g++ && \
   cd /bootstrap && \
   cmake --build libcxxrt -- -j$(nproc) && \
   DESTDIR=${SYSROOT} cmake --install libcxxrt ;
