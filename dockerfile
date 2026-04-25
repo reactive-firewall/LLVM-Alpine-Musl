@@ -870,12 +870,20 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
     -DCMAKE_LINKER=lld && \
   cd /bootstrap && \
   cmake --build libcxxrt -- -j$(nproc) && \
-  ls -l libcxxrt && \
   ls -l libcxxrt/lib && \
   find libcxxrt -type f -iname "libcxxrt.so*" -exec file {} + || true;\
   apk del --no-cache \
     g++ \
-    cmd:g++ ;
+    cmd:g++ ;\
+  if [ -f libcxxrt/lib/libcxxrt.so ] ; then \
+      if command -v llvm-strip >/dev/null 2>&1; then \
+         llvm-strip --strip-unneeded libcxxrt/lib/libcxxrt.so + || true; \
+      else \
+         strip --strip-unneeded libcxxrt/lib/libcxxrt.so + || true; \
+      fi ; \
+      install -m 0644 libcxxrt/lib/libcxxrt.so "${SYSROOT}/usr/lib/libcxxrt.so" ;\
+      touch -d "${SOME_DATE_EPOCH}" "${SYSROOT}/usr/lib/libcxxrt.so" || true ; \
+  fi ;
 
 RUN llvm-readelf -l ${SYSROOT}/usr/lib/libcxxrt.so | grep INTERP
 
@@ -1070,6 +1078,7 @@ RUN mkdir -p build-libcxx-config && \
       -DLIBCXX_INCLUDE_TESTS=OFF \
     ;\
     cmake --build . || true ;\
+    python3 ../libcxx/utils/generate_iwyu_mapping.py || true ;\
     cmake --install . || true ;
 
 WORKDIR /bootstrap/llvmorg
