@@ -886,7 +886,8 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
   fi ;
 
 
-RUN llvm-readelf -l ${SYSROOT}/usr/lib/libcxxrt.so | grep -F "INTERP"
+RUN llvm-readelf -l ${SYSROOT}/usr/lib/libcxxrt.so | grep -iF "musl" ;\
+  llvm-readelf -l ${SYSROOT}/usr/lib/libcxxrt.so | grep -F "INTERP"
 
 RUN printf "%s\n" "DEBUG CHECKPOINT" && exit 125 ;
 
