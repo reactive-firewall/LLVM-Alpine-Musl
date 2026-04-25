@@ -877,15 +877,16 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
     cmd:g++ ;\
   if [ -f libcxxrt/lib/libcxxrt.so ] ; then \
       if command -v llvm-strip >/dev/null 2>&1; then \
-         llvm-strip --strip-unneeded libcxxrt/lib/libcxxrt.so + || true; \
+         llvm-strip --strip-unneeded libcxxrt/lib/libcxxrt.so || true; \
       else \
-         strip --strip-unneeded libcxxrt/lib/libcxxrt.so + || true; \
+         strip --strip-unneeded libcxxrt/lib/libcxxrt.so || true; \
       fi ; \
       install -m 0644 libcxxrt/lib/libcxxrt.so "${SYSROOT}/usr/lib/libcxxrt.so" ;\
       touch -d "${SOME_DATE_EPOCH}" "${SYSROOT}/usr/lib/libcxxrt.so" || true ; \
   fi ;
 
-RUN llvm-readelf -l ${SYSROOT}/usr/lib/libcxxrt.so | grep INTERP
+
+RUN llvm-readelf -l ${SYSROOT}/usr/lib/libcxxrt.so | grep -F "INTERP"
 
 RUN printf "%s\n" "DEBUG CHECKPOINT" && exit 125 ;
 
