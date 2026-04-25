@@ -861,18 +861,18 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
     -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
     -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
     -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-    -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-    -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
+    -DCMAKE_C_FLAGS="-std=c11 ${CFLAGS} -Qunused-arguments" \
+    -DCMAKE_CXX_FLAGS="-std=c++11 ${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
     -DLIBCXXRT_ENABLE_EXCEPTIONS=ON \
     -DLIBCXXRT_ENABLE_THREADS=ON \
     -DLIBCXXRT_USE_COMPILER_RT=ON \
     -DCMAKE_INSTALL_PREFIX=/usr \
     -DCMAKE_LINKER=lld && \
+  cd /bootstrap && \
+  cmake --build libcxxrt -- -j$(nproc) && \
   apk del --no-cache \
     g++ \
     cmd:g++ && \
-  cd /bootstrap && \
-  cmake --build libcxxrt -- -j$(nproc) && \
   DESTDIR=${SYSROOT} cmake --install libcxxrt ;
 
 RUN llvm-readelf -l ${SYSROOT}/usr/lib/libcxxrt.so | grep INTERP
