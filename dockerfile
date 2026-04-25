@@ -870,6 +870,9 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
     -DCMAKE_LINKER=lld && \
   cd /bootstrap && \
   cmake --build libcxxrt -- -j$(nproc) && \
+  ls -l libcxxrt && \
+  ls -l libcxxrt/lib && \
+  find libcxxrt -type f -iname "libcxxrt.so*" -exec file {} + || true;
   apk del --no-cache \
     g++ \
     cmd:g++ && \
