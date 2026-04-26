@@ -649,6 +649,7 @@ ENV MUSL_PREFIX="/usr"
 # may need -Wl,--sysroot=/sysroot OR -Wl,--dynamic-linker=/lib/libc.so
 # may need to play around with -Wl,--allow-shlib-undefined to allow __eh_* undefs
 # may want -unwindlib=none when building libunwind
+# may want -Wl,--exclude-libs=libgcc_s.so.1
 ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/sysroot/lib/${MUSL_LDLIB} -fuse-ld=lld -Wl,-T,/bootstrap/ehframe.ld"
 # may require -D__linux__
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -iwithsysroot /usr/include"
@@ -868,7 +869,8 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
     -DLIBCXXRT_ENABLE_THREADS=ON \
     -DLIBCXXRT_USE_COMPILER_RT=ON \
     -DCMAKE_INSTALL_PREFIX=/usr \
-    -DCMAKE_LINKER=lld && \
+    -DCMAKE_LINKER=lld \
+    -DCMAKE_LINK_FLAGS="${LDFLAGS} -Wl,--exclude-libs=libgcc_s.so.1" && \
   cd /bootstrap && \
   cmake --build libcxxrt -- -j$(nproc) && \
   ls -l libcxxrt/lib && \
