@@ -1,1 +1,1 @@
-/lib64/mach-o:/lib/mach-o:/lib64/generic:/lib/generic:/lib64/x86:/lib/x86:/lib64:/lib:/libexec
+/lib/mach-o:/lib/generic:/lib64/x86:/lib/x86:/lib64/x64:/lib:/libexec

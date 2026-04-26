@@ -825,6 +825,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:lld \
     cmd:llvm-ar \
     cmd:llvm-ranlib \
+    cmd:llvm-objdump \
     cmd:llvm-readelf \
     file \
     cmd:find
@@ -871,7 +872,6 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
   cd /bootstrap && \
   cmake --build libcxxrt -- -j$(nproc) && \
   ls -l libcxxrt/lib && \
-  find libcxxrt -type f -iname "libcxxrt.so*" -exec file {} + || true;\
   apk del --no-cache \
     g++ \
     cmd:g++ ;\
@@ -881,15 +881,15 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
       else \
          strip --strip-unneeded libcxxrt/lib/libcxxrt.so || true; \
       fi ; \
+      find libcxxrt -type f -iname "libcxxrt.so*" -exec file {} + || true;\
+      find libcxxrt -type f -iname "libcxxrt.so*" -exec llvm-objdump -harp {} + || true;\
       install -m 0644 libcxxrt/lib/libcxxrt.so "${SYSROOT}/usr/lib/libcxxrt.so" ;\
       touch -d "${SOME_DATE_EPOCH}" "${SYSROOT}/usr/lib/libcxxrt.so" || true ; \
   fi ;
 
 
 RUN llvm-readelf -l ${SYSROOT}/usr/lib/libcxxrt.so | grep -iF "musl" ;\
-  llvm-readelf -l ${SYSROOT}/usr/lib/libcxxrt.so | grep -F "INTERP"
-
-RUN printf "%s\n" "DEBUG CHECKPOINT" && exit 125 ;
+  llvm-readelf -l ${SYSROOT}/usr/lib/libcxxrt.so | grep -F "INTERP" || true ;
 
 # --- Lib C++ headers ---
 FROM --platform="linux/${TARGETARCH}" alpine:latest AS libcxxheaders

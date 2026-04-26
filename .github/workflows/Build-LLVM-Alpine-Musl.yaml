@@ -48,8 +48,8 @@ jobs:
           printf "%s\n" "::group::llvm-alpine-musl-env"
           printf "bootstrap-timestamp=%s\n" $(git log -1 --pretty=%ct) >> "$GITHUB_OUTPUT"
           printf "TIMESTAMP=%s\n" $(git log -1 --pretty=%ct) >> "$GITHUB_ENV"
-          printf "src-timestamp=%s %s\n" $(date -j -f "%s" "$(git log -1 --pretty=%ct)" "+%C%y-%d-%m %H:%M:%S") >> "$GITHUB_OUTPUT"
-          printf "%s %s\n" "llvm-alpine-musl will be synced at time of:" $(date -j -f "%s" "$(git log -1 --pretty=%ct)" "+%C%y-%d-%m %H:%M:%S")
+          printf "src-timestamp=%s %s\n" $(date -j -f "%s" "$(git log -1 --pretty=%ct)" "+%C%y-%m-%d %H:%M:%S") >> "$GITHUB_OUTPUT"
+          printf "%s %s\n" "llvm-alpine-musl will be synced at time of:" $(date -j -f "%s" "$(git log -1 --pretty=%ct)" "+%C%y-%m-%d %H:%M:%S")
           printf "%s\n" "::endgroup::"
 
   build:
