@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2025 Mr. Walls
+Copyright (c) 2025-2026 Mr. Walls
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -29,3 +29,5 @@ LLVM is licensed under its own LLVM-Apache-2.0 licence.
 Alpine Linux is licensed under an MIT licence.
 
 Musl (libc) is licensed under an MIT licence.
+
+Libcxxrt is licensed under its own BSD License.

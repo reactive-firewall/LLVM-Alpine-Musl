@@ -735,7 +735,10 @@ COPY --from=fetcher /fetch/libcxxrt /bootstrap/libcxxrt-project
 COPY --from=sysroot /sysroot /sysroot
 COPY --from=build-unwind /stage /stage
 
-# Copy your Generic-Musl.cmake into the image build context before building the image
+# Copy shims/unwind_shim.h into the image build context before building the image
+COPY shims/unwind_shim.h /tmp/unwind_shim.h
+
+# Copy Generic-Musl.cmake into the image build context before building the image
 COPY Generic-Musl.cmake /tmp/Generic-Musl.cmake
 COPY Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
 
@@ -870,7 +873,7 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
     -DLIBCXXRT_USE_COMPILER_RT=ON \
     -DCMAKE_INSTALL_PREFIX=/usr \
     -DCMAKE_LINKER=lld \
-    -DCMAKE_LINK_FLAGS="${LDFLAGS} -Wl,--exclude-libs=libgcc_s.so.1" && \
+    -DCMAKE_LINK_FLAGS="${CFLAGS} ${LDFLAGS} -Wl,--exclude-libs=libgcc_s.so.1" && \
   cd /bootstrap && \
   cmake --build libcxxrt -- -j$(nproc) && \
   ls -l libcxxrt/lib && \
@@ -883,14 +886,25 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
       else \
          strip --strip-unneeded libcxxrt/lib/libcxxrt.so || true; \
       fi ; \
-      find libcxxrt -type f -iname "libcxxrt.so*" -exec file {} + || true;\
-      find libcxxrt -type f -iname "libcxxrt.so*" -exec llvm-objdump -harp {} + || true;\
+      file "libcxxrt/lib/libcxxrt.so" 2>/dev/null || true;\
+      { llvm-objdump -harp libcxxrt/lib/libcxxrt.so || true ;} 2>/dev/null | grep -iF "musl" ;\
       install -m 0644 libcxxrt/lib/libcxxrt.so "${SYSROOT}/usr/lib/libcxxrt.so" ;\
       touch -d "${SOME_DATE_EPOCH}" "${SYSROOT}/usr/lib/libcxxrt.so" || true ; \
-  fi ;
+  fi ;\
+  if [ -r "libcxxrt/src/cxxabi.h" ] ; then \
+    file "libcxxrt/src/cxxabi.h" 2>/dev/null || true;\
+    { wc -l libcxxrt/src/cxxabi.h || true ;} 2>/dev/null;\
+    mkdir -m 0755 -p "${SYSROOT}/usr/include/c++/v1/cxxabi" ;\
+    install -m 0644 "libcxxrt/src/unwind.h" "${SYSROOT}/usr/include/c++/v1/cxxabi/unwind-cxxabi.h" ;\
+    install -m 0644 "/stage/usr/include/__libunwind_config.h" "${SYSROOT}/usr/include/c++/v1/cxxabi/__libunwind_config.h" ;\
+    install -m 0644 "/stage/usr/include/unwind.h" "${SYSROOT}/usr/include/c++/v1/cxxabi/unwind-llvm.h" ;\
+    install -m 0644 /tmp/unwind_shim.h "${SYSROOT}/usr/include/c++/v1/cxxabi/unwind.h" ;\
+    install -m 0644 libcxxrt/src/cxxabi.h "${SYSROOT}/usr/include/c++/v1/cxxabi/cxxabi.h" ;\
+    touch -d "${SOME_DATE_EPOCH}" "${SYSROOT}/usr/lib/libcxxrt.so" || true ; \
+  fi ;\
 
 
-RUN llvm-readelf -l ${SYSROOT}/usr/lib/libcxxrt.so | grep -iF "musl" ;\
+RUN llvm-readelf -l ${SYSROOT}/usr/lib/libcxxrt.so ;\
   llvm-readelf -l ${SYSROOT}/usr/lib/libcxxrt.so | grep -F "INTERP" || true ;
 
 # --- Lib C++ headers ---
@@ -903,7 +917,7 @@ COPY --from=fetcher /fetch/llvmorg /bootstrap/llvmorg
 COPY --from=sysroot /sysroot /sysroot
 COPY --from=build-unwind /stage /stage
 
-# Copy your Generic-Musl.cmake into the image build context before building the image
+# Copy custom Generic-Musl.cmake into the image build context before building the image
 COPY Generic-Musl.cmake /tmp/Generic-Musl.cmake
 COPY Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
 
@@ -1087,7 +1101,7 @@ RUN mkdir -p build-libcxx-config && \
 
 WORKDIR /bootstrap/llvmorg
 
-ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot /headers -iwithsysroot /usr/include -iwithsysroot /usr/include/c++/v1"
+ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot /headers -iwithsysroot /usr/include/c++/v1 -iwithsysroot /usr/include"
 ENV CXXFLAGS="-unwindlib=/sysroot/usr/lib/libunwind.so.1.0 -cxx-isystem /headers/usr/include/c++/v1"
 
 # Install libcxxabi headers too (ABI types required by libc++ headers)
@@ -1180,7 +1194,7 @@ COPY --from=build-unwind /stage /stage
 COPY --from=build-libcxxrt /sysroot /stage-libcxxrt
 COPY --from=libcxxheaders /headers /stage-cxx
 
-# Copy your Generic-Musl.cmake into the image build context before building the image
+# Copy custom Generic-Musl.cmake into the image build context before building the image
 COPY Generic-Musl.cmake /tmp/Generic-Musl.cmake
 COPY Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
 
