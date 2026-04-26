@@ -1080,7 +1080,7 @@ RUN mkdir -p build-libcxx-config && \
       -DLIBCXX_INCLUDE_TESTS=OFF \
     ;\
     cmake --build . || true ;\
-    python3 ../libcxx/utils/generate_iwyu_mapping.py || true ;\
+    python3 ../libcxx/utils/generate_iwyu_mapping.py -o include/c++/v1/libcxx.imp || true ;\
     cmake --install . || true ;
 
 WORKDIR /bootstrap/llvmorg
