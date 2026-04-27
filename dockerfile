@@ -901,7 +901,7 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
     install -m 0644 /tmp/unwind_shim.h "${SYSROOT}/usr/include/c++/v1/cxxabi/unwind.h" ;\
     install -m 0644 libcxxrt/src/cxxabi.h "${SYSROOT}/usr/include/c++/v1/cxxabi/cxxabi.h" ;\
     touch -d "${SOME_DATE_EPOCH}" "${SYSROOT}/usr/lib/libcxxrt.so" || true ; \
-  fi ;\
+  fi ;
 
 
 RUN llvm-readelf -l ${SYSROOT}/usr/lib/libcxxrt.so ;\
@@ -916,6 +916,7 @@ WORKDIR /bootstrap
 COPY --from=fetcher /fetch/llvmorg /bootstrap/llvmorg
 COPY --from=sysroot /sysroot /sysroot
 COPY --from=build-unwind /stage /stage
+COPY --from=build-libcxxrt /sysroot /stage-cxxrt
 
 # Copy custom Generic-Musl.cmake into the image build context before building the image
 COPY Generic-Musl.cmake /tmp/Generic-Musl.cmake
@@ -991,6 +992,17 @@ RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
 RUN set -eux \
     && ln -fns libunwind.so.1.0 ${SYSROOT}/lib/libunwind.so.1 && \
     ln -fns libunwind.so.1 ${SYSROOT}/lib/libunwind.so
+
+# overlay the libcxxrt
+RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
+    for CXXRT_FILE_ARTIFACT in usr/include/c++/v1/cxxabi/cxxabi.h \
+        usr/include/c++/v1/cxxabi/unwind-llvm.h \
+        usr/include/c++/v1/cxxabi/unwind-cxxabi.h \
+        usr/include/c++/v1/cxxabi/unwind.h \
+        usr/lib/libcxxrt.so.1.0 ; do \
+          cp -vf /stage-cxxrt/${CXXRT_FILE_ARTIFACT} ${SYSROOT}/${CXXRT_FILE_ARTIFACT} || true ; \
+          touch -d "${SOME_DATE_EPOCH}" ${SYSROOT}/${CXXRT_FILE_ARTIFACT} || true ; \
+    done ;
 
 # install minimal build tooling (musl-based; no libstdc++/glibc packages used)
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
