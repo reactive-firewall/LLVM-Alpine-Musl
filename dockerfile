@@ -1323,9 +1323,6 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:g++
 # but we remove it anyway afterwards
 
-ENV PATH=/opt/llvm/bin:$PATH
-ENV LD_LIBRARY_PATH=/opt/llvm/lib:$LD_LIBRARY_PATH
-
 WORKDIR /work
 
 # Copy helper scripts and sources into the image
