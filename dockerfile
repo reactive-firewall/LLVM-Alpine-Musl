@@ -1328,7 +1328,7 @@ WORKDIR /work
 # Copy helper scripts and sources into the image
 # (Ensure these files exist next to the Dockerfile when building)
 COPY run_cmake_build.sh /work/run_cmake_build.sh
-COPY bootstrap_cxa_stubs.cpp /work/bootstrap_cxa_stubs.cpp
+COPY shims/bootstrap_cxa_stubs.cpp /work/bootstrap_cxa_stubs.cpp
 COPY test_exception.cpp /work/test_exception.cpp
 
 RUN chmod +x /work/run_cmake_build.sh
