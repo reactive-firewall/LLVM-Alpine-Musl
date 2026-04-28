@@ -1219,7 +1219,7 @@ FROM --platform="linux/${TARGETARCH}" alpine:latest AS build-libcxx
 WORKDIR /work
 
 # copy sources (llvmorg is the llvm-project checkout root)
-COPY --from=fetcher /fetch/llvmorg /work/llvmorg-project
+COPY --from=fetcher /fetch/llvmorg /work/llvm-project
 COPY --from=sysroot /sysroot /sysroot
 COPY --from=build-unwind /stage /stage
 COPY --from=build-libcxxrt /sysroot /stage-cxxrt
