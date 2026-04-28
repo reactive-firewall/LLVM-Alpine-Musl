@@ -407,7 +407,7 @@ RUN set -eux \
         cmd:find
 
 # Ensure the dynamic loader is configured to search paths correctly
-COPY ld-musl-x86_64.path /etc/ld-musl-x86_64.path
+COPY payloads/etc/ld-musl-x86_64.path /etc/ld-musl-x86_64.path
 RUN set -eux; \
     if [ "$(uname -m)" = "x86_64" ]; then \
       [ -L "${SYSROOT}"/etc/ld-musl-i486.path ] || ln -svf ld-musl-x86_64.path "${SYSROOT}"/etc/ld-musl-i486.path; \
@@ -417,13 +417,13 @@ RUN set -eux; \
       [ -L "${SYSROOT}"/etc/ld-musl-generic.path ] || ln -svf ld-musl-x86_64.path "${SYSROOT}"/etc/ld-musl-generic.path; \
     fi ;
 
-COPY ld-musl-aarch64.path /etc/ld-musl-aarch64.path
+COPY payloads/etc/ld-musl-aarch64.path /etc/ld-musl-aarch64.path
 RUN set -eux; \
     if [ "$(uname -m)" = "aarch64" ]; then \
       [ -L "${SYSROOT}"/etc/ld-musl-generic.path ] || ln -svf ld-musl-aarch64.path "${SYSROOT}"/etc/ld-musl-generic.path; \
     fi;
 
-COPY ld-musl-arm.path /etc/ld-musl-arm.path
+COPY payloads/etc/ld-musl-arm.path /etc/ld-musl-arm.path
 RUN set -eux; \
     [ -L "${SYSROOT}"/etc/ld-musl-armv7.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-armv7.path; \
     [ -L "${SYSROOT}"/etc/ld-musl-armv8.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-armv8.path;
@@ -441,7 +441,7 @@ COPY --from=fetcher /fetch/llvmorg /bootstrap/llvmorg
 COPY --from=sysroot /sysroot /sysroot
 
 # copy ehframe.ld script
-COPY ehframe.ld /bootstrap/ehframe.ld
+COPY payloads/ld.libunwind/ehframe.ld /bootstrap/ehframe.ld
 
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
@@ -558,7 +558,7 @@ WORKDIR /bootstrap/llvmorg
 # might need LDFLAGS="-Wl,--exclude-libs,libssp_nonshared.a"
 # also might need -DCMAKE_C_FLAGS="-fno-stack-protector" -DCMAKE_CXX_FLAGS="-fno-stack-protector"
 
-# Build minimal llvm libunwind (install to sysroot)
+# Build minimal static llvm libunwind (install to sysroot)
 RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
     -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm/cmake/modules \
@@ -593,14 +593,7 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     cmake --install build-libunwind && \
     rm -vfr /bootstrap/llvmorg/build-libunwind/
 
-# check on the lib
-#RUN printf "%s\n" "Bootstrapped Libs (static):" && \
-#    ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true ; \
-#    printf "%s\n" "Bootstrapped Headers:" && \
-#    ls -lapr ${SYSROOT}/usr/include/ || true
-
-# move the changed files out to stage
-
+# prepare static libunwind overlay stage
 RUN mkdir -pv /stage-static/usr/include/mach-o && mkdir -pv /stage-static/usr/lib && \
     for UNWIND_FILE_ARTIFACT in usr/include/__libunwind_config.h \
         usr/include/libunwind.h \
@@ -613,6 +606,19 @@ RUN mkdir -pv /stage-static/usr/include/mach-o && mkdir -pv /stage-static/usr/li
           cp -vn ${SYSROOT}/${UNWIND_FILE_ARTIFACT} /stage-static/${UNWIND_FILE_ARTIFACT} || true ; \
           touch -d "${SOME_DATE_EPOCH}" /stage-static/${UNWIND_FILE_ARTIFACT} || true ; \
     done ;
+
+# Cleanup build packages and intermediate files to keep this stage small
+RUN apk del --no-cache \
+        llvm \
+        lld \
+        libc++ \
+        libc++-dev \
+        compiler-rt \
+        cmd:llvm-ar \
+        llvm-runtimes \
+        cmake \
+        python3 \
+        samurai
 
 # --- build-unwind: bootstrap unwind using distro clang/llvm to compile a minimal unwind library ---
 FROM --platform="linux/${TARGETARCH}" build-unwind-base AS build-unwind
@@ -741,8 +747,8 @@ COPY --from=build-unwind /stage /stage
 COPY shims/unwind_shim.h /tmp/unwind_shim.h
 
 # Copy Generic-Musl.cmake into the image build context before building the image
-COPY Generic-Musl.cmake /tmp/Generic-Musl.cmake
-COPY Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
+COPY Generic-Musl/Platforms/Generic-Musl.cmake /tmp/Generic-Musl.cmake
+COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
 
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
@@ -875,7 +881,7 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
     -DLIBCXXRT_USE_COMPILER_RT=ON \
     -DCMAKE_INSTALL_PREFIX=/usr \
     -DCMAKE_LINKER=lld \
-    -DCMAKE_LINK_FLAGS="${CFLAGS} ${LDFLAGS} -Wl,--exclude-libs=libgcc_s.so.1" && \
+    -DCMAKE_LINKER_FLAGS="${CFLAGS} ${LDFLAGS} -Wl,--exclude-libs=libgcc_s.so.1" && \
   cd /bootstrap && \
   cmake --build libcxxrt -- -j$(nproc) && \
   ls -l libcxxrt/lib && \
@@ -905,9 +911,19 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
     touch -d "${SOME_DATE_EPOCH}" "${SYSROOT}/usr/lib/libcxxrt.so" || true ; \
   fi ;
 
+RUN ls -1 "${SYSROOT}/usr/include/c++/v1/cxxabi/unwind.h" && \
+    ls -1 "${SYSROOT}/usr/include/c++/v1/cxxabi/unwind-cxxabi.h" && \
+    ls -1 "${SYSROOT}/usr/include/c++/v1/cxxabi/unwind-llvm.h" && \
+    ls -1 "${SYSROOT}/usr/include/c++/v1/cxxabi/cxxabi.h" && \
+    { llvm-objdump -harp ${SYSROOT}/usr/lib/libcxxrt.so || true ;} 2>/dev/null | grep -iF "musl" || true ;
 
-RUN llvm-readelf -l ${SYSROOT}/usr/lib/libcxxrt.so ;\
-  llvm-readelf -l ${SYSROOT}/usr/lib/libcxxrt.so | grep -F "INTERP" || true ;
+# Cleanup build packages and intermediate files to keep this stage small
+RUN apk del --no-cache \
+        compiler-rt \
+        cmd:clang++ \
+        cmake \
+        samurai \
+        python3 ;
 
 # --- Lib C++ headers ---
 FROM --platform="linux/${TARGETARCH}" alpine:latest AS libcxxheaders
@@ -921,8 +937,8 @@ COPY --from=build-unwind /stage /stage
 COPY --from=build-libcxxrt /sysroot /stage-cxxrt
 
 # Copy custom Generic-Musl.cmake into the image build context before building the image
-COPY Generic-Musl.cmake /tmp/Generic-Musl.cmake
-COPY Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
+COPY Generic-Musl/Platforms/Generic-Musl.cmake /tmp/Generic-Musl.cmake
+COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
 
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
@@ -996,7 +1012,7 @@ RUN set -eux \
     ln -fns libunwind.so.1 ${SYSROOT}/lib/libunwind.so
 
 # overlay the libcxxrt
-RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
+RUN mkdir -pv ${SYSROOT}/usr/include/c++/v1/cxxabi && \
     for CXXRT_FILE_ARTIFACT in usr/include/c++/v1/cxxabi/cxxabi.h \
         usr/include/c++/v1/cxxabi/unwind-llvm.h \
         usr/include/c++/v1/cxxabi/unwind-cxxabi.h \
@@ -1063,7 +1079,7 @@ RUN mkdir -pv /headers && \
             touch -d "${SOME_DATE_EPOCH}" /headers/${MUSL_SDK_FILE_ARTIFACT} || true ; \
           fi ; \
     done ;\
-    find /headers/usr/include -type f -iname "*.h" -depth 1 -exec sh -c 'for f; do ln -svf "$f" /headers/usr/include/$(basename "$f"); done' _ {} + || true;
+    find /headers/usr/include -maxdepth 1 -type f -iname "*.h" -exec sh -c 'for f; do ln -svf "$f" /headers/usr/include/$(basename "$f"); done' _ {} + || true;
 
 # WORKAROUND: cmake still thinks that clang++ requires g++
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
@@ -1187,7 +1203,7 @@ RUN for MUSL_SDK_FILE_ARTIFACT in bin sbin lib libexec \
             rm -vf -- /headers/${MUSL_SDK_FILE_ARTIFACT} || true ; \
           fi ; \
     done ; \
-    find /headers/usr/include -type l -iname "*.h" -depth 1 -exec rm -vf -- {} + || true;
+    find /headers/usr/include -maxdepth 1 -type l -iname "*.h" -exec rm -vf -- {} + || true;
 
 # The resulting "headers" sysroot:
 # /headers/usr/include    <-- contains libc++ and libcxxabi headers and generated config headers
@@ -1200,17 +1216,23 @@ RUN ls -l -r /headers/usr/include || true && \
 # --- MARK for round-trip bootstrap build of libcxxabi.so
 FROM --platform="linux/${TARGETARCH}" alpine:latest AS build-libcxx
 
-WORKDIR /bootstrap
+WORKDIR /work
 
 # copy sources (llvmorg is the llvm-project checkout root)
-COPY --from=fetcher /fetch/llvmorg /bootstrap/llvmorg
+COPY --from=fetcher /fetch/llvmorg /work/llvmorg
 COPY --from=sysroot /sysroot /sysroot
 COPY --from=build-unwind /stage /stage
 COPY --from=build-libcxxrt /sysroot /stage-cxxrt
 
 # Copy custom Generic-Musl.cmake into the image build context before building the image
-COPY Generic-Musl.cmake /tmp/Generic-Musl.cmake
-COPY Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
+COPY Generic-Musl/Platforms/Generic-Musl.cmake /tmp/Generic-Musl.cmake
+COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
+
+# Copy helper scripts and sources into the image
+# (Ensure these files exist next to the Dockerfile when building)
+COPY payloads/bin/run_cmake_build.sh /work/run_cmake_build.sh
+COPY shims/bootstrap_cxa_stubs.cpp /work/bootstrap_cxa_stubs.cpp
+COPY payloads/tests/test_exception.cpp /work/test_exception.cpp
 
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
@@ -1276,7 +1298,7 @@ RUN set -eux \
     ln -fns libunwind.so.1 ${SYSROOT}/lib/libunwind.so
 
 # overlay the libcxxrt
-RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
+RUN mkdir -pv ${SYSROOT}/usr/include/c++/v1/cxxabi && \
     for CXXRT_FILE_ARTIFACT in usr/include/c++/v1/cxxabi/cxxabi.h \
         usr/include/c++/v1/cxxabi/unwind-llvm.h \
         usr/include/c++/v1/cxxabi/unwind-cxxabi.h \
@@ -1322,14 +1344,6 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:clang++ \
     cmd:g++
 # but we remove it anyway afterwards
-
-WORKDIR /work
-
-# Copy helper scripts and sources into the image
-# (Ensure these files exist next to the Dockerfile when building)
-COPY run_cmake_build.sh /work/run_cmake_build.sh
-COPY shims/bootstrap_cxa_stubs.cpp /work/bootstrap_cxa_stubs.cpp
-COPY test_exception.cpp /work/test_exception.cpp
 
 RUN chmod +x /work/run_cmake_build.sh
 
@@ -1474,8 +1488,8 @@ COPY --from=libcxxheaders /headers /stage-cxx
 COPY --from=build-libcxx /opt/libcxx-final /stage-cxx-root
 
 # Copy custom Generic-Musl.cmake into the image build context before building the image
-COPY Generic-Musl.cmake /tmp/Generic-Musl.cmake
-COPY Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
+COPY Generic-Musl/Platforms/Generic-Musl.cmake /tmp/Generic-Musl.cmake
+COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
 
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
