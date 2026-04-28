@@ -1873,7 +1873,7 @@ RUN ln -sf /opt/llvm-bootstrap/include/clang /sysroot/usr/include/clang && \
 
 
 # Copy the toolchain file into the image
-COPY llvm-musl-toolchain.cmake /build/llvm-musl-toolchain.cmake
+COPY Generic-Musl/llvm-musl-toolchain.cmake /build/llvm-musl-toolchain.cmake
 
 ENV BOOTSTRAP_CLANG=/opt/llvm-bootstrap/bin/clang
 ENV BOOTSTRAP_CLANGXX=/opt/llvm-bootstrap/bin/clang++
