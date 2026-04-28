@@ -1364,11 +1364,11 @@ ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_
 # might need -nostdinc++
 ENV CXXFLAGS="-ffunction-sections -fdata-sections -unwindlib=${SYSROOT}/usr/lib/libunwind.so.1.0"
 
+RUN "${HOST_CXX}" $CFLAGS $CXXFLAGS $LDFLAGS -v -fno-rtti -fno-exceptions -c /work/bootstrap_cxa_stubs.cpp -o /work/bootstrap_cxa_stubs.o && \
+    llvm-ar rcs /work/libbootstrap_cxa.a /work/bootstrap_cxa_stubs.o
 
 # Stage 1: Build libc++ (bootstrap0) with minimal ABI stubs
 RUN mkdir -p /work/build-libcxx-bootstrap0 && \
-    "${HOST_CXX}" -fPIC -fno-rtti -fno-exceptions -c /work/bootstrap_cxa_stubs.cpp -o /work/bootstrap_cxa_stubs.o && \
-    llvm-ar rcs /work/libbootstrap_cxa.a /work/bootstrap_cxa_stubs.o && \
     /work/run_cmake_build.sh llvm-project/libcxx /work/build-libcxx-bootstrap0 \
       -G Ninja \
       -DCMAKE_C_COMPILER=${HOST_CC} \
@@ -1387,7 +1387,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && \
       -DLIBCXX_HARDENING_MODE=extensive \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
-      -DCMAKE_EXE_LINKER_FLAGS="-Wl,--whole-archive /work/bootstrap_cxa_stubs.a -Wl,--no-whole-archive -Wl,-rpath,/opt/libcxx-bootstrap0/lib" \
+      -DCMAKE_EXE_LINKER_FLAGS="-Wl,--whole-archive /work/libbootstrap_cxa.a -Wl,--no-whole-archive -Wl,-rpath,/opt/libcxx-bootstrap0/lib" \
       -DCMAKE_INSTALL_RPATH=/opt/libcxx-bootstrap0/lib
 
 # Stage 2: Build libc++abi against libc++ bootstrap0 (abi-bootstrap0)
