@@ -1219,7 +1219,7 @@ FROM --platform="linux/${TARGETARCH}" alpine:latest AS build-libcxx
 WORKDIR /work
 
 # copy sources (llvmorg is the llvm-project checkout root)
-COPY --from=fetcher /fetch/llvmorg /work/llvmorg
+COPY --from=fetcher /fetch/llvmorg /work/llvmorg-project
 COPY --from=sysroot /sysroot /sysroot
 COPY --from=build-unwind /stage /stage
 COPY --from=build-libcxxrt /sysroot /stage-cxxrt
@@ -1367,7 +1367,7 @@ ENV CXXFLAGS="-ffunction-sections -fdata-sections -unwindlib=${SYSROOT}/usr/lib/
 
 # Stage 1: Build libc++ (bootstrap0) with minimal ABI stubs
 RUN mkdir -p /work/build-libcxx-bootstrap0 && \
-    ${HOST_CXX} -fPIC -c /work/bootstrap_cxa_stubs.cpp -o /work/bootstrap_cxa_stubs.o && \
+    "${HOST_CXX}" -fPIC -c /work/bootstrap_cxa_stubs.cpp -o /work/bootstrap_cxa_stubs.o && \
     /work/run_cmake_build.sh llvm-project/libcxx /work/build-libcxx-bootstrap0 \
       -G Ninja \
       -DCMAKE_C_COMPILER=${HOST_CC} \
