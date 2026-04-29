@@ -1382,9 +1382,6 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
-      -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
-      -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
-      -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_SYSROOT=${SYSROOT} \
@@ -1402,8 +1399,11 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && \
       -DLIBCXX_CXX_ABI_LIBRARY_PATH=${SYS_LIB} \
       -DLIBCXX_CXX_ABI_INCLUDE_PATHS=${SYS_INCLUDE} \
       -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=OFF \
+      -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
       -DCMAKE_EXE_LINKER_FLAGS="-Wl,--whole-archive /work/libbootstrap_cxa.a -Wl,--no-whole-archive -Wl,-rpath,/opt/libcxx-bootstrap0/lib -L${SYS_LIB} -Wl,-rpath-link,${SYS_LIB}" \
-      -DCMAKE_INSTALL_RPATH=/opt/libcxx-bootstrap0/lib
+      -DCMAKE_INSTALL_RPATH=/opt/libcxx-bootstrap0/lib \
+      -DLIBCXX_INCLUDE_TESTS=OFF
 
 # Stage 2: Build libc++abi against libc++ bootstrap0 (abi-bootstrap0)
 # If you still want to build libc++abi in-stage using bootstrap libc++, point to both the sysroot (for libunwind) and the bootstrap libc++ install.
@@ -1414,9 +1414,6 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && \
       -DCMAKE_CXX_COMPILER=${HOST_CXX} \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
-      -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
-      -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
-      -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
@@ -1431,7 +1428,8 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && \
       -DLIBCXXABI_HAS_CXA_THREAD_ATEXIT_IMPL=FALSE \
       -DLIBCXXABI_HAS_GCC_S_LIB=NO \
       -DCMAKE_PREFIX_PATH=/opt/libcxx-bootstrap0 \
-      -DCMAKE_CXX_FLAGS="-I/opt/libcxx-bootstrap0/include -I${SYS_INCLUDE}" \
+      -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -I/opt/libcxx-bootstrap0/include -I${SYS_INCLUDE}" \
       -DCMAKE_EXE_LINKER_FLAGS="-L/opt/libcxx-bootstrap0/lib -L${SYS_LIB} -Wl,-rpath,/opt/libcxx-bootstrap0/lib"
 
 # Stage 3: Rebuild libc++ (stage1) linking against libc++abi-bootstrap0
@@ -1443,9 +1441,6 @@ RUN mkdir -p /work/build-libcxx-stage1 && \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
-      -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
-      -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
-      -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_SYSROOT=${SYSROOT} \
@@ -1462,7 +1457,8 @@ RUN mkdir -p /work/build-libcxx-stage1 && \
       -DLIBCXX_CXX_ABI=libcxxabi \
       -DLIBCXX_CXX_ABI_LIBRARY_PATH=/opt/libcxxabi-bootstrap0/lib \
       -DLIBCXX_CXX_ABI_INCLUDE_PATHS=/opt/libcxxabi-bootstrap0/include \
-      -DCMAKE_CXX_FLAGS="-I/opt/libcxx-bootstrap0/include -I/opt/libcxxabi-bootstrap0/include -I${SYS_INCLUDE}" \
+      -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -I/opt/libcxx-bootstrap0/include -I/opt/libcxxabi-bootstrap0/include -I${SYS_INCLUDE}" \
       -DCMAKE_EXE_LINKER_FLAGS="-L/opt/libcxxabi-bootstrap0/lib -L/opt/libcxx-bootstrap0/lib -L${SYS_LIB} -Wl,-rpath,/opt/libcxxabi-bootstrap0/lib:/opt/libcxx-stage1/lib"
 
 # Stage 4: Rebuild libc++abi against libc++ stage1 (final ABI)
@@ -1474,9 +1470,6 @@ RUN mkdir -p /work/build-libcxxabi-final && \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
-      -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
-      -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
-      -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_SYSROOT=${SYSROOT} \
@@ -1490,7 +1483,8 @@ RUN mkdir -p /work/build-libcxxabi-final && \
       -DLIBCXXABI_HAS_CXA_THREAD_ATEXIT_IMPL=FALSE \
       -DLIBCXXABI_HAS_GCC_S_LIB=NO \
       -DCMAKE_PREFIX_PATH=/opt/libcxx-stage1 \
-      -DCMAKE_CXX_FLAGS="-I/opt/libcxx-stage1/include -I${SYS_INCLUDE}" \
+      -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -I/opt/libcxx-stage1/include -I${SYS_INCLUDE}" \
       -DCMAKE_EXE_LINKER_FLAGS="-L/opt/libcxx-stage1/lib -L${SYS_LIB} -Wl,-rpath,/opt/libcxx-stage1/lib"
 
 # Stage 5: Final libc++ rebuild against final libc++abi
@@ -1502,9 +1496,6 @@ RUN mkdir -p /work/build-libcxx-final && \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
-      -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
-      -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
-      -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_SYSROOT=${SYSROOT} \
@@ -1521,7 +1512,8 @@ RUN mkdir -p /work/build-libcxx-final && \
       -DLIBCXX_CXX_ABI=libcxxabi \
       -DLIBCXX_CXX_ABI_LIBRARY_PATH=/opt/libcxxabi-final/lib \
       -DLIBCXX_CXX_ABI_INCLUDE_PATHS=/opt/libcxxabi-final/include \
-      -DCMAKE_CXX_FLAGS="-I/opt/libcxx-stage1/include -I/opt/libcxxabi-final/include -I${SYS_INCLUDE}" \
+      -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -I/opt/libcxx-stage1/include -I/opt/libcxxabi-final/include -I${SYS_INCLUDE}" \
       -DCMAKE_EXE_LINKER_FLAGS="-L/opt/libcxxabi-final/lib -L/opt/libcxx-stage1/lib -L${SYS_LIB} -Wl,-rpath,/opt/libcxxabi-final/lib:/opt/libcxx-final/lib"
 
 # Build test program and link against final libs
