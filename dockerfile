@@ -1363,14 +1363,14 @@ ENV HOST_LD=ld.lld
 # may want linker flag -Wl,--nostdlib to prevent linking to any std c++
 ENV LDFLAGS="-v -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic -Wl,--dynamic-linker=/sysroot/lib/${MUSL_LDLIB}"
 # Does NOT require -D__ELF__
-ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include"
+ENV CFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include"
 # might need -nostdinc++
 ENV CXXFLAGS="-ffunction-sections -fdata-sections -unwindlib=${SYSROOT}/usr/lib/libunwind.so.1.0"
 
-RUN "${HOST_CC}" $CFLAGS $LDFLAGS -v -x c -c /work/__stack_chk_fail_local.c -o /work/__stack_chk_fail_local.o && \
+RUN "${HOST_CC}" $CFLAGS $LDFLAGS -Qunused-arguments -x c -c /work/__stack_chk_fail_local.c -o /work/__stack_chk_fail_local.o && \
     llvm-ar --format=bsd rcs ${SYSROOT}/usr/lib/generic/libssp_nonshared.a /work/__stack_chk_fail_local.o
 
-RUN "${HOST_CXX}" $CFLAGS $CXXFLAGS $LDFLAGS -fuse=lld -v -fno-rtti -fno-exceptions -c /work/bootstrap_cxa_stubs.cpp -o /work/bootstrap_cxa_stubs.o && \
+RUN "${HOST_CXX}" $CFLAGS $CXXFLAGS $LDFLAGS -fuse-ld=lld -Qunused-arguments -fno-rtti -fno-exceptions -c /work/bootstrap_cxa_stubs.cpp -o /work/bootstrap_cxa_stubs.o && \
     llvm-ar --format=bsd rcs /work/libbootstrap_cxa.a /work/bootstrap_cxa_stubs.o
 
 # Stage 1: Build libc++ (bootstrap0) but link against existing libcxxabi (libcxxrt) in sysroot
@@ -1382,6 +1382,11 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
+      -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
+      -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
+      -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_SYSROOT=${SYSROOT} \
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT} \
       -DCMAKE_INSTALL_PREFIX=/opt/libcxx-bootstrap0 \
@@ -1409,6 +1414,11 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && \
       -DCMAKE_CXX_COMPILER=${HOST_CXX} \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
+      -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
+      -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
+      -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
       -DCMAKE_SYSROOT=${SYSROOT} \
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT} \
@@ -1433,6 +1443,11 @@ RUN mkdir -p /work/build-libcxx-stage1 && \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
+      -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
+      -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
+      -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_SYSROOT=${SYSROOT} \
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT} \
       -DCMAKE_INSTALL_PREFIX=/opt/libcxx-stage1 \
@@ -1459,6 +1474,11 @@ RUN mkdir -p /work/build-libcxxabi-final && \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
+      -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
+      -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
+      -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_SYSROOT=${SYSROOT} \
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT} \
       -DCMAKE_INSTALL_PREFIX=/opt/libcxxabi-final \
@@ -1482,6 +1502,11 @@ RUN mkdir -p /work/build-libcxx-final && \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
+      -DLLVM_HOST_TRIPLE=${HOST_TRIPLE} \
+      -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
+      -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_SYSROOT=${SYSROOT} \
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT} \
       -DCMAKE_INSTALL_PREFIX=/opt/libcxx-final \
