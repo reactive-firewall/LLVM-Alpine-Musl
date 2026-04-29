@@ -1029,7 +1029,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:bash \
     cmd:dash \
     cmd:clang \
-    compiler-rt \
+    llvm-libs \
     cmake \
     python3 \
     samurai \
@@ -1318,7 +1318,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:bash \
     cmd:dash \
     cmd:clang \
-    compiler-rt \
+    llvm-libs \
     cmake \
     python3 \
     samurai \
@@ -1361,7 +1361,8 @@ ENV HOST_LD=ld.lld
 
 # may need -Wl,--sysroot=/sysroot
 # may want linker flag -Wl,--nostdlib to prevent linking to any std c++
-ENV LDFLAGS="-v -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic -Wl,--dynamic-linker=/sysroot/lib/${MUSL_LDLIB}"
+# may want to link -Wl,-l,${LLVM_RTLIB_STUB}
+ENV LDFLAGS="-v -Wl,--sysroot=${SYSROOT} -Wl,-L,${SYS_LIB} -Wl,-L,${SYSROOT}/lib -Wl,-L,${SYS_LIB}/generic -Wl,-l,${LLVM_RTLIB_STUB} -Wl,--dynamic-linker=${SYSROOT}/lib/${MUSL_LDLIB}"
 # Does NOT require -D__ELF__
 ENV CFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include"
 # might need -nostdinc++
@@ -1395,14 +1396,16 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && \
       -DLIBCXX_HAS_PTHREAD_API=ON \
       -DLIBCXX_INCLUDE_BENCHMARKS=OFF \
       -DLIBCXX_HARDENING_MODE=extensive \
+      -DLIBCXX_ABI_VERSION=1 \
       -DLIBCXX_CXX_ABI=libcxxrt \
       -DLIBCXX_CXX_ABI_LIBRARY_PATH=${SYS_LIB} \
-      -DLIBCXX_CXX_ABI_INCLUDE_PATHS=${SYS_INCLUDE} \
+      -DLIBCXX_CXX_ABI_INCLUDE_PATHS=${SYS_INCLUDE}/c++/v1/cxxabi \
       -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=OFF \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
       -DCMAKE_EXE_LINKER_FLAGS="-Wl,--whole-archive /work/libbootstrap_cxa.a -Wl,--no-whole-archive -Wl,-rpath,/opt/libcxx-bootstrap0/lib -L${SYS_LIB} -Wl,-rpath-link,${SYS_LIB}" \
       -DCMAKE_INSTALL_RPATH=/opt/libcxx-bootstrap0/lib \
+      -DLLVM_ENABLE_RUNTIMES= \
       -DLIBCXX_INCLUDE_TESTS=OFF
 
 # Stage 2: Build libc++abi against libc++ bootstrap0 (abi-bootstrap0)
@@ -1430,7 +1433,9 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && \
       -DCMAKE_PREFIX_PATH=/opt/libcxx-bootstrap0 \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -I/opt/libcxx-bootstrap0/include -I${SYS_INCLUDE}" \
-      -DCMAKE_EXE_LINKER_FLAGS="-L/opt/libcxx-bootstrap0/lib -L${SYS_LIB} -Wl,-rpath,/opt/libcxx-bootstrap0/lib"
+      -DCMAKE_EXE_LINKER_FLAGS="-L/opt/libcxx-bootstrap0/lib -L${SYS_LIB} -Wl,-rpath,/opt/libcxx-bootstrap0/lib" \
+      -DLLVM_ENABLE_RUNTIMES= \
+      -DLIBCXXABI_INCLUDE_TESTS=OFF
 
 # Stage 3: Rebuild libc++ (stage1) linking against libc++abi-bootstrap0
 RUN mkdir -p /work/build-libcxx-stage1 && \
