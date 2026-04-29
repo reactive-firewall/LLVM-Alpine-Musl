@@ -1232,6 +1232,7 @@ COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cma
 # (Ensure these files exist next to the Dockerfile when building)
 COPY payloads/bin/run_cmake_build.sh /work/run_cmake_build.sh
 COPY shims/bootstrap_cxa_stubs.cpp /work/bootstrap_cxa_stubs.cpp
+COPY shims/__stack_chk_fail_local.c /work/__stack_chk_fail_local.c
 COPY payloads/tests/test_exception.cpp /work/test_exception.cpp
 
 ARG MUSL_LDLIB
@@ -1360,14 +1361,17 @@ ENV HOST_LD=ld.lld
 
 # may need -Wl,--sysroot=/sysroot
 # may want linker flag -Wl,--nostdlib to prevent linking to any std c++
-ENV LDFLAGS="-v -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic"
+ENV LDFLAGS="-v -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic -Wl,--dynamic-linker=/sysroot/lib/${MUSL_LDLIB}"
 # Does NOT require -D__ELF__
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include"
 # might need -nostdinc++
 ENV CXXFLAGS="-ffunction-sections -fdata-sections -unwindlib=${SYSROOT}/usr/lib/libunwind.so.1.0"
 
-RUN "${HOST_CXX}" $CFLAGS $CXXFLAGS $LDFLAGS -v -fno-rtti -fno-exceptions -c /work/bootstrap_cxa_stubs.cpp -o /work/bootstrap_cxa_stubs.o && \
-    llvm-ar rcs /work/libbootstrap_cxa.a /work/bootstrap_cxa_stubs.o
+RUN "${HOST_CC}" $CFLAGS $LDFLAGS -v -x c -c /work/__stack_chk_fail_local.c -o /work/__stack_chk_fail_local.o && \
+    llvm-ar --format=bsd rcs ${SYSROOT}/usr/lib/generic/libssp_nonshared.a /work/__stack_chk_fail_local.o
+
+RUN "${HOST_CXX}" $CFLAGS $CXXFLAGS $LDFLAGS -fuse=lld -v -fno-rtti -fno-exceptions -c /work/bootstrap_cxa_stubs.cpp -o /work/bootstrap_cxa_stubs.o && \
+    llvm-ar --format=bsd rcs /work/libbootstrap_cxa.a /work/bootstrap_cxa_stubs.o
 
 # Stage 1: Build libc++ (bootstrap0) but link against existing libcxxabi (libcxxrt) in sysroot
 RUN mkdir -p /work/build-libcxx-bootstrap0 && \
