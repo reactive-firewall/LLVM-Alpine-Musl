@@ -1370,7 +1370,7 @@ ENV CXXFLAGS="-ffunction-sections -fdata-sections -unwindlib=${SYSROOT}/usr/lib/
 RUN "${HOST_CC}" $CFLAGS $LDFLAGS -Qunused-arguments -x c -c /work/__stack_chk_fail_local.c -o /work/__stack_chk_fail_local.o && \
     llvm-ar --format=bsd rcs ${SYSROOT}/usr/lib/generic/libssp_nonshared.a /work/__stack_chk_fail_local.o
 
-RUN "${HOST_CXX}" $CFLAGS $CXXFLAGS $LDFLAGS -fuse-ld=lld -Qunused-arguments -fno-rtti -fno-exceptions -c /work/bootstrap_cxa_stubs.cpp -o /work/bootstrap_cxa_stubs.o && \
+RUN "${HOST_CXX}" $CFLAGS $CXXFLAGS $LDFLAGS -fuse-ld=lld -Qunused-arguments -x c++ -fno-rtti -fno-exceptions -c /work/bootstrap_cxa_stubs.cpp -o /work/bootstrap_cxa_stubs.o && \
     llvm-ar --format=bsd rcs /work/libbootstrap_cxa.a /work/bootstrap_cxa_stubs.o
 
 # Stage 1: Build libc++ (bootstrap0) but link against existing libcxxabi (libcxxrt) in sysroot
