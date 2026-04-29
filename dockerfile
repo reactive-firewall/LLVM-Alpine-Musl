@@ -550,7 +550,7 @@ ENV MUSL_PREFIX="/usr"
 # may want to play around with -Wl,--allow-shlib-undefined to allow __eh_* undefs (see ehframe.ld)
 ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/sysroot/lib/${MUSL_LDLIB} -fuse-ld=lld -unwindlib=none"
 # does NOT require -D__linux__
-ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include"
+ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT:-/sysroot}/usr/include"
 ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
 
 WORKDIR /bootstrap/llvmorg
@@ -560,7 +560,7 @@ WORKDIR /bootstrap/llvmorg
 
 # Build minimal static llvm libunwind (install to sysroot)
 RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
-    -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
+    -DCMAKE_INSTALL_PREFIX="${SYSROOT:-/sysroot}/usr" \
     -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm/cmake/modules \
     -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
     -DClang_DIR=/bootstrap/llvmorg/clang \
@@ -603,7 +603,7 @@ RUN mkdir -pv /stage-static/usr/include/mach-o && mkdir -pv /stage-static/usr/li
         usr/include/unwind_itanium.h \
         usr/include/unwind.h \
         usr/lib/libunwind.a ; do \
-          cp -vn ${SYSROOT}/${UNWIND_FILE_ARTIFACT} /stage-static/${UNWIND_FILE_ARTIFACT} || true ; \
+          cp -vn ${SYSROOT:-/sysroot}/${UNWIND_FILE_ARTIFACT} /stage-static/${UNWIND_FILE_ARTIFACT} || true ; \
           touch -d "${SOME_DATE_EPOCH}" /stage-static/${UNWIND_FILE_ARTIFACT} || true ; \
     done ;
 
@@ -660,7 +660,7 @@ ENV MUSL_PREFIX="/usr"
 # may want -Wl,--exclude-libs=libgcc_s.so.1
 ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/sysroot/lib/${MUSL_LDLIB} -fuse-ld=lld -Wl,-T,/bootstrap/ehframe.ld"
 # may require -D__linux__
-ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include -iwithsysroot /usr/include"
+ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT:-/sysroot}/usr/include -iwithsysroot /usr/include"
 ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
 
 WORKDIR /bootstrap/llvmorg
@@ -670,7 +670,7 @@ WORKDIR /bootstrap/llvmorg
 
 # and again for shared lib (but use clang++ for first pass)
 RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
-    -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
+    -DCMAKE_INSTALL_PREFIX="${SYSROOT:-/sysroot}/usr" \
     -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm/cmake/modules \
     -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
     -DClang_DIR=/bootstrap/llvmorg/clang \
@@ -710,7 +710,7 @@ COPY --from=build-unwind-static /stage-static /stage
 # move the changed files out to stage
 
 RUN for UNWIND_FILE_ARTIFACT in usr/lib/libunwind.so.1.0 ; do \
-          cp -vn ${SYSROOT}/${UNWIND_FILE_ARTIFACT} /stage/${UNWIND_FILE_ARTIFACT} || true ; \
+          cp -vn ${SYSROOT:-/sysroot}/${UNWIND_FILE_ARTIFACT} /stage/${UNWIND_FILE_ARTIFACT} || true ; \
     done ; \
     if [ -f usr/lib/libunwind.so.1.0 ] ; then \
       if command -v llvm-strip >/dev/null 2>&1; then \
@@ -797,12 +797,12 @@ ENV MUSL_PREFIX="/usr"
 # may want linker flag -Wl,--nostdlib to prevent linking to any std c++
 ENV LDFLAGS="-v -fuse-ld=lld -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic"
 # Does NOT require -D__ELF__
-ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT} -iwithsysroot /usr/include"
+ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -iwithsysroot /usr/include"
 # might need -nostdinc++
 ENV CXXFLAGS="-ffunction-sections -fdata-sections -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
 
 # overlay the unwinder
-RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
+RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/mach-o && \
     for UNWIND_FILE_ARTIFACT in usr/include/__libunwind_config.h \
         usr/include/libunwind.h \
         usr/include/libunwind.modulemap \
@@ -812,14 +812,14 @@ RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
         usr/include/unwind.h \
         usr/lib/libunwind.a \
         usr/lib/libunwind.so.1.0 ; do \
-          cp -vf /stage/${UNWIND_FILE_ARTIFACT} ${SYSROOT}/${UNWIND_FILE_ARTIFACT} || true ; \
-          touch -d "${SOME_DATE_EPOCH}" ${SYSROOT}/${UNWIND_FILE_ARTIFACT} || true ; \
+          cp -vf /stage/${UNWIND_FILE_ARTIFACT} ${SYSROOT:-/sysroot}/${UNWIND_FILE_ARTIFACT} || true ; \
+          touch -d "${SOME_DATE_EPOCH}" ${SYSROOT:-/sysroot}/${UNWIND_FILE_ARTIFACT} || true ; \
     done ;
 
 # Ensure unwind has canonical name (example: /usr/lib/libunwind.so -> /usr/lib/libunwind.so.1.0)
 RUN set -eux \
-    && ln -fns libunwind.so.1.0 ${SYSROOT}/lib/libunwind.so.1 && \
-    ln -fns libunwind.so.1 ${SYSROOT}/lib/libunwind.so
+    && ln -fns libunwind.so.1.0 ${SYSROOT:-/sysroot}/lib/libunwind.so.1 && \
+    ln -fns libunwind.so.1 ${SYSROOT:-/sysroot}/lib/libunwind.so
 
 # install minimal build tooling (musl-based; no libstdc++/glibc packages used)
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
@@ -868,8 +868,8 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
     -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
-    -DCMAKE_SYSROOT=${SYSROOT} \
-    -DCMAKE_FIND_ROOT_PATH=${SYSROOT} \
+    -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
+    -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
     -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
     -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
     -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
@@ -896,26 +896,26 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
       fi ; \
       file "libcxxrt/lib/libcxxrt.so" 2>/dev/null || true;\
       { llvm-objdump -harp libcxxrt/lib/libcxxrt.so || true ;} 2>/dev/null | grep -iF "musl" ;\
-      install -m 0644 libcxxrt/lib/libcxxrt.so "${SYSROOT}/usr/lib/libcxxrt.so" ;\
-      touch -d "${SOME_DATE_EPOCH}" "${SYSROOT}/usr/lib/libcxxrt.so" || true ; \
+      install -m 0644 libcxxrt/lib/libcxxrt.so "${SYSROOT:-/sysroot}/usr/lib/libcxxrt.so" ;\
+      touch -d "${SOME_DATE_EPOCH}" "${SYSROOT:-/sysroot}/usr/lib/libcxxrt.so" || true ; \
   fi ;\
   if [ -r "libcxxrt/src/cxxabi.h" ] ; then \
     file "libcxxrt/src/cxxabi.h" 2>/dev/null || true;\
     { wc -l libcxxrt/src/cxxabi.h || true ;} 2>/dev/null;\
-    mkdir -m 0755 -p "${SYSROOT}/usr/include/c++/v1/cxxabi" ;\
-    install -m 0644 "libcxxrt/src/unwind.h" "${SYSROOT}/usr/include/c++/v1/cxxabi/unwind-cxxabi.h" ;\
-    install -m 0644 "/stage/usr/include/__libunwind_config.h" "${SYSROOT}/usr/include/c++/v1/cxxabi/__libunwind_config.h" ;\
-    install -m 0644 "/stage/usr/include/unwind.h" "${SYSROOT}/usr/include/c++/v1/cxxabi/unwind-llvm.h" ;\
-    install -m 0644 /tmp/unwind_shim.h "${SYSROOT}/usr/include/c++/v1/cxxabi/unwind.h" ;\
-    install -m 0644 libcxxrt/src/cxxabi.h "${SYSROOT}/usr/include/c++/v1/cxxabi/cxxabi.h" ;\
-    touch -d "${SOME_DATE_EPOCH}" "${SYSROOT}/usr/lib/libcxxrt.so" || true ; \
+    mkdir -m 0755 -p "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi" ;\
+    install -m 0644 "libcxxrt/src/unwind.h" "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind-cxxabi.h" ;\
+    install -m 0644 "/stage/usr/include/__libunwind_config.h" "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/__libunwind_config.h" ;\
+    install -m 0644 "/stage/usr/include/unwind.h" "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind-llvm.h" ;\
+    install -m 0644 /tmp/unwind_shim.h "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind.h" ;\
+    install -m 0644 libcxxrt/src/cxxabi.h "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/cxxabi.h" ;\
+    touch -d "${SOME_DATE_EPOCH}" "${SYSROOT:-/sysroot}/usr/lib/libcxxrt.so" || true ; \
   fi ;
 
-RUN ls -1 "${SYSROOT}/usr/include/c++/v1/cxxabi/unwind.h" && \
-    ls -1 "${SYSROOT}/usr/include/c++/v1/cxxabi/unwind-cxxabi.h" && \
-    ls -1 "${SYSROOT}/usr/include/c++/v1/cxxabi/unwind-llvm.h" && \
-    ls -1 "${SYSROOT}/usr/include/c++/v1/cxxabi/cxxabi.h" && \
-    { llvm-objdump -harp ${SYSROOT}/usr/lib/libcxxrt.so || true ;} 2>/dev/null | grep -iF "musl" || true ;
+RUN ls -1 "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind.h" && \
+    ls -1 "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind-cxxabi.h" && \
+    ls -1 "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind-llvm.h" && \
+    ls -1 "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/cxxabi.h" && \
+    { llvm-objdump -harp ${SYSROOT:-/sysroot}/usr/lib/libcxxrt.so || true ;} 2>/dev/null | grep -iF "musl" || true ;
 
 # Cleanup build packages and intermediate files to keep this stage small
 RUN apk del --no-cache \
@@ -987,12 +987,12 @@ ENV MUSL_PREFIX="/usr"
 # may want linker flag -Wl,--nostdlib to prevent linking to any std c++
 ENV LDFLAGS="-v -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic"
 # Does NOT require -D__ELF__
-ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT} -iwithsysroot /usr/include"
+ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -iwithsysroot /usr/include"
 # might need -nostdinc++
 ENV CXXFLAGS="-iwithsysroot /usr/include/c++/v1 -ffunction-sections -fdata-sections -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
 
 # overlay the unwinder
-RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
+RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/mach-o && \
     for UNWIND_FILE_ARTIFACT in usr/include/__libunwind_config.h \
         usr/include/libunwind.h \
         usr/include/libunwind.modulemap \
@@ -1002,24 +1002,24 @@ RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
         usr/include/unwind.h \
         usr/lib/libunwind.a \
         usr/lib/libunwind.so.1.0 ; do \
-          cp -vf /stage/${UNWIND_FILE_ARTIFACT} ${SYSROOT}/${UNWIND_FILE_ARTIFACT} || true ; \
-          touch -d "${SOME_DATE_EPOCH}" ${SYSROOT}/${UNWIND_FILE_ARTIFACT} || true ; \
+          cp -vf /stage/${UNWIND_FILE_ARTIFACT} ${SYSROOT:-/sysroot}/${UNWIND_FILE_ARTIFACT} || true ; \
+          touch -d "${SOME_DATE_EPOCH}" ${SYSROOT:-/sysroot}/${UNWIND_FILE_ARTIFACT} || true ; \
     done ;
 
 # Ensure unwind has canonical name (example: /usr/lib/libunwind.so -> /usr/lib/libunwind.so.1.0)
 RUN set -eux \
-    && ln -fns libunwind.so.1.0 ${SYSROOT}/lib/libunwind.so.1 && \
-    ln -fns libunwind.so.1 ${SYSROOT}/lib/libunwind.so
+    && ln -fns libunwind.so.1.0 ${SYSROOT:-/sysroot}/lib/libunwind.so.1 && \
+    ln -fns libunwind.so.1 ${SYSROOT:-/sysroot}/lib/libunwind.so
 
 # overlay the libcxxrt
-RUN mkdir -pv ${SYSROOT}/usr/include/c++/v1/cxxabi && \
+RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi && \
     for CXXRT_FILE_ARTIFACT in usr/include/c++/v1/cxxabi/cxxabi.h \
         usr/include/c++/v1/cxxabi/unwind-llvm.h \
         usr/include/c++/v1/cxxabi/unwind-cxxabi.h \
         usr/include/c++/v1/cxxabi/unwind.h \
         usr/lib/libcxxrt.so ; do \
-          cp -vf /stage-cxxrt/${CXXRT_FILE_ARTIFACT} ${SYSROOT}/${CXXRT_FILE_ARTIFACT} || true ; \
-          touch -d "${SOME_DATE_EPOCH}" ${SYSROOT}/${CXXRT_FILE_ARTIFACT} || true ; \
+          cp -vf /stage-cxxrt/${CXXRT_FILE_ARTIFACT} ${SYSROOT:-/sysroot}/${CXXRT_FILE_ARTIFACT} || true ; \
+          touch -d "${SOME_DATE_EPOCH}" ${SYSROOT:-/sysroot}/${CXXRT_FILE_ARTIFACT} || true ; \
     done ;
 
 # install minimal build tooling (musl-based; no libstdc++/glibc packages used)
@@ -1276,12 +1276,12 @@ ARG SOME_DATE_EPOCH
 ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
 
 ENV SYSROOT=/sysroot
-ENV SYS_LIB=${SYSROOT}/usr/lib
-ENV SYS_INCLUDE=${SYSROOT}/usr/include
+ENV SYS_LIB=${SYSROOT:-/sysroot}/usr/lib
+ENV SYS_INCLUDE=${SYSROOT:-/sysroot}/usr/include
 ENV MUSL_PREFIX="/usr"
 
 # overlay the unwinder
-RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
+RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/mach-o && \
     for UNWIND_FILE_ARTIFACT in usr/include/__libunwind_config.h \
         usr/include/libunwind.h \
         usr/include/libunwind.modulemap \
@@ -1291,24 +1291,24 @@ RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
         usr/include/unwind.h \
         usr/lib/libunwind.a \
         usr/lib/libunwind.so.1.0 ; do \
-          cp -vf /stage/${UNWIND_FILE_ARTIFACT} ${SYSROOT}/${UNWIND_FILE_ARTIFACT} || true ; \
-          touch -d "${SOME_DATE_EPOCH}" ${SYSROOT}/${UNWIND_FILE_ARTIFACT} || true ; \
+          cp -vf /stage/${UNWIND_FILE_ARTIFACT} ${SYSROOT:-/sysroot}/${UNWIND_FILE_ARTIFACT} || true ; \
+          touch -d "${SOME_DATE_EPOCH}" ${SYSROOT:-/sysroot}/${UNWIND_FILE_ARTIFACT} || true ; \
     done ;
 
 # Ensure unwind has canonical name (example: /usr/lib/libunwind.so -> /usr/lib/libunwind.so.1.0)
 RUN set -eux \
-    && ln -fns libunwind.so.1.0 ${SYSROOT}/lib/libunwind.so.1 && \
-    ln -fns libunwind.so.1 ${SYSROOT}/lib/libunwind.so
+    && ln -fns libunwind.so.1.0 ${SYSROOT:-/sysroot}/lib/libunwind.so.1 && \
+    ln -fns libunwind.so.1 ${SYSROOT:-/sysroot}/lib/libunwind.so
 
 # overlay the libcxxrt
-RUN mkdir -pv ${SYSROOT}/usr/include/c++/v1/cxxabi && \
+RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi && \
     for CXXRT_FILE_ARTIFACT in usr/include/c++/v1/cxxabi/cxxabi.h \
         usr/include/c++/v1/cxxabi/unwind-llvm.h \
         usr/include/c++/v1/cxxabi/unwind-cxxabi.h \
         usr/include/c++/v1/cxxabi/unwind.h \
         usr/lib/libcxxrt.so ; do \
-          cp -vf /stage-cxxrt/${CXXRT_FILE_ARTIFACT} ${SYSROOT}/${CXXRT_FILE_ARTIFACT} || true ; \
-          touch -d "${SOME_DATE_EPOCH}" ${SYSROOT}/${CXXRT_FILE_ARTIFACT} || true ; \
+          cp -vf /stage-cxxrt/${CXXRT_FILE_ARTIFACT} ${SYSROOT:-/sysroot}/${CXXRT_FILE_ARTIFACT} || true ; \
+          touch -d "${SOME_DATE_EPOCH}" ${SYSROOT:-/sysroot}/${CXXRT_FILE_ARTIFACT} || true ; \
     done ;
 
 # install minimal build tooling (musl-based; no libstdc++/glibc packages used)
@@ -1352,8 +1352,8 @@ RUN chmod +x /work/run_cmake_build.sh
 
 # Create helper dirs
 RUN mkdir -p /opt/libcxx-stage1 /opt/libcxxabi-final /opt/libcxx-final /work/builds ;\
-    cp -pfr ${SYSROOT} /opt/libcxx-bootstrap0 ;\
-    cp -pfr ${SYSROOT} /opt/libcxxabi-bootstrap0 ;
+    cp -pfr ${SYSROOT:-/sysroot} /opt/libcxx-bootstrap0 ;\
+    cp -pfr ${SYSROOT:-/sysroot} /opt/libcxxabi-bootstrap0 ;
 
 ENV HOST_CC=${CC}
 ENV HOST_CXX=clang++
@@ -1362,17 +1362,19 @@ ENV HOST_LD=ld.lld
 # may need -Wl,--sysroot=/sysroot
 # may want linker flag -Wl,--nostdlib to prevent linking to any std c++
 # may want to link -Wl,-l,${LLVM_RTLIB_STUB}
-ENV LDFLAGS="-v -Wl,--sysroot=${SYSROOT} -Wl,-L,${SYS_LIB} -Wl,-L,${SYSROOT}/lib -Wl,-L,${SYS_LIB}/generic -Wl,-l,${LLVM_RTLIB_STUB} -Wl,--dynamic-linker=${SYSROOT}/lib/${MUSL_LDLIB}"
+ENV LDFLAGS="-v -Wl,--sysroot=${SYSROOT:-/sysroot} -Wl,-L,${SYS_LIB} -Wl,-L,${SYSROOT:-/sysroot}/lib -Wl,-L,${SYS_LIB}/generic -Wl,-l,${LLVM_RTLIB_STUB} -Wl,--dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB}"
 # Does NOT require -D__ELF__
-ENV CFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT}/usr/include"
+ENV CFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT:-/sysroot}/usr/include"
 # might need -nostdinc++
-ENV CXXFLAGS="-ffunction-sections -fdata-sections -unwindlib=${SYSROOT}/usr/lib/libunwind.so.1.0"
+ENV CXXFLAGS="-ffunction-sections -fdata-sections -unwindlib=${SYSROOT:-/sysroot}/usr/lib/libunwind.so.1.0"
 
 RUN "${HOST_CC}" $CFLAGS $LDFLAGS -Qunused-arguments -x c -c /work/__stack_chk_fail_local.c -o /work/__stack_chk_fail_local.o && \
-    llvm-ar --format=bsd rcs ${SYSROOT}/usr/lib/generic/libssp_nonshared.a /work/__stack_chk_fail_local.o
+    llvm-ar --format=bsd rcs ${SYSROOT:-/sysroot}/usr/lib/generic/libssp_nonshared.a /work/__stack_chk_fail_local.o
 
 RUN "${HOST_CXX}" $CFLAGS $CXXFLAGS $LDFLAGS -fuse-ld=lld -Qunused-arguments -x c++ -fno-rtti -fno-exceptions -c /work/bootstrap_cxa_stubs.cpp -o /work/bootstrap_cxa_stubs.o && \
     llvm-ar --format=bsd rcs /work/libbootstrap_cxa.a /work/bootstrap_cxa_stubs.o
+
+# may want to play with LIBCXX_TARGET_SUBDIR
 
 # Stage 1: Build libc++ (bootstrap0) but link against existing libcxxabi (libcxxrt) in sysroot
 RUN mkdir -p /work/build-libcxx-bootstrap0 && \
@@ -1385,10 +1387,11 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
-      -DCMAKE_SYSROOT=${SYSROOT} \
-      -DCMAKE_FIND_ROOT_PATH=${SYSROOT} \
+      -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
+      -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
       -DCMAKE_INSTALL_PREFIX=/opt/libcxx-bootstrap0 \
       -DLIBCXX_ENABLE_SHARED=ON \
+      -DLIBCXX_USE_COMPILER_RT=ON \
       -DLIBCXX_ENABLE_EXCEPTIONS=ON \
       -DLIBCXX_ENABLE_RTTI=ON \
       -DLIBCXX_HAS_MUSL_LIBC=ON \
@@ -1399,7 +1402,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && \
       -DLIBCXX_ABI_VERSION=1 \
       -DLIBCXX_CXX_ABI=libcxxrt \
       -DLIBCXX_CXX_ABI_LIBRARY_PATH=${SYS_LIB} \
-      -DLIBCXX_CXX_ABI_INCLUDE_PATHS=${SYS_INCLUDE}/c++/v1/cxxabi \
+      -DLIBCXX_CXX_ABI_INCLUDE_PATHS="${SYS_INCLUDE};${SYS_INCLUDE}/c++/v1/cxxabi" \
       -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=OFF \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
@@ -1420,8 +1423,8 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
-      -DCMAKE_SYSROOT=${SYSROOT} \
-      -DCMAKE_FIND_ROOT_PATH=${SYSROOT} \
+      -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
+      -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
       -DCMAKE_INSTALL_PREFIX=/opt/libcxxabi-bootstrap0 \
       -DLIBCXXABI_ENABLE_SHARED=ON \
       -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
@@ -1448,8 +1451,8 @@ RUN mkdir -p /work/build-libcxx-stage1 && \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
-      -DCMAKE_SYSROOT=${SYSROOT} \
-      -DCMAKE_FIND_ROOT_PATH=${SYSROOT} \
+      -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
+      -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
       -DCMAKE_INSTALL_PREFIX=/opt/libcxx-stage1 \
       -DLIBCXX_ENABLE_SHARED=ON \
       -DLIBCXX_ABI_VERSION=1 \
@@ -1477,8 +1480,8 @@ RUN mkdir -p /work/build-libcxxabi-final && \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
-      -DCMAKE_SYSROOT=${SYSROOT} \
-      -DCMAKE_FIND_ROOT_PATH=${SYSROOT} \
+      -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
+      -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
       -DCMAKE_INSTALL_PREFIX=/opt/libcxxabi-final \
       -DLIBCXXABI_ENABLE_SHARED=ON \
       -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
@@ -1503,8 +1506,8 @@ RUN mkdir -p /work/build-libcxx-final && \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
-      -DCMAKE_SYSROOT=${SYSROOT} \
-      -DCMAKE_FIND_ROOT_PATH=${SYSROOT} \
+      -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
+      -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
       -DCMAKE_INSTALL_PREFIX=/opt/libcxx-final \
       -DLIBCXX_ENABLE_SHARED=ON \
       -DLIBCXX_ABI_VERSION=1 \
@@ -1589,11 +1592,11 @@ ENV SYSROOT="/sysroot"
 ENV MUSL_PREFIX="/usr"
 
 ENV LDFLAGS="-v -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic"
-ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT} -iwithsysroot /usr/include"
+ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -iwithsysroot /usr/include"
 ENV CXXFLAGS="-cxx-isystem /sysroot/usr/include/c++/v1 -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
 
 # overlay the unwinder
-RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
+RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/mach-o && \
     for UNWIND_FILE_ARTIFACT in usr/include/__libunwind_config.h \
         usr/include/libunwind.h \
         usr/include/libunwind.modulemap \
@@ -1603,26 +1606,26 @@ RUN mkdir -pv ${SYSROOT}/usr/include/mach-o && \
         usr/include/unwind.h \
         usr/lib/libunwind.a \
         usr/lib/libunwind.so.1.0 ; do \
-          cp -vf /stage/${UNWIND_FILE_ARTIFACT} ${SYSROOT}/${UNWIND_FILE_ARTIFACT} || true ; \
-          touch -d "${SOME_DATE_EPOCH}" ${SYSROOT}/${UNWIND_FILE_ARTIFACT} || true ; \
+          cp -vf /stage/${UNWIND_FILE_ARTIFACT} ${SYSROOT:-/sysroot}/${UNWIND_FILE_ARTIFACT} || true ; \
+          touch -d "${SOME_DATE_EPOCH}" ${SYSROOT:-/sysroot}/${UNWIND_FILE_ARTIFACT} || true ; \
     done ;
 
 # Ensure unwind has canonical name (example: /usr/lib/libunwind.so -> /usr/lib/libunwind.so.1.0)
 RUN set -eux \
-    && ln -fns libunwind.so.1.0 ${SYSROOT}/lib/libunwind.so.1 && \
-    ln -fns libunwind.so.1 ${SYSROOT}/lib/libunwind.so
+    && ln -fns libunwind.so.1.0 ${SYSROOT:-/sysroot}/lib/libunwind.so.1 && \
+    ln -fns libunwind.so.1 ${SYSROOT:-/sysroot}/lib/libunwind.so
 
 # Ensure we have the unwinder and libc headers present (sysroot paths)
-RUN ls -l ${SYSROOT}${MUSL_PREFIX}/include || true \
-    && file ${SYSROOT}${MUSL_PREFIX}/include/* || true
+RUN ls -l ${SYSROOT:-/sysroot}${MUSL_PREFIX}/include || true \
+    && file ${SYSROOT:-/sysroot}${MUSL_PREFIX}/include/* || true
 
 #check the lib directories too
 # check on the lib
 RUN printf "%s\n" "Bootstrapped Libs (pre-c++):" && \
-    ls -lap ${SYSROOT}/lib/ && file ${SYSROOT}/lib/generic/* || true ;\
-    ls -lap ${SYSROOT}/lib/generic/ && file ${SYSROOT}/lib/generic/* || true ;\
+    ls -lap ${SYSROOT:-/sysroot}/lib/ && file ${SYSROOT:-/sysroot}/lib/generic/* || true ;\
+    ls -lap ${SYSROOT:-/sysroot}/lib/generic/ && file ${SYSROOT:-/sysroot}/lib/generic/* || true ;\
     printf "%s\n" "Bootstrapped Headers:" && \
-    ls -lapr ${SYSROOT}/usr/include/ || true
+    ls -lapr ${SYSROOT:-/sysroot}/usr/include/ || true
 
 # Install distro packages that provide clang able to cross-emit --target. Adjust names for Alpine tag.
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
@@ -1692,11 +1695,11 @@ RUN apk add --no-cache \
 
 # might want -DLLVM_CONFIG_PATH=/usr/bin/llvm-config  (but need mocking implementation for sysroot)
 
-# does not use manually added -DLLVM_LIBCXXABI_LIBRARY_PATH="${SYSROOT}/usr/lib"
+# does not use manually added -DLLVM_LIBCXXABI_LIBRARY_PATH="${SYSROOT:-/sysroot}/usr/lib"
 # does not use manually added -DLIBCXXABI_HAS_GCC_LIB=NO
 # might not use manually added -DLIBCXXABI_ENABLE_SHARED=ON (always seems to build static?)
 
-# might want -fdebug-prefix-map=/include=${SYSROOT}/usr/include
+# might want -fdebug-prefix-map=/include=${SYSROOT:-/sysroot}/usr/include
 # sysroot diff hint To see what will be set, inspect the built binary with: readelf -d <bin> | grep RUNPATH or objdump -x <bin> | grep RPATH
 
 # might want unused -DLIBCXXABI_HAS_GCC_LIB=NO
@@ -1714,12 +1717,12 @@ RUN printf "%s\n" "CMake Version: $(cmake --version)" && \
     printf "%s\n" "Clang-cpp Version: $(clang-cpp --version)" && \
     printf "%s\n" "Clang++ Version: $(clang++ --version)" && \
     printf "%s\n" "Installed Libraries:" && \
-    ls -1 ${SYSROOT}/usr/lib/ && ls -1 ${SYSROOT}/usr/lib/generic/ && \
+    ls -1 ${SYSROOT:-/sysroot}/usr/lib/ && ls -1 ${SYSROOT:-/sysroot}/usr/lib/generic/ && \
     printf "\n"
 
 # Build minimal static libc++abi.so (install to sysroot)
 RUN cmake -S runtimes -B build-libcxxabi-shared -G "Ninja" \
-    -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
+    -DCMAKE_INSTALL_PREFIX="${SYSROOT:-/sysroot}/usr" \
     -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm/cmake/modules \
     -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
     -DClang_DIR=/bootstrap/llvmorg/clang \
@@ -1758,16 +1761,16 @@ RUN cmake -S runtimes -B build-libcxxabi-shared -G "Ninja" \
     rm -vfr /bootstrap/llvmorg/build-libcxxabi-shared/
 
 # Ensure we have the c++abi lib and headers present (sysroot paths)
-RUN ls -l ${SYSROOT}${MUSL_PREFIX}/lib || true \
-    && file ${SYSROOT}${MUSL_PREFIX}/lib/* || true
+RUN ls -l ${SYSROOT:-/sysroot}${MUSL_PREFIX}/lib || true \
+    && file ${SYSROOT:-/sysroot}${MUSL_PREFIX}/lib/* || true
 
 # Ensure we have the libc++ headers present (sysroot paths)
-RUN ls -l ${SYSROOT}${MUSL_PREFIX}/include || true \
-    && file ${SYSROOT}${MUSL_PREFIX}/include/* || true
+RUN ls -l ${SYSROOT:-/sysroot}${MUSL_PREFIX}/include || true \
+    && file ${SYSROOT:-/sysroot}${MUSL_PREFIX}/include/* || true
 
 # Build minimal static libc++.a (install to sysroot)
 #RUN cmake -S llvm -B build-runtimes -Wno-dev -G "Ninja" \
-#    -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
+#    -DCMAKE_INSTALL_PREFIX="${SYSROOT:-/sysroot}/usr" \
 #    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg/llvm/cmake/modules \
 #    -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
 #    -DClang_DIR=/bootstrap/llvmorg/clang \
@@ -1805,24 +1808,24 @@ RUN ls -l ${SYSROOT}${MUSL_PREFIX}/include || true \
 #    rm -vfr /bootstrap/llvmorg/build-runtimes/
 
 # Ensure we have the dynamic loader and libs present (sysroot paths)
-#RUN ls -l ${SYSROOT}${MUSL_PREFIX}/lib || true \
-#    && file ${SYSROOT}/usr/lib/* || true
+#RUN ls -l ${SYSROOT:-/sysroot}${MUSL_PREFIX}/lib || true \
+#    && file ${SYSROOT:-/sysroot}/usr/lib/* || true
 
 # Ensure we have the libc headers present (sysroot paths)
-#RUN ls -l ${SYSROOT}/usr/include || true \
-#    && file ${SYSROOT}/usr/include/* || true
+#RUN ls -l ${SYSROOT:-/sysroot}/usr/include || true \
+#    && file ${SYSROOT:-/sysroot}/usr/include/* || true
 
 # Build minimal clang (install to stsroot)
 #RUN cmake -S llvm -B build-llvm -G "Ninja" \
 #    -DCMAKE_BUILD_TYPE=Release \
-#    -DCMAKE_INSTALL_PREFIX="${SYSROOT}/usr" \
+#    -DCMAKE_INSTALL_PREFIX="${SYSROOT:-/sysroot}/usr" \
 #    -DLLVM_CMAKE_DIR=/bootstrap/llvmorg \
 #    -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
 #    -DClang_DIR=/bootstrap/llvmorg/clang \
 #    -DCMAKE_C_COMPILER=clang \
 #    -DCMAKE_CXX_COMPILER=clang++ \
 #    -DCMAKE_SYSTEM_NAME=Linux \
-#    -DCMAKE_SYSROOT="${SYSROOT}" \
+#    -DCMAKE_SYSROOT="${SYSROOT:-/sysroot}" \
 #    -DLLVM_ENABLE_PROJECTS="clang;lld" \
 #    -DTARGET_TRIPLE=${TARGET_TRIPLE} \
 #    -DHOST_TRIPLE=${HOST_TRIPLE} \
@@ -1847,11 +1850,11 @@ RUN set -eux \
         cmd:find
 
 # check on the lib
-RUN ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/linux/ || true
+RUN ls -lap ${SYSROOT:-/sysroot}/lib/ && ls -lap ${SYSROOT:-/sysroot}/lib/linux/ || true
 
-RUN find ${SYSROOT} -type f -iname "*.so*" 2>/dev/null || true
-RUN find ${SYSROOT} -type f -iname "*.a" 2>/dev/null || true
-RUN find ${SYSROOT} -type f -iname "clang*" 2>/dev/null || true
+RUN find ${SYSROOT:-/sysroot} -type f -iname "*.so*" 2>/dev/null || true
+RUN find ${SYSROOT:-/sysroot} -type f -iname "*.a" 2>/dev/null || true
+RUN find ${SYSROOT:-/sysroot} -type f -iname "clang*" 2>/dev/null || true
 
 ENV BOOTSTRAP_CLANG=/opt/llvm-bootstrap/bin/clang
 ENV BOOTSTRAP_CLANGXX=/opt/llvm-bootstrap/bin/clang++
