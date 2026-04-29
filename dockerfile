@@ -1274,7 +1274,9 @@ ENV TZ='UTC+0'
 ARG SOME_DATE_EPOCH
 ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
 
-ENV SYSROOT="/sysroot"
+ENV SYSROOT=/sysroot
+ENV SYS_LIB=${SYSROOT}/usr/lib
+ENV SYS_INCLUDE=${SYSROOT}/usr/include
 ENV MUSL_PREFIX="/usr"
 
 # overlay the unwinder
@@ -1367,7 +1369,7 @@ ENV CXXFLAGS="-ffunction-sections -fdata-sections -unwindlib=${SYSROOT}/usr/lib/
 RUN "${HOST_CXX}" $CFLAGS $CXXFLAGS $LDFLAGS -v -fno-rtti -fno-exceptions -c /work/bootstrap_cxa_stubs.cpp -o /work/bootstrap_cxa_stubs.o && \
     llvm-ar rcs /work/libbootstrap_cxa.a /work/bootstrap_cxa_stubs.o
 
-# Stage 1: Build libc++ (bootstrap0) with minimal ABI stubs
+# Stage 1: Build libc++ (bootstrap0) but link against existing libcxxabi (libcxxrt) in sysroot
 RUN mkdir -p /work/build-libcxx-bootstrap0 && \
     /work/run_cmake_build.sh llvm-project/libcxx /work/build-libcxx-bootstrap0 \
       -G Ninja \
@@ -1376,6 +1378,8 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
+      -DCMAKE_SYSROOT=${SYSROOT} \
+      -DCMAKE_FIND_ROOT_PATH=${SYSROOT} \
       -DCMAKE_INSTALL_PREFIX=/opt/libcxx-bootstrap0 \
       -DLIBCXX_ENABLE_SHARED=ON \
       -DLIBCXX_ENABLE_EXCEPTIONS=ON \
@@ -1385,12 +1389,15 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && \
       -DLIBCXX_HAS_PTHREAD_API=ON \
       -DLIBCXX_INCLUDE_BENCHMARKS=OFF \
       -DLIBCXX_HARDENING_MODE=extensive \
-      -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
-      -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
-      -DCMAKE_EXE_LINKER_FLAGS="-Wl,--whole-archive /work/libbootstrap_cxa.a -Wl,--no-whole-archive -Wl,-rpath,/opt/libcxx-bootstrap0/lib" \
+      -DLIBCXX_CXX_ABI=libcxxrt \
+      -DLIBCXX_CXX_ABI_LIBRARY_PATH=${SYS_LIB} \
+      -DLIBCXX_CXX_ABI_INCLUDE_PATHS=${SYS_INCLUDE} \
+      -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=OFF \
+      -DCMAKE_EXE_LINKER_FLAGS="-Wl,--whole-archive /work/libbootstrap_cxa.a -Wl,--no-whole-archive -Wl,-rpath,/opt/libcxx-bootstrap0/lib -L${SYS_LIB} -Wl,-rpath-link,${SYS_LIB}" \
       -DCMAKE_INSTALL_RPATH=/opt/libcxx-bootstrap0/lib
 
 # Stage 2: Build libc++abi against libc++ bootstrap0 (abi-bootstrap0)
+# If you still want to build libc++abi in-stage using bootstrap libc++, point to both the sysroot (for libunwind) and the bootstrap libc++ install.
 RUN mkdir -p /work/build-libcxxabi-bootstrap0 && \
     /work/run_cmake_build.sh llvm-project/libcxxabi /work/build-libcxxabi-bootstrap0 \
       -G Ninja \
@@ -1399,11 +1406,19 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
+      -DCMAKE_SYSROOT=${SYSROOT} \
+      -DCMAKE_FIND_ROOT_PATH=${SYSROOT} \
       -DCMAKE_INSTALL_PREFIX=/opt/libcxxabi-bootstrap0 \
       -DLIBCXXABI_ENABLE_SHARED=ON \
+      -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
+      -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
+      -DLIBCXXABI_ENABLE_THREADS=ON \
+      -DLIBCXXABI_HAS_PTHREAD_LIB=ON \
+      -DLIBCXXABI_HAS_CXA_THREAD_ATEXIT_IMPL=FALSE \
+      -DLIBCXXABI_HAS_GCC_S_LIB=NO \
       -DCMAKE_PREFIX_PATH=/opt/libcxx-bootstrap0 \
-      -DCMAKE_CXX_FLAGS="-I/opt/libcxx-bootstrap0/include" \
-      -DCMAKE_EXE_LINKER_FLAGS="-L/opt/libcxx-bootstrap0/lib -Wl,-rpath,/opt/libcxx-bootstrap0/lib"
+      -DCMAKE_CXX_FLAGS="-I/opt/libcxx-bootstrap0/include -I${SYS_INCLUDE}" \
+      -DCMAKE_EXE_LINKER_FLAGS="-L/opt/libcxx-bootstrap0/lib -L${SYS_LIB} -Wl,-rpath,/opt/libcxx-bootstrap0/lib"
 
 # Stage 3: Rebuild libc++ (stage1) linking against libc++abi-bootstrap0
 RUN mkdir -p /work/build-libcxx-stage1 && \
@@ -1414,6 +1429,8 @@ RUN mkdir -p /work/build-libcxx-stage1 && \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
+      -DCMAKE_SYSROOT=${SYSROOT} \
+      -DCMAKE_FIND_ROOT_PATH=${SYSROOT} \
       -DCMAKE_INSTALL_PREFIX=/opt/libcxx-stage1 \
       -DLIBCXX_ENABLE_SHARED=ON \
       -DLIBCXX_ABI_VERSION=1 \
@@ -1423,8 +1440,11 @@ RUN mkdir -p /work/build-libcxx-stage1 && \
       -DLIBCXX_INCLUDE_BENCHMARKS=OFF \
       -DLIBCXX_HARDENING_MODE=extensive \
       -DCMAKE_PREFIX_PATH=/opt/libcxxabi-bootstrap0;/opt/libcxx-bootstrap0 \
-      -DCMAKE_CXX_FLAGS="-I/opt/libcxx-bootstrap0/include -I/opt/libcxxabi-bootstrap0/include" \
-      -DCMAKE_EXE_LINKER_FLAGS="-L/opt/libcxxabi-bootstrap0/lib -L/opt/libcxx-bootstrap0/lib -Wl,-rpath,/opt/libcxxabi-bootstrap0/lib:/opt/libcxx-stage1/lib"
+      -DLIBCXX_CXX_ABI=libcxxabi \
+      -DLIBCXX_CXX_ABI_LIBRARY_PATH=/opt/libcxxabi-bootstrap0/lib \
+      -DLIBCXX_CXX_ABI_INCLUDE_PATHS=/opt/libcxxabi-bootstrap0/include \
+      -DCMAKE_CXX_FLAGS="-I/opt/libcxx-bootstrap0/include -I/opt/libcxxabi-bootstrap0/include -I${SYS_INCLUDE}" \
+      -DCMAKE_EXE_LINKER_FLAGS="-L/opt/libcxxabi-bootstrap0/lib -L/opt/libcxx-bootstrap0/lib -L${SYS_LIB} -Wl,-rpath,/opt/libcxxabi-bootstrap0/lib:/opt/libcxx-stage1/lib"
 
 # Stage 4: Rebuild libc++abi against libc++ stage1 (final ABI)
 RUN mkdir -p /work/build-libcxxabi-final && \
@@ -1435,6 +1455,8 @@ RUN mkdir -p /work/build-libcxxabi-final && \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
+      -DCMAKE_SYSROOT=${SYSROOT} \
+      -DCMAKE_FIND_ROOT_PATH=${SYSROOT} \
       -DCMAKE_INSTALL_PREFIX=/opt/libcxxabi-final \
       -DLIBCXXABI_ENABLE_SHARED=ON \
       -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
@@ -1444,8 +1466,8 @@ RUN mkdir -p /work/build-libcxxabi-final && \
       -DLIBCXXABI_HAS_CXA_THREAD_ATEXIT_IMPL=FALSE \
       -DLIBCXXABI_HAS_GCC_S_LIB=NO \
       -DCMAKE_PREFIX_PATH=/opt/libcxx-stage1 \
-      -DCMAKE_CXX_FLAGS="-I/opt/libcxx-stage1/include" \
-      -DCMAKE_EXE_LINKER_FLAGS="-L/opt/libcxx-stage1/lib -Wl,-rpath,/opt/libcxx-stage1/lib"
+      -DCMAKE_CXX_FLAGS="-I/opt/libcxx-stage1/include -I${SYS_INCLUDE}" \
+      -DCMAKE_EXE_LINKER_FLAGS="-L/opt/libcxx-stage1/lib -L${SYS_LIB} -Wl,-rpath,/opt/libcxx-stage1/lib"
 
 # Stage 5: Final libc++ rebuild against final libc++abi
 RUN mkdir -p /work/build-libcxx-final && \
@@ -1456,6 +1478,8 @@ RUN mkdir -p /work/build-libcxx-final && \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
+      -DCMAKE_SYSROOT=${SYSROOT} \
+      -DCMAKE_FIND_ROOT_PATH=${SYSROOT} \
       -DCMAKE_INSTALL_PREFIX=/opt/libcxx-final \
       -DLIBCXX_ENABLE_SHARED=ON \
       -DLIBCXX_ABI_VERSION=1 \
@@ -1465,8 +1489,11 @@ RUN mkdir -p /work/build-libcxx-final && \
       -DLIBCXX_INCLUDE_BENCHMARKS=OFF \
       -DLIBCXX_HARDENING_MODE=extensive \
       -DCMAKE_PREFIX_PATH=/opt/libcxxabi-final;/opt/libcxx-stage1 \
-      -DCMAKE_CXX_FLAGS="-I/opt/libcxx-stage1/include -I/opt/libcxxabi-final/include" \
-      -DCMAKE_EXE_LINKER_FLAGS="-L/opt/libcxxabi-final/lib -L/opt/libcxx-stage1/lib -Wl,-rpath,/opt/libcxxabi-final/lib:/opt/libcxx-final/lib"
+      -DLIBCXX_CXX_ABI=libcxxabi \
+      -DLIBCXX_CXX_ABI_LIBRARY_PATH=/opt/libcxxabi-final/lib \
+      -DLIBCXX_CXX_ABI_INCLUDE_PATHS=/opt/libcxxabi-final/include \
+      -DCMAKE_CXX_FLAGS="-I/opt/libcxx-stage1/include -I/opt/libcxxabi-final/include -I${SYS_INCLUDE}" \
+      -DCMAKE_EXE_LINKER_FLAGS="-L/opt/libcxxabi-final/lib -L/opt/libcxx-stage1/lib -L${SYS_LIB} -Wl,-rpath,/opt/libcxxabi-final/lib:/opt/libcxx-final/lib"
 
 # Build test program and link against final libs
 RUN ${HOST_CXX} -std=c++17 /work/test_exception.cpp -o /work/test_exception \
