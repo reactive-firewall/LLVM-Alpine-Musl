@@ -1234,6 +1234,7 @@ COPY --from=build-libcxxrt /sysroot /stage-cxxrt
 
 # Copy custom Generic-Musl.cmake into the image build context before building the image
 COPY Generic-Musl/Platforms/Generic-Musl.cmake /tmp/Generic-Musl.cmake
+COPY Generic-Musl/Platforms/Generic-Musl-Libcxxrt.cmake /tmp/Generic-Musl-Libcxxrt.cmake
 COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
 
 # Copy helper scripts and sources into the image
@@ -1342,6 +1343,8 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 RUN mkdir -p /usr/share/cmake/Modules/Platform \
  && install -m 0644 /tmp/Generic-Musl.cmake /usr/share/cmake/Modules/Platform/Generic-Musl.cmake \
  && rm /tmp/Generic-Musl.cmake \
+ && install -m 0644 /tmp/Generic-Musl-Libcxxrt.cmake /usr/share/cmake/Modules/Platform/Generic-Musl-Libcxxrt.cmake \
+ && rm /tmp/Generic-Musl-Libcxxrt.cmake \
  && chmod -R a+rX /usr/share/cmake/Modules/Platform \
  && mkdir -p /usr/share/cmake/Modules/Platform/Linker \
  && install -m 0644 /tmp/Generic-Musl-Linker.cmake /usr/share/cmake/Modules/Platform/Linker/Generic-Musl-Linker.cmake \
