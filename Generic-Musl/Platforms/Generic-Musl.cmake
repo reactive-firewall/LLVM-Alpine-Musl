@@ -402,8 +402,7 @@ if(_GENERIC_MUSL_HAVE_CLANG)
     message(STATUS "clang_rt builtins not auto-detected; set -DCLANG_RT_PATH=/path/to/libclang_rt.builtins.a to link it.")
   endif()
   # Check compile definitions usable at configure-time: the user may pass -D_GNU_SOURCE etc.
-  if(CMAKE_C_FLAGS MATCHES "_GNU_SOURCE" OR CMAKE_C_FLAGS MATCHES "_ALL_SOURCE" \
-     OR CMAKE_CXX_FLAGS MATCHES "_GNU_SOURCE" OR CMAKE_CXX_FLAGS MATCHES "_ALL_SOURCE")
+  if(CMAKE_C_FLAGS MATCHES "_GNU_SOURCE" OR CMAKE_C_FLAGS MATCHES "_ALL_SOURCE" OR CMAKE_CXX_FLAGS MATCHES "_GNU_SOURCE" OR CMAKE_CXX_FLAGS MATCHES "_ALL_SOURCE")
     set(C_EXTENSIONS ON)
     set(CXX_EXTENSIONS ON)
   endif()
