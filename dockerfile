@@ -1403,6 +1403,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
       -DLIBCXX_HAS_MUSL_LIBC=ON \
       -DLIBCXX_ENABLE_THREADS=ON \
       -DLIBCXX_HAS_PTHREAD_API=ON \
+      -DLIBCXXABI_USE_LLVM_UNWINDER=NO \
       -DLIBCXX_INCLUDE_BENCHMARKS=OFF \
       -DLIBCXX_HARDENING_MODE=extensive \
       -DLIBCXX_ABI_VERSION=1 \
@@ -1413,7 +1414,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
       -DLIBCXX_ENABLE_NEW_DELETE_DEFINITIONS=ON \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_LINKER_FLAGS="-v ${LDFLAGS} -Wl,--verbose" \
+      -DLIBCXX_LINK_FLAGS="-v ${LDFLAGS} -Wl,--verbose" \
       -DCMAKE_EXE_LINKER_FLAGS="-Wl,--whole-archive /work/libbootstrap_cxa.a -Wl,--no-whole-archive -Wl,-rpath,/opt/libcxx-bootstrap0/lib -L${SYS_LIB} -Wl,-rpath-link,${SYS_LIB}" \
       -DCMAKE_INSTALL_RPATH=/opt/libcxx-bootstrap0/lib \
       -DLLVM_ENABLE_RUNTIMES= \
