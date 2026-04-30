@@ -1374,7 +1374,8 @@ ENV CFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -ffunction-sectio
 ENV CXXFLAGS="-ffunction-sections -fdata-sections -unwindlib=${SYSROOT:-/sysroot}/usr/lib/libunwind.so.1.0"
 
 RUN "${HOST_CC}" $CFLAGS $LDFLAGS -Qunused-arguments -x c -c /work/__stack_chk_fail_local.c -o /work/__stack_chk_fail_local.o && \
-    llvm-ar --format=bsd rcs ${SYSROOT:-/sysroot}/usr/lib/generic/libssp_nonshared.a /work/__stack_chk_fail_local.o
+    llvm-ar --format=bsd rcs ${SYSROOT:-/sysroot}/usr/lib/generic/libssp_nonshared.a /work/__stack_chk_fail_local.o && \
+    ln -svf generic/libssp_nonshared.a ${SYSROOT:-/sysroot}/usr/lib/libssp_nonshared.a
 
 RUN "${HOST_CXX}" $CFLAGS $CXXFLAGS $LDFLAGS -fuse-ld=lld -Qunused-arguments -x c++ -fno-rtti -fno-exceptions -c /work/bootstrap_cxa_stubs.cpp -o /work/bootstrap_cxa_stubs.o && \
     llvm-ar --format=bsd rcs /work/libbootstrap_cxa.a /work/bootstrap_cxa_stubs.o
@@ -1411,7 +1412,8 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
       -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=OFF \
       -DLIBCXX_ENABLE_NEW_DELETE_DEFINITIONS=ON \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -Wl,--verbose" \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
+      -DCMAKE_LINKER_FLAGS="-v ${LDFLAGS} -Wl,--verbose" \
       -DCMAKE_EXE_LINKER_FLAGS="-Wl,--whole-archive /work/libbootstrap_cxa.a -Wl,--no-whole-archive -Wl,-rpath,/opt/libcxx-bootstrap0/lib -L${SYS_LIB} -Wl,-rpath-link,${SYS_LIB}" \
       -DCMAKE_INSTALL_RPATH=/opt/libcxx-bootstrap0/lib \
       -DLLVM_ENABLE_RUNTIMES= \
