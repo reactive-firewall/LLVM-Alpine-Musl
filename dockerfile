@@ -1362,7 +1362,7 @@ RUN mkdir -p /opt/libcxx-stage1 /opt/libcxxabi-final /opt/libcxx-final /work/bui
 
 ENV HOST_CC=${CC}
 ENV HOST_CXX=clang++
-ENV HOST_LD=ld.lld
+ENV HOST_LD=lld
 
 # may need -Wl,--sysroot=/sysroot
 # may want linker flag -Wl,--nostdlib to prevent linking to any std c++
