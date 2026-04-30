@@ -2,25 +2,27 @@
 # Platform file for System-V style embedded targets using musl libc and Clang/LLVM.
 # Use: -DCMAKE_SYSTEM_NAME=Generic-Musl -DCMAKE_C_COMPILER=... -DCMAKE_CXX_COMPILER=...
 
-# To help the find_xxx() commands, set at least the following so CMAKE_FIND_ROOT_PATH
-# works at least for some simple cases:
-set(CMAKE_SYSTEM_INCLUDE_PATH /include )
-set(CMAKE_SYSTEM_LIBRARY_PATH /lib )
-set(CMAKE_SYSTEM_PROGRAM_PATH /bin )
-
 set(CMAKE_SYSTEM_NAME "Generic" CACHE STRING "Target system")
 set(CMAKE_SYSTEM_VERSION 1)
 
-# Provide a SYSROOT fallback from env if still not set
-if(NOT DEFINED SYSROOT OR SYSROOT STREQUAL "")
+# Provide a CMAKE_SYSROOT fallback from env if still not set
+if(NOT DEFINED CMAKE_SYSROOT OR CMAKE_SYSROOT STREQUAL "")
   if(DEFINED ENV{SYSROOT})
-    set(SYSROOT "$ENV{SYSROOT}" CACHE PATH "Target sysroot" FORCE)
+    set(CMAKE_SYSROOT "$ENV{SYSROOT}" CACHE PATH "Target sysroot" FORCE)
   endif()
+else()
+  set(CMAKE_SYSROOT "")
 endif()
 
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
   set(CMAKE_INSTALL_PREFIX "")
 endif()
+
+# To help the find_xxx() commands, set at least the following so CMAKE_FIND_ROOT_PATH
+# works at least for some simple cases:
+set(CMAKE_SYSTEM_INCLUDE_PATH "${CMAKE_SYSROOT}/include" )
+set(CMAKE_SYSTEM_LIBRARY_PATH "${CMAKE_SYSROOT}/lib" )
+set(CMAKE_SYSTEM_PROGRAM_PATH "${CMAKE_SYSROOT}/bin" )
 
 set(UNIX 1)
 include(Platform/UnixPaths)
@@ -34,6 +36,13 @@ set(CMAKE_SHARED_LIBRARY_SUFFIX ".so")
 set(CMAKE_SHARED_MODULE_SUFFIX ".so")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON CACHE BOOL "Position independent code for shared libs" FORCE)
 
+# musl does NOT need GNU extensions, but can leverage them when either one of
+#  _GNU_SOURCE or _ALL_SOURCE is defined.
+#  Treat compiler GNU extensions when _GNU_SOURCE or _ALL_SOURCE are defined
+#  (set these variables so the rest of the toolchain can use them)
+set(C_EXTENSIONS OFF)
+set(CXX_EXTENSIONS OFF)
+
 if(CMAKE_C_COMPILER_ID MATCHES "GNU")
   message(FATAL_ERROR "Generic-Musl platform can not be used with GNU toolchains.")
 endif()
@@ -41,6 +50,16 @@ endif()
 set(_GENERIC_MUSL_HAVE_CLANG OFF)
 if(CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_C_COMPILER_ID MATCHES "AppleClang")
   set(_GENERIC_MUSL_HAVE_CLANG ON)
+endif()
+
+# Also allow explicit option override
+option(ENABLE_C_EXTENSIONS "Enable C GNU extensions" ${C_EXTENSIONS})
+option(ENABLE_CXX_EXTENSIONS "Enable C++ GNU extensions" ${CXX_EXTENSIONS})
+if(ENABLE_C_EXTENSIONS)
+  add_compile_definitions(_GNU_SOURCE)
+endif()
+if(ENABLE_CXX_EXTENSIONS)
+  add_compile_definitions(_GNU_SOURCE)
 endif()
 
 # Infer C++ driver if plausible
@@ -63,7 +82,9 @@ if(NOT DEFINED CLANG_RT_PATH AND _GENERIC_MUSL_HAVE_CLANG)
   get_filename_component(_clang_parent_dir "${_clang_bin_dir}" PATH)
   set(_try_paths
     "${CMAKE_SYSROOT}/lib/generic"
+    "${CMAKE_SYSROOT}/usr/lib/generic"
     "${CMAKE_INSTALL_PREFIX}/lib/generic"
+    "${CMAKE_INSTALL_PREFIX}/usr/lib/generic"
     "/lib/generic"
     "/usr/lib/generic"
     "${_clang_parent_dir}/lib/clang"
@@ -71,7 +92,6 @@ if(NOT DEFINED CLANG_RT_PATH AND _GENERIC_MUSL_HAVE_CLANG)
     "${_clang_parent_dir}/../lib/clang"
     "/usr/lib/clang"
     "/usr/lib64/clang"
-    "${CMAKE_SYSROOT}/usr/lib/clang"
   )
   foreach(_p IN LISTS _try_paths)
     if(EXISTS "${_p}")
@@ -90,6 +110,8 @@ endif()
 set(_libc_candidates
   "${CMAKE_SYSROOT}/lib/libc.so"
   "${CMAKE_INSTALL_PREFIX}/lib/libc.so"
+  "${CMAKE_SYSROOT}/usr/lib/libc.so"
+  "${CMAKE_INSTALL_PREFIX}/usr/lib/libc.so"
   "/lib/libc.so"
   "/usr/lib/libc.so"
 )
@@ -112,6 +134,50 @@ foreach(_c IN LISTS _libc_candidates)
     break()
   endif()
 endforeach()
+
+find_program(_llvm_objdump NAMES llvm-objdump)
+find_program(_gnu_objdump NAMES objdump)
+if(_llvm_objdump)
+  set(_OBJDUMP "${_llvm_objdump}")
+elseif(_gnu_objdump)
+  set(_OBJDUMP "${_gnu_objdump}")
+else()
+  set(_OBJDUMP "")
+endif()
+
+if(_OBJDUMP AND EXISTS "${libc_path}")
+  execute_process(
+    COMMAND ${_OBJDUMP} -p "${libc_path}"
+    RESULT_VARIABLE _od_res
+    OUTPUT_VARIABLE _od_out
+    ERROR_QUIET
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+  if(_od_res EQUAL 0 AND _od_out)
+    # Try to extract SONAME first (e.g. SONAME libc.so.1) or any "libc.so.<num>"
+    string(REGEX MATCH "SONAME[[:space:]]+([^[:space:]]+)" _match "${_od_out}")
+    if(_match)
+      string(REGEX REPLACE "SONAME[[:space:]]+([^[:space:]]+)" "\\1" _ver_candidate "${_match}")
+    else()
+      # fallback: filename version like libc.so.1 or libc-<ver>.so
+      get_filename_component(_fname "${libc_path}" NAME)
+      string(REGEX MATCH "libc[^0-9]*([0-9]+(\\.[0-9]+)*)?" _fmatch "${_fname}")
+      if(_fmatch)
+        string(REGEX REPLACE "libc[^0-9]*([0-9]+(\\.[0-9]+)*)?" "\\1" _ver_candidate "${_fmatch}")
+      endif()
+    endif()
+
+    if(_ver_candidate)
+      # set the CMake cached vars only if not already set by user
+      if(NOT DEFINED CMAKE_HOST_SYSTEM_VERSION)
+        set(CMAKE_HOST_SYSTEM_VERSION "${_ver_candidate}" CACHE STRING "Host system version (detected from libc)" FORCE)
+      endif()
+      if(DEFINED CMAKE_SYSTEM_VERSION AND (CMAKE_SYSTEM_VERSION STREQUAL "1" OR NOT CMAKE_SYSTEM_VERSION))
+        set(CMAKE_SYSTEM_VERSION "${_ver_candidate}" CACHE STRING "System version (detected from libc)" FORCE)
+      endif()
+    endif()
+  endif()
+endif()
 
 # check for c99 compliance of detected libc.so
 # Preserve any existing known features
@@ -318,6 +384,10 @@ endif()
 
 # Defaults and hints
 set(CMAKE_SKIP_RPATH OFF)
+# POSIX -std=c99 is supported by musl (when defined)
+add_compile_definitions(_POSIX_C_SOURCE=200809L)
+# POSIX/XOPEN is also supported by musl (when defined)
+add_compile_definitions(_XOPEN_SOURCE=700)
 # POSIX -std=c99 -lm is supported with an empty archive by musl
 set(CMAKE_PLATFORM_HAS_MATH_LIB ${CMAKE_PLATFORM_HAS_MATH_LIB})
 # POSIX -std=c99 -lpthread is supported with an empty archive by musl
@@ -330,6 +400,12 @@ if(_GENERIC_MUSL_HAVE_CLANG)
     message(STATUS "clang_rt builtins: ${CLANG_RT_PATH}")
   else()
     message(STATUS "clang_rt builtins not auto-detected; set -DCLANG_RT_PATH=/path/to/libclang_rt.builtins.a to link it.")
+  endif()
+  # Check compile definitions usable at configure-time: the user may pass -D_GNU_SOURCE etc.
+  if(CMAKE_C_FLAGS MATCHES "_GNU_SOURCE" OR CMAKE_C_FLAGS MATCHES "_ALL_SOURCE" \
+     OR CMAKE_CXX_FLAGS MATCHES "_GNU_SOURCE" OR CMAKE_CXX_FLAGS MATCHES "_ALL_SOURCE")
+    set(C_EXTENSIONS ON)
+    set(CXX_EXTENSIONS ON)
   endif()
 else()
   message(STATUS "No Clang detected; leaving most toolchain variables unchanged (GNU toolchains are unsupported).")

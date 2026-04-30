@@ -940,6 +940,7 @@ COPY --from=build-libcxxrt /sysroot /stage-cxxrt
 
 # Copy custom Generic-Musl.cmake into the image build context before building the image
 COPY Generic-Musl/Platforms/Generic-Musl.cmake /tmp/Generic-Musl.cmake
+COPY Generic-Musl/Platforms/Generic-Musl-Libcxxrt.cmake /tmp/Generic-Musl-Libcxxrt.cmake
 COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
 
 ARG MUSL_LDLIB
@@ -1050,6 +1051,8 @@ RUN mkdir -p /usr/share/cmake/Modules/Platform \
  && install -m 0644 /tmp/Generic-Musl.cmake /usr/share/cmake/Modules/Platform/Generic-Musl.cmake \
  && rm /tmp/Generic-Musl.cmake \
  && chmod -R a+rX /usr/share/cmake/Modules/Platform \
+ && install -m 0644 /tmp/Generic-Musl-Libcxxrt.cmake /usr/share/cmake/Modules/Platform/Generic-Musl-Libcxxrt.cmake \
+ && rm /tmp/Generic-Musl-Libcxxrt.cmake \
  && mkdir -p /usr/share/cmake/Modules/Platform/Linker \
  && install -m 0644 /tmp/Generic-Musl-Linker.cmake /usr/share/cmake/Modules/Platform/Linker/Generic-Musl-Linker.cmake \
  && rm /tmp/Generic-Musl-Linker.cmake \
@@ -1135,7 +1138,7 @@ RUN mkdir -p build-libcxx-config && \
 
 WORKDIR /bootstrap/llvmorg
 
-ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot /headers -iwithsysroot /usr/include/c++/v1 -iwithsysroot /usr/include"
+ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot /headers -iwithsysroot /usr/include/c++/v1 -iwithsysroot /usr/include"
 ENV CXXFLAGS="-unwindlib=/sysroot/usr/lib/libunwind.so.1.0 -cxx-isystem /headers/usr/include/c++/v1"
 
 # Install libcxxabi headers too (ABI types required by libc++ headers)
@@ -1390,7 +1393,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
       -DCMAKE_CXX_COMPILER=${HOST_CXX} \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_SYSTEM_NAME=Generic-Musl \
+      -DCMAKE_SYSTEM_NAME=Generic-Musl-Libcxxrt \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
@@ -1418,6 +1421,10 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
       -DCMAKE_EXE_LINKER_FLAGS="-Wl,--whole-archive /work/libbootstrap_cxa.a -Wl,--no-whole-archive -Wl,-rpath,/opt/libcxx-bootstrap0/lib -L${SYS_LIB} -Wl,-rpath-link,${SYS_LIB}" \
       -DCMAKE_INSTALL_RPATH=/opt/libcxx-bootstrap0/lib \
       -DLLVM_ENABLE_RUNTIMES= \
+      -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+      -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+      -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+      -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
       -DLIBCXX_INCLUDE_TESTS=OFF
 
 # Stage 2: Build libc++abi against libc++ bootstrap0 (abi-bootstrap0)
