@@ -1,6 +1,6 @@
 include(Platform/Generic-Musl)
 
-Detect optional shared libcxxrt and required cxxabi header location
+# Detect optional shared libcxxrt and required cxxabi header location
 # Prefer an imported shared library if found and expose it as libcxxrt::lib
 # Respect sysroot by using CMAKE_SYSROOT
 find_library(_LIBCXXRT_NAMED libcxxrt
