@@ -7,5 +7,4 @@ builddir="${2:-build}"
 shift 2
 mkdir -p "$builddir"
 cmake -S "$src" -B "$builddir" -Wno-dev "$@"
-cmake --build "$builddir" -- -j2
-cmake --install "$builddir"
+cmake --build "$builddir" && cmake --install "$builddir" ;

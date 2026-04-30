@@ -1225,6 +1225,7 @@ WORKDIR /work
 # copy sources (llvmorg is the llvm-project checkout root)
 COPY --from=fetcher /fetch/llvmorg /work/llvm-project
 COPY --from=sysroot /sysroot /sysroot
+COPY --from=fetcher /fetch/libcxxrt/src /sysroot/usr/include/c++/v1/cxxabi
 COPY --from=build-unwind /stage /stage
 COPY --from=build-libcxxrt /sysroot /stage-cxxrt
 
@@ -1309,8 +1310,6 @@ RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi && \
     for CXXRT_FILE_ARTIFACT in usr/include/c++/v1/cxxabi/cxxabi.h \
         usr/include/c++/v1/cxxabi/unwind-llvm.h \
         usr/include/c++/v1/cxxabi/unwind-cxxabi.h \
-        usr/include/c++/v1/cxxabi/unwind-arm.h \
-        usr/include/c++/v1/cxxabi/unwind-itanium.h \
         usr/include/c++/v1/cxxabi/unwind.h \
         usr/lib/libcxxrt.so ; do \
           cp -vf /stage-cxxrt/${CXXRT_FILE_ARTIFACT} ${SYSROOT:-/sysroot}/${CXXRT_FILE_ARTIFACT} || true ; \
@@ -1383,8 +1382,8 @@ RUN "${HOST_CXX}" $CFLAGS $CXXFLAGS $LDFLAGS -fuse-ld=lld -Qunused-arguments -x 
 # may want to play with LIBCXX_TARGET_SUBDIR
 
 # Stage 1: Build libc++ (bootstrap0) but link against existing libcxxabi (libcxxrt) in sysroot
-RUN mkdir -p /work/build-libcxx-bootstrap0 && \
-    /work/run_cmake_build.sh llvm-project/libcxx /work/build-libcxx-bootstrap0 \
+RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 && \
+    /work/run_cmake_build.sh /work/llvm-project/libcxx /work/build-libcxx-bootstrap0 \
       -G Ninja \
       -DCMAKE_C_COMPILER=${HOST_CC} \
       -DCMAKE_CXX_COMPILER=${HOST_CXX} \
@@ -1400,7 +1399,6 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && \
       -DLIBCXX_USE_COMPILER_RT=ON \
       -DLIBCXX_ENABLE_EXCEPTIONS=ON \
       -DLIBCXX_ENABLE_RTTI=ON \
-      -DLIBCXX_ENABLE_NEW_DELETE_DEFINITIONS=ON \
       -DLIBCXX_HAS_MUSL_LIBC=ON \
       -DLIBCXX_ENABLE_THREADS=ON \
       -DLIBCXX_HAS_PTHREAD_API=ON \
@@ -1411,6 +1409,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && \
       -DLIBCXX_CXX_ABI_LIBRARY_PATH=${SYS_LIB} \
       -DLIBCXX_CXX_ABI_INCLUDE_PATHS="${SYS_INCLUDE}/c++/v1/cxxabi" \
       -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=OFF \
+      -DLIBCXX_ENABLE_NEW_DELETE_DEFINITIONS=ON \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
       -DCMAKE_EXE_LINKER_FLAGS="-Wl,--whole-archive /work/libbootstrap_cxa.a -Wl,--no-whole-archive -Wl,-rpath,/opt/libcxx-bootstrap0/lib -L${SYS_LIB} -Wl,-rpath-link,${SYS_LIB}" \
@@ -1420,7 +1419,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && \
 
 # Stage 2: Build libc++abi against libc++ bootstrap0 (abi-bootstrap0)
 # If you still want to build libc++abi in-stage using bootstrap libc++, point to both the sysroot (for libunwind) and the bootstrap libc++ install.
-RUN mkdir -p /work/build-libcxxabi-bootstrap0 && \
+RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootstrap0 && \
     /work/run_cmake_build.sh llvm-project/libcxxabi /work/build-libcxxabi-bootstrap0 \
       -G Ninja \
       -DCMAKE_C_COMPILER=${HOST_CC} \
@@ -1448,7 +1447,7 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && \
       -DLIBCXXABI_INCLUDE_TESTS=OFF
 
 # Stage 3: Rebuild libc++ (stage1) linking against libc++abi-bootstrap0
-RUN mkdir -p /work/build-libcxx-stage1 && \
+RUN mkdir -p /work/build-libcxx-stage1 && cd /work/build-libcxx-stage1 \
     /work/run_cmake_build.sh llvm-project/libcxx /work/build-libcxx-stage1 \
       -G Ninja \
       -DCMAKE_C_COMPILER=${HOST_CC} \
