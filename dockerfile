@@ -907,6 +907,8 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
     install -m 0644 "/stage/usr/include/__libunwind_config.h" "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/__libunwind_config.h" ;\
     install -m 0644 "/stage/usr/include/unwind.h" "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind-llvm.h" ;\
     install -m 0644 /tmp/unwind_shim.h "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind.h" ;\
+    install -m 0644 "libcxxrt/src/unwind-arm.h "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind-arm.h" ;\
+    install -m 0644 "libcxxrt/src/unwind-itanium.h "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind-itanium.h" ;\
     install -m 0644 libcxxrt/src/cxxabi.h "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/cxxabi.h" ;\
     touch -d "${SOME_DATE_EPOCH}" "${SYSROOT:-/sysroot}/usr/lib/libcxxrt.so" || true ; \
   fi ;
@@ -1016,6 +1018,8 @@ RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi && \
     for CXXRT_FILE_ARTIFACT in usr/include/c++/v1/cxxabi/cxxabi.h \
         usr/include/c++/v1/cxxabi/unwind-llvm.h \
         usr/include/c++/v1/cxxabi/unwind-cxxabi.h \
+        usr/include/c++/v1/cxxabi/unwind-arm.h \
+        usr/include/c++/v1/cxxabi/unwind-itanium.h \
         usr/include/c++/v1/cxxabi/unwind.h \
         usr/lib/libcxxrt.so ; do \
           cp -vf /stage-cxxrt/${CXXRT_FILE_ARTIFACT} ${SYSROOT:-/sysroot}/${CXXRT_FILE_ARTIFACT} || true ; \
@@ -1305,6 +1309,8 @@ RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi && \
     for CXXRT_FILE_ARTIFACT in usr/include/c++/v1/cxxabi/cxxabi.h \
         usr/include/c++/v1/cxxabi/unwind-llvm.h \
         usr/include/c++/v1/cxxabi/unwind-cxxabi.h \
+        usr/include/c++/v1/cxxabi/unwind-arm.h \
+        usr/include/c++/v1/cxxabi/unwind-itanium.h \
         usr/include/c++/v1/cxxabi/unwind.h \
         usr/lib/libcxxrt.so ; do \
           cp -vf /stage-cxxrt/${CXXRT_FILE_ARTIFACT} ${SYSROOT:-/sysroot}/${CXXRT_FILE_ARTIFACT} || true ; \
@@ -1402,7 +1408,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && \
       -DLIBCXX_ABI_VERSION=1 \
       -DLIBCXX_CXX_ABI=libcxxrt \
       -DLIBCXX_CXX_ABI_LIBRARY_PATH=${SYS_LIB} \
-      -DLIBCXX_CXX_ABI_INCLUDE_PATHS="${SYS_INCLUDE};${SYS_INCLUDE}/c++/v1/cxxabi" \
+      -DLIBCXX_CXX_ABI_INCLUDE_PATHS="${SYS_INCLUDE}/c++/v1/cxxabi" \
       -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=OFF \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
