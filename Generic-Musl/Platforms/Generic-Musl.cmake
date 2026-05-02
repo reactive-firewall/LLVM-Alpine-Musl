@@ -130,6 +130,16 @@ foreach(_c IN LISTS _libc_candidates)
     file(GLOB _ldcandidates "${_c_dir}/ld-musl-*.so.1")
     if(_ldcandidates)
       list(GET _ldcandidates 0 _musl_loader)
+      set(CMAKE_SYSTEM_LIBRARY_PATH "${_c_dir}")
+      set(_c_dir_flags "-Wl,-L${CMAKE_SYSTEM_LIBRARY_PATH}")
+      list(FIND CMAKE_EXE_LINKER_FLAGS "${_c_dir_flags}" _found_musl_lib)
+      if(_found_musl_lib EQUAL -1)
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${_c_dir_flags}")
+      endif()
+      list(FIND CMAKE_SHARED_LINKER_FLAGS "${_c_dir_flags}" _found_musl_lib2)
+      if(_found_musl_lib2 EQUAL -1)
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${_c_dir_flags}")
+      endif()
     endif()
     break()
   endif()
@@ -410,6 +420,75 @@ else()
   message(STATUS "No Clang detected; leaving most toolchain variables unchanged (GNU toolchains are unsupported).")
 endif()
 
+# STDC detection for Musl
+
+# Candidate mapping: CMake-standard-string -> preferred __STDC_VERSION__ numeric literal
+set(_candidates
+  "26;202600L"   # provisional C26
+  "23;202311L"   # Clang / provisional C23
+  "23;202300L"
+  "17;201710L"
+  "11;201112L"
+  "99;199901L"
+  "90;199409L"
+)
+
+# Does the musl build provide Annex K? (default: OFF)
+option(MUSL_HAS_ANNEX_K "Set ON if musl libc was built to provide Annex K" OFF)
+
+# If you want the config to define __STDC_NO_ANNEX_K__ when MUSL_HAS_ANNEX_K is OFF,
+# enable this. (Separate from MUSL_HAS_ANNEX_K to avoid reusing the same option name.)
+option(DEFINE_NO_ANNEX_K "When ON and MUSL_HAS_ANNEX_K is OFF, define __STDC_NO_ANNEX_K__=1" OFF)
+
+# Option to force-define __STDC_VERSION__ as a compile definition (nonstandard; default OFF)
+option(FORCE_DEFINE_STDC_VERSION "Define __STDC_VERSION__ as a compile definition" OFF)
+
+# Determine requested C standard (prefer user-supplied CMAKE_C_STANDARD)
+if(DEFINED CMAKE_C_STANDARD AND CMAKE_C_STANDARD)
+  set(_requested_std "${CMAKE_C_STANDARD}")
+else()
+  # Default to highest candidate (first entry)
+  list(GET _candidates 0 _first_pair)
+  string(REGEX REPLACE "([^;]+);(.+)" "\\1" _requested_std "${_first_pair}")
+  # also set CMake variable so CMake's rules get the requested standard
+  set(CMAKE_C_STANDARD "${_requested_std}" CACHE STRING "Requested C standard" FORCE)
+endif()
+
+# Only emit compile definitions if the user asked CMake to strictly enforce the requested standard
+# or if the user explicitly requested forcing the definition.
+# (This avoids redefining reserved macros unless explicitly asked.)
+if(CMAKE_C_STANDARD_REQUIRED OR FORCE_DEFINE_STDC_VERSION)
+
+# Find the numeric __STDC_VERSION__ value that matches the requested CMake standard name
+set(SELECTED_STD_VALUE "")
+foreach(_pair IN LISTS _candidates)
+  string(REGEX REPLACE "([^;]+);(.+)" "\\1" _cand_std "${_pair}")
+  string(REGEX REPLACE "([^;]+);(.+)" "\\2" _cand_val "${_pair}")
+  if(_cand_std STREQUAL _requested_std)
+    set(SELECTED_STD_VALUE "${_cand_val}")
+    break()
+  endif()
+endforeach()
+
+# Fallback to C11 numeric value if no exact match found
+if(NOT SELECTED_STD_VALUE)
+  set(SELECTED_STD_VALUE "201112L")
+endif()
+
+message(STATUS "Requested C standard: ${_requested_std} -> selected __STDC_VERSION__=${SELECTED_STD_VALUE}")
+message(STATUS "MUSL_HAS_ANNEX_K = ${MUSL_HAS_ANNEX_K}; DEFINE_NO_ANNEX_K = ${DEFINE_NO_ANNEX_K}; FORCE_DEFINE_STDC_VERSION = ${FORCE_DEFINE_STDC_VERSION}")
+
+  if(FORCE_DEFINE_STDC_VERSION)
+    add_compile_definitions("__STDC_VERSION__=${SELECTED_STD_VALUE}")
+  endif()
+endif()
+
+# If musl lacks Annex K and the user opted in, define the no-Annex-K macro
+if(NOT MUSL_HAS_ANNEX_K AND DEFINE_NO_ANNEX_K)
+  add_compile_definitions("__STDC_NO_ANNEX_K__=1")
+endif()
+
+#shared libs support
 if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   message(STATUS "Shared libraries supported (musl loader and linker detected).")
   # (musl) support shared libraries

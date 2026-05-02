@@ -1427,7 +1427,6 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
       -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
-      -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
       -DLIBCXX_INCLUDE_TESTS=OFF
 
 # Stage 2: Build libc++abi against libc++ bootstrap0 (abi-bootstrap0)
