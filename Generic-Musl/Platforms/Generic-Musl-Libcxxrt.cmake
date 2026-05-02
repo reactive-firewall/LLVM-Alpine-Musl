@@ -35,10 +35,14 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
     endif()
 
     # Create imported target for linkage convenience
-    add_library(libcxxrt::lib UNKNOWN IMPORTED)
+    add_library(libcxxrt::lib INTERFACE IMPORTED GLOBAL)
     set_target_properties(libcxxrt::lib PROPERTIES
       IMPORTED_LOCATION "${_LIBCXXRT_NAMED}"
     )
+    set_target_properties(libcxxrt::lib PROPERTIES
+      IMPORTED_LIBNAME "cxxrt"
+    )
+
     if(_inc_root)
       target_include_directories(libcxxrt::lib INTERFACE "${_inc_root}")
     endif()
@@ -55,10 +59,10 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   # endif()
   #
   # Alternatively, create an interface to automatically apply to SHARED C++ targets:
-  add_library(Generic::CXXSharedRuntimes INTERFACE)
-  if(LIBCXXRT_FOUND)
-    target_link_libraries(Generic::CXXSharedRuntimes INTERFACE libcxxrt::lib)
-  endif()
+  # add_library(Generic::CXXSharedRuntimes INTERFACE)
+  # if(LIBCXXRT_FOUND)
+  #  target_link_libraries(Generic::CXXSharedRuntimes INTERFACE libcxxrt::lib)
+  # endif()
 else()
   if(_LIBCXXRT_NAMED)
     message(STATUS "Detected C++ runtime library: ${_LIBCXXRT_NAMED}")
