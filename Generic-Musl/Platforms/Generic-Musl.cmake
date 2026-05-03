@@ -526,7 +526,7 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   # PIE link options are managed in Compiler/<compiler>.cmake file
   list(FIND CMAKE_SHARED_LIBRARY_C_FLAGS "-fseparate-named-sections -fPIC" _found_named_sections_flag)
   if(_found_named_sections_flag EQUAL -1)
-    set(CMAKE_SHARED_LIBRARY_C_FLAGS "${CMAKE_SHARED_LIBRARY_C_FLAGS} -Xlinker -fseparate-named-sections -fPIC")
+    set(CMAKE_SHARED_LIBRARY_C_FLAGS "${CMAKE_SHARED_LIBRARY_C_FLAGS} -fseparate-named-sections -fPIC")
   endif()
   set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS "-shared")       # -shared
   if(NOT DEFINED CMAKE_SHARED_LIBRARY_LINK_C_FLAGS)
