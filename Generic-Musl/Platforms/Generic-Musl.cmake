@@ -132,7 +132,7 @@ foreach(_c IN LISTS _libc_candidates)
     if(_ldcandidates)
       list(GET _ldcandidates 0 _musl_loader)
       set(CMAKE_SYSTEM_LIBRARY_PATH "${_c_dir}")
-      set(_c_dir_flags "-Wl,-L${CMAKE_SYSTEM_LIBRARY_PATH}")
+      set(_c_dir_flags "-Xlinker -L${CMAKE_SYSTEM_LIBRARY_PATH}")
       list(FIND CMAKE_EXE_LINKER_FLAGS "${_c_dir_flags}" _found_musl_lib)
       if(_found_musl_lib EQUAL -1)
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${_c_dir_flags}")
@@ -274,6 +274,10 @@ if(_musl_loader)
   if(LD_LLD OR LD_CLANG OR LLD_LINK OR LLVM_LLD)
     set(_CMAKE_SYSTEM_LINKER_TYPE LLD CACHE INTERNAL "System linker type")
     set(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS ON CACHE BOOL "Should the flag -shared be used" FORCE)
+    set(CMAKE_C_LINKER_WRAPPER_FLAG "-Xlinker" " ")
+    if(NOT DEFINED CMAKE_CXX_LINKER_WRAPPER_FLAG)
+      set(CMAKE_CXX_LINKER_WRAPPER_FLAG "-Xlinker" " ")
+    endif()
   else()
     if(NOT DEFINED CMAKE_LINKER)
       set(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS OFF CACHE BOOL "Should the flag -shared be used")
@@ -301,8 +305,22 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
 
   # Set dynamic linker path for musl
   if(_musl_loader)
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--unique -Wl,--dynamic-linker=${_musl_loader}")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--unique -Wl,--dynamic-linker=${_musl_loader}")
+    list(FIND CMAKE_EXE_LINKER_FLAGS "--unique" _found_musl_lib)
+    if(_found_uniq_flag EQUAL -1)
+      set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Xlinker --unique")
+    endif()
+    list(FIND CMAKE_EXE_LINKER_FLAGS "--dynamic-linker" _found_dyn_link_flag)
+    if(_found_dyn_link_flag EQUAL -1)
+      set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Xlinker --dynamic-linker=${_musl_loader}")
+    endif()
+    list(FIND CMAKE_SHARED_LINKER_FLAGS "--unique" _found_musl_lib2)
+    if(_found_uniq_flag2 EQUAL -1)
+      set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Xlinker --unique")
+    endif()
+    list(FIND CMAKE_SHARED_LINKER_FLAGS "--dynamic-linker" _found_dyn_link_flag2)
+    if(_found_dyn_link_flag2 EQUAL -1)
+      set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Xlinker --dynamic-linker=${_musl_loader}")
+    endif()
   endif()
 
   # From Musl's own documentation:
@@ -310,8 +328,8 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
   #   and use library directories named lib.
 
   # Conservative security flags
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-z,relro -Wl,-z,now")
-  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,relro -Wl,-z,now")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Xlinker -z,relro -Xlinker -z,now")
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Xlinker -z,relro -Xlinker -z,now")
 else()
   # Ensure shared lib variables don't advertise support
   set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
@@ -506,26 +524,30 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   set(CMAKE_SHARED_LIBRARY_FORMAT "ELF" CACHE STRING "Shared lib format")
   set(CMAKE_SHARED_MODULE_FORMAT "ELF" CACHE STRING "Shared module format")
   # PIE link options are managed in Compiler/<compiler>.cmake file
-  set(CMAKE_SHARED_LIBRARY_C_FLAGS "${} -fseparate-named-sections -fPIC")            # -pic
-  set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS "-shared")       # -shared
+  list(FIND CMAKE_SHARED_LIBRARY_C_FLAGS "-fseparate-named-sections -fPIC" _found_named_sections_flag)
+  if(_found_named_sections_flag EQUAL -1)
+    set(CMAKE_SHARED_LIBRARY_C_FLAGS "${CMAKE_SHARED_LIBRARY_C_FLAGS} -fseparate-named-sections -fPIC")
+  endif()
+  set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS "LINKER:-shared")       # -shared
   if(NOT DEFINED CMAKE_SHARED_LIBRARY_LINK_C_FLAGS)
+    message(STATUS "Detected dynamic linker id: ${CMAKE_LINKER}")
     set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")         # +s, flag for exe link to use shared lib
   endif()
 
   # Not sure if rpaths are used by musl (ld-musl-ARCH.so.1 is hardcoded when linking to musl)
-  set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "LINKER:-rpath,")       # -rpath
+  set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "-rpath,")       # -rpath
   # probably works like FreeBSD
   set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG_SEP ":")   # : or empty
   # Not sure about '-z' (including '-z origin') with musl linker
   set(CMAKE_SHARED_LIBRARY_RPATH_ORIGIN_TOKEN "\$ORIGIN")
-  set(CMAKE_SHARED_LIBRARY_RPATH_LINK_C_FLAG "LINKER:-rpath-link,")
-  set(CMAKE_SHARED_LIBRARY_SONAME_C_FLAG "LINKER:-soname,")
-  set(CMAKE_EXE_EXPORTS_C_FLAG "LINKER:--export-dynamic")
+  set(CMAKE_SHARED_LIBRARY_RPATH_LINK_C_FLAG "-rpath-link,")
+  set(CMAKE_SHARED_LIBRARY_SONAME_C_FLAG "-soname,")
+  set(CMAKE_EXE_EXPORTS_C_FLAG "--export-dynamic")
 
   # From Musl's own documentation:
   #   Since 1.1.21, musl supports increasing the default thread
   #   stack size via the PT_GNU_STACK program header, which can
-  #   be set at link time via -Wl,-z,stack-size=N.
+  #   be set at link time via -Xlinker -z,stack-size=N.
 
   # Shared libraries with no builtin soname may not be linked safely by
   # specifying the file path.

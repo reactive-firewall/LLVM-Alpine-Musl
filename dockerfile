@@ -797,7 +797,7 @@ ENV MUSL_PREFIX="/usr"
 # may want linker flag -Wl,--nostdlib to prevent linking to any std c++
 ENV LDFLAGS="-v -fuse-ld=lld -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic"
 # Does NOT require -D__ELF__
-ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -iwithsysroot /usr/include"
+ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -I${SYSROOT:-/sysroot}/usr/include"
 # might need -nostdinc++
 ENV CXXFLAGS="-ffunction-sections -fdata-sections -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
 
