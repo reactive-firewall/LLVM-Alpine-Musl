@@ -21,7 +21,7 @@ endif()
 # To help the find_xxx() commands, set at least the following so CMAKE_FIND_ROOT_PATH
 # works at least for some simple cases:
 set(CMAKE_SYSTEM_INCLUDE_PATH "${CMAKE_SYSROOT}/include" )
-set(CMAKE_SYSTEM_LIBRARY_PATH "${CMAKE_SYSROOT}/lib" )
+set(CMAKE_SYSTEM_LIBRARY_PATH "${CMAKE_SYSROOT}/lib;${CMAKE_SYSROOT}/usr/lib" )
 set(CMAKE_SYSTEM_PROGRAM_PATH "${CMAKE_SYSROOT}/bin" )
 
 set(UNIX 1)
@@ -40,8 +40,9 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON CACHE BOOL "Position independent code for
 #  _GNU_SOURCE or _ALL_SOURCE is defined.
 #  Treat compiler GNU extensions when _GNU_SOURCE or _ALL_SOURCE are defined
 #  (set these variables so the rest of the toolchain can use them)
-set(C_EXTENSIONS OFF)
-set(CXX_EXTENSIONS OFF)
+set(CMAKE_C_EXTENSIONS_DEFAULT OFF)
+set(CMAKE_CXX_EXTENSIONS_DEFAULT OFF)
+set(CMAKE_C_EXTENSIONS OFF) # musl in generic mode need not use extensions (so default to off)
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU")
   message(FATAL_ERROR "Generic-Musl platform can not be used with GNU toolchains.")
@@ -443,40 +444,43 @@ option(DEFINE_NO_ANNEX_K "When ON and MUSL_HAS_ANNEX_K is OFF, define __STDC_NO_
 # Option to force-define __STDC_VERSION__ as a compile definition (nonstandard; default OFF)
 option(FORCE_DEFINE_STDC_VERSION "Define __STDC_VERSION__ as a compile definition" OFF)
 
-# Determine requested C standard (prefer user-supplied CMAKE_C_STANDARD)
-if(DEFINED CMAKE_C_STANDARD AND CMAKE_C_STANDARD)
-  set(_requested_std "${CMAKE_C_STANDARD}")
-else()
-  # Default to highest candidate (first entry)
-  list(GET _candidates 0 _first_pair)
-  string(REGEX REPLACE "([^;]+);(.+)" "\\1" _requested_std "${_first_pair}")
-  # also set CMake variable so CMake's rules get the requested standard
-  set(CMAKE_C_STANDARD "${_requested_std}" CACHE STRING "Requested C standard" FORCE)
-endif()
-
 # Only emit compile definitions if the user asked CMake to strictly enforce the requested standard
 # or if the user explicitly requested forcing the definition.
 # (This avoids redefining reserved macros unless explicitly asked.)
 if(CMAKE_C_STANDARD_REQUIRED OR FORCE_DEFINE_STDC_VERSION)
 
-# Find the numeric __STDC_VERSION__ value that matches the requested CMake standard name
-set(SELECTED_STD_VALUE "")
-foreach(_pair IN LISTS _candidates)
-  string(REGEX REPLACE "([^;]+);(.+)" "\\1" _cand_std "${_pair}")
-  string(REGEX REPLACE "([^;]+);(.+)" "\\2" _cand_val "${_pair}")
-  if(_cand_std STREQUAL _requested_std)
-    set(SELECTED_STD_VALUE "${_cand_val}")
-    break()
+  # Determine requested C standard (prefer user-supplied CMAKE_C_STANDARD)
+  if(DEFINED CMAKE_C_STANDARD AND CMAKE_C_STANDARD)
+    set(_requested_std "${CMAKE_C_STANDARD}")
+  else()
+    # Default to highest candidate (first entry)
+    #list(GET _candidates 0 _first_pair)
+    # WORKAROUND for cmake being a bit behind the drafts.
+    # Default to c11 candidate (fifth entry)
+    list(GET _candidates 4 _first_pair)
+    string(REGEX REPLACE "([^;]+);(.+)" "\\1" _requested_std "${_first_pair}")
+    # also set CMake variable so CMake's rules get the requested standard
+    set(CMAKE_C_STANDARD "${_requested_std}" CACHE STRING "Requested C standard" FORCE)
   endif()
-endforeach()
 
-# Fallback to C11 numeric value if no exact match found
-if(NOT SELECTED_STD_VALUE)
-  set(SELECTED_STD_VALUE "201112L")
-endif()
+  # Find the numeric __STDC_VERSION__ value that matches the requested CMake standard name
+  set(SELECTED_STD_VALUE "")
+  foreach(_pair IN LISTS _candidates)
+    string(REGEX REPLACE "([^;]+);(.+)" "\\1" _cand_std "${_pair}")
+    string(REGEX REPLACE "([^;]+);(.+)" "\\2" _cand_val "${_pair}")
+    if(_cand_std STREQUAL _requested_std)
+      set(SELECTED_STD_VALUE "${_cand_val}")
+      break()
+    endif()
+  endforeach()
 
-message(STATUS "Requested C standard: ${_requested_std} -> selected __STDC_VERSION__=${SELECTED_STD_VALUE}")
-message(STATUS "MUSL_HAS_ANNEX_K = ${MUSL_HAS_ANNEX_K}; DEFINE_NO_ANNEX_K = ${DEFINE_NO_ANNEX_K}; FORCE_DEFINE_STDC_VERSION = ${FORCE_DEFINE_STDC_VERSION}")
+  # Fallback to C11 numeric value if no exact match found
+  if(NOT SELECTED_STD_VALUE)
+    set(SELECTED_STD_VALUE "201112L")
+  endif()
+
+  message(STATUS "Requested C standard: ${_requested_std} -> selected __STDC_VERSION__=${SELECTED_STD_VALUE}")
+  message(STATUS "MUSL_HAS_ANNEX_K = ${MUSL_HAS_ANNEX_K}; DEFINE_NO_ANNEX_K = ${DEFINE_NO_ANNEX_K}; FORCE_DEFINE_STDC_VERSION = ${FORCE_DEFINE_STDC_VERSION}")
 
   if(FORCE_DEFINE_STDC_VERSION)
     add_compile_definitions("__STDC_VERSION__=${SELECTED_STD_VALUE}")
@@ -502,19 +506,21 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   set(CMAKE_SHARED_LIBRARY_FORMAT "ELF" CACHE STRING "Shared lib format")
   set(CMAKE_SHARED_MODULE_FORMAT "ELF" CACHE STRING "Shared module format")
   # PIE link options are managed in Compiler/<compiler>.cmake file
-  set(CMAKE_SHARED_LIBRARY_C_FLAGS "-fseparate-named-sections -fPIC")            # -pic
+  set(CMAKE_SHARED_LIBRARY_C_FLAGS "${} -fseparate-named-sections -fPIC")            # -pic
   set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS "-shared")       # -shared
-  set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")         # +s, flag for exe link to use shared lib
+  if(NOT DEFINED CMAKE_SHARED_LIBRARY_LINK_C_FLAGS)
+    set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")         # +s, flag for exe link to use shared lib
+  endif()
 
   # Not sure if rpaths are used by musl (ld-musl-ARCH.so.1 is hardcoded when linking to musl)
-  set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "-Wl,-rpath,")       # -rpath
+  set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "LINKER:-rpath,")       # -rpath
   # probably works like FreeBSD
   set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG_SEP ":")   # : or empty
   # Not sure about '-z' (including '-z origin') with musl linker
   set(CMAKE_SHARED_LIBRARY_RPATH_ORIGIN_TOKEN "\$ORIGIN")
-  set(CMAKE_SHARED_LIBRARY_RPATH_LINK_C_FLAG "-Wl,-rpath-link,")
-  set(CMAKE_SHARED_LIBRARY_SONAME_C_FLAG "-Wl,-soname,")
-  set(CMAKE_EXE_EXPORTS_C_FLAG "-Wl,--export-dynamic")
+  set(CMAKE_SHARED_LIBRARY_RPATH_LINK_C_FLAG "LINKER:-rpath-link,")
+  set(CMAKE_SHARED_LIBRARY_SONAME_C_FLAG "LINKER:-soname,")
+  set(CMAKE_EXE_EXPORTS_C_FLAG "LINKER:--export-dynamic")
 
   # From Musl's own documentation:
   #   Since 1.1.21, musl supports increasing the default thread
@@ -533,8 +539,8 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   # to other libraries to select whether to use the static or shared
   # versions of the libraries.
   foreach(type SHARED_LIBRARY SHARED_MODULE EXE)
-    set(CMAKE_${type}_LINK_STATIC_C_FLAGS "-Wl,-Bstatic")
-    set(CMAKE_${type}_LINK_DYNAMIC_C_FLAGS "-Wl,-Bdynamic")
+    set(CMAKE_${type}_LINK_STATIC_C_FLAGS "LINKER:-Bstatic")
+    set(CMAKE_${type}_LINK_DYNAMIC_C_FLAGS "LINKER:-Bdynamic")
   endforeach()
 
   set(CMAKE_SHARED_LIBRARY_CXX_FLAGS "${CMAKE_SHARED_LIBRARY_C_FLAGS}")
@@ -572,4 +578,10 @@ endif()
 # New in CMake 3.30: https://cmake.org/cmake/help/latest/policy/CMP0164.html
 if(POLICY CMP0164)
   cmake_policy(SET CMP0164 NEW)
+endif()
+
+# CMP0128: <LANG>_EXTENSIONS are initialized with respect to CMAKE_<LANG>_EXTENSIONS_DEFAULT, unless overridden.
+# New in CMake 3.22: https://cmake.org/cmake/help/latest/policy/CMP0128.html
+if(POLICY CMP0128)
+  cmake_policy(SET CMP0128 NEW)
 endif()
