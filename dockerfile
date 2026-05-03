@@ -1373,7 +1373,7 @@ ENV HOST_LD=lld
 # may need -Wl,--sysroot=/sysroot
 # may want linker flag -Wl,--nostdlib to prevent linking to any std c++
 # may want to link -Wl,-l,${LLVM_RTLIB_STUB}
-ENV LDFLAGS="-v -Wl,--sysroot=${SYSROOT:-/sysroot} -Wl,-L,${SYS_LIB} -Wl,-L,${SYSROOT:-/sysroot}/lib -Wl,-L,${SYS_LIB}/generic -Wl,-l,${LLVM_RTLIB_STUB} -Wl,--dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB}"
+ENV LDFLAGS="-v -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker -L -Xlinker${SYSROOT:-/sysroot}/lib -Xlinker -L,${SYS_LIB}/generic -Xlinker -l,${LLVM_RTLIB_STUB} -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB}"
 # Does NOT require -D__ELF__
 ENV CFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT:-/sysroot}/usr/include"
 # might need -nostdinc++
@@ -1420,7 +1420,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
       -DLIBCXX_ENABLE_NEW_DELETE_DEFINITIONS=ON \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
-      -DLIBCXX_LINK_FLAGS="-v ${LDFLAGS} -Wl,--verbose" \
+      -DLIBCXX_LINK_FLAGS="-v ${LDFLAGS} -Xlinker --verbose" \
       -DCMAKE_EXE_LINKER_FLAGS="-Wl,--whole-archive /work/libbootstrap_cxa.a -Wl,--no-whole-archive -Wl,-rpath,/opt/libcxx-bootstrap0/lib -L${SYS_LIB} -Wl,-rpath-link,${SYS_LIB}" \
       -DCMAKE_INSTALL_RPATH=/opt/libcxx-bootstrap0/lib \
       -DLLVM_ENABLE_RUNTIMES= \

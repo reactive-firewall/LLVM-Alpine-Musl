@@ -328,8 +328,8 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
   #   and use library directories named lib.
 
   # Conservative security flags
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Xlinker -z,relro -Xlinker -z,now")
-  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Xlinker -z,relro -Xlinker -z,now")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Xlinker -z -Xlinker relro -Xlinker -z -Xlinker now")
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Xlinker -z -Xlinker relro -Xlinker -z -Xlinker now")
 else()
   # Ensure shared lib variables don't advertise support
   set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
