@@ -528,26 +528,26 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   if(_found_named_sections_flag EQUAL -1)
     set(CMAKE_SHARED_LIBRARY_C_FLAGS "${CMAKE_SHARED_LIBRARY_C_FLAGS} -fseparate-named-sections -fPIC")
   endif()
-  set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS "LINKER:-shared")       # -shared
+  set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS "-shared")       # -shared
   if(NOT DEFINED CMAKE_SHARED_LIBRARY_LINK_C_FLAGS)
     message(STATUS "Detected dynamic linker id: ${CMAKE_LINKER}")
     set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")         # +s, flag for exe link to use shared lib
   endif()
 
   # Not sure if rpaths are used by musl (ld-musl-ARCH.so.1 is hardcoded when linking to musl)
-  set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "-rpath,")       # -rpath
+  set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "${CMAKE_C_LINKER_WRAPPER_FLAG} -rpath,")       # -rpath
   # probably works like FreeBSD
   set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG_SEP ":")   # : or empty
   # Not sure about '-z' (including '-z origin') with musl linker
   set(CMAKE_SHARED_LIBRARY_RPATH_ORIGIN_TOKEN "\$ORIGIN")
-  set(CMAKE_SHARED_LIBRARY_RPATH_LINK_C_FLAG "-rpath-link,")
-  set(CMAKE_SHARED_LIBRARY_SONAME_C_FLAG "-soname,")
-  set(CMAKE_EXE_EXPORTS_C_FLAG "--export-dynamic")
+  set(CMAKE_SHARED_LIBRARY_RPATH_LINK_C_FLAG "${CMAKE_C_LINKER_WRAPPER_FLAG} -rpath-link,")
+  set(CMAKE_SHARED_LIBRARY_SONAME_C_FLAG "${CMAKE_C_LINKER_WRAPPER_FLAG} -soname,")
+  set(CMAKE_EXE_EXPORTS_C_FLAG "${CMAKE_C_LINKER_WRAPPER_FLAG} --export-dynamic")
 
   # From Musl's own documentation:
   #   Since 1.1.21, musl supports increasing the default thread
   #   stack size via the PT_GNU_STACK program header, which can
-  #   be set at link time via -Xlinker -z,stack-size=N.
+  #   be set at link time via ${CMAKE_C_LINKER_WRAPPER_FLAG} -z,stack-size=N.
 
   # Shared libraries with no builtin soname may not be linked safely by
   # specifying the file path.
@@ -561,8 +561,8 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   # to other libraries to select whether to use the static or shared
   # versions of the libraries.
   foreach(type SHARED_LIBRARY SHARED_MODULE EXE)
-    set(CMAKE_${type}_LINK_STATIC_C_FLAGS "LINKER:-Bstatic")
-    set(CMAKE_${type}_LINK_DYNAMIC_C_FLAGS "LINKER:-Bdynamic")
+    set(CMAKE_${type}_LINK_STATIC_C_FLAGS "${CMAKE_C_LINKER_WRAPPER_FLAG} -Bstatic")
+    set(CMAKE_${type}_LINK_DYNAMIC_C_FLAGS "${CMAKE_C_LINKER_WRAPPER_FLAG} -Bdynamic")
   endforeach()
 
   set(CMAKE_SHARED_LIBRARY_CXX_FLAGS "${CMAKE_SHARED_LIBRARY_C_FLAGS}")
