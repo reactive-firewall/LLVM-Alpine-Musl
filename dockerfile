@@ -1373,7 +1373,7 @@ ENV HOST_LD=lld
 # may need -Wl,--sysroot=/sysroot
 # may want linker flag -Wl,--nostdlib to prevent linking to any std c++
 # may want to link -Wl,-l,${LLVM_RTLIB_STUB}
-ENV LDFLAGS="-v -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker -L -Xlinker${SYSROOT:-/sysroot}/lib -Xlinker -L,${SYS_LIB}/generic -Xlinker -l,${LLVM_RTLIB_STUB} -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB}"
+ENV LDFLAGS="-v -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/lib -Xlinker -L -Xlinker ${SYS_LIB}/generic -Xlinker -l${LLVM_RTLIB_STUB} -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB}"
 # Does NOT require -D__ELF__
 ENV CFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT:-/sysroot}/usr/include"
 # might need -nostdinc++
@@ -1454,7 +1454,7 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DCMAKE_PREFIX_PATH=/opt/libcxx-bootstrap0 \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -I/opt/libcxx-bootstrap0/include -I${SYS_INCLUDE}" \
-      -DCMAKE_EXE_LINKER_FLAGS="-L/opt/libcxx-bootstrap0/lib -L${SYS_LIB} -Wl,-rpath,/opt/libcxx-bootstrap0/lib" \
+      -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/opt/libcxx-bootstrap0/lib" \
       -DLLVM_ENABLE_RUNTIMES= \
       -DLIBCXXABI_INCLUDE_TESTS=OFF
 
@@ -1485,7 +1485,7 @@ RUN mkdir -p /work/build-libcxx-stage1 && cd /work/build-libcxx-stage1 \
       -DLIBCXX_CXX_ABI_INCLUDE_PATHS=/opt/libcxxabi-bootstrap0/include \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -I/opt/libcxx-bootstrap0/include -I/opt/libcxxabi-bootstrap0/include -I${SYS_INCLUDE}" \
-      -DCMAKE_EXE_LINKER_FLAGS="-L/opt/libcxxabi-bootstrap0/lib -L/opt/libcxx-bootstrap0/lib -L${SYS_LIB} -Wl,-rpath,/opt/libcxxabi-bootstrap0/lib:/opt/libcxx-stage1/lib"
+      -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /opt/libcxxabi-bootstrap0/lib -Xlinker -L -Xlinker /opt/libcxx-bootstrap0/lib -L${SYS_LIB} -Wl,-rpath,/opt/libcxxabi-bootstrap0/lib:/opt/libcxx-stage1/lib"
 
 # Stage 4: Rebuild libc++abi against libc++ stage1 (final ABI)
 RUN mkdir -p /work/build-libcxxabi-final && \
