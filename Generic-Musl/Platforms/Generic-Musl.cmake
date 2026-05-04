@@ -218,8 +218,8 @@ set(CMAKE_FIND_LIBRARY_PREFIXES "lib")
 set(CMAKE_FIND_LIBRARY_SUFFIXES ".so" ".a")
 
 # support position independance
-set(CMAKE_C_COMPILE_OPTIONS_PIC "-fPIC")
-set(CMAKE_C_COMPILE_OPTIONS_PIE "-fPIE")
+set(CMAKE_C_COMPILE_OPTIONS_PIC "-fPIC -Xlinker --pic-veneer")
+set(CMAKE_C_COMPILE_OPTIONS_PIE "-Xlinker --pic-veneer -fPIE -Xlinker --pie")
 
 # Detect libpthread / libm near libc
 set(CMAKE_PLATFORM_HAS_PTHREADS OFF)
@@ -291,8 +291,8 @@ endif()
 
 # Shared linking flags when supported
 if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
-  set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "-shared")
-  set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "-shared")
+  set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "-shared -Xlinker --shared")
+  set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "-shared -Xlinker --shared")
   set(CMAKE_SHARED_MODULE_LINK_C_FLAGS "-shared")
   set(CMAKE_SHARED_MODULE_LINK_CXX_FLAGS "-shared")
 
@@ -305,21 +305,30 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
 
   # Set dynamic linker path for musl
   if(_musl_loader)
-    list(FIND CMAKE_EXE_LINKER_FLAGS "--unique" _found_musl_lib)
+    list(FIND CMAKE_EXE_LINKER_FLAGS "--unique" _found_uniq_flag)
     if(_found_uniq_flag EQUAL -1)
-      set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Xlinker --unique")
+      set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Xlinker --no-gnu-unique -Xlinker --unique")
     endif()
     list(FIND CMAKE_EXE_LINKER_FLAGS "--dynamic-linker" _found_dyn_link_flag)
     if(_found_dyn_link_flag EQUAL -1)
       set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Xlinker --dynamic-linker=${_musl_loader}")
     endif()
+    list(FIND CMAKE_EXE_LINKER_FLAGS "--pack-dyn-relocs=relr" _found_dyn_reloc_flag)
+    if(_found_dyn_reloc_flag EQUAL -1)
+      set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Xlinker --pack-dyn-relocs=relr")
+    endif()
     list(FIND CMAKE_SHARED_LINKER_FLAGS "--unique" _found_musl_lib2)
     if(_found_uniq_flag2 EQUAL -1)
-      set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Xlinker --unique")
+      set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Xlinker --no-gnu-unique -Xlinker --unique")
     endif()
     list(FIND CMAKE_SHARED_LINKER_FLAGS "--dynamic-linker" _found_dyn_link_flag2)
     if(_found_dyn_link_flag2 EQUAL -1)
       set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Xlinker --dynamic-linker=${_musl_loader}")
+    endif()
+    # musl's dynamic loader supports DT_RELR / SHT_RELR
+    list(FIND CMAKE_SHARED_LINKER_FLAGS "--pack-dyn-relocs=relr" _found_dyn_reloc_flag2)
+    if(_found_dyn_reloc_flag2 EQUAL -1)
+      set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Xlinker --pack-dyn-relocs=relr")
     endif()
   endif()
 
@@ -431,7 +440,8 @@ if(_GENERIC_MUSL_HAVE_CLANG)
     message(STATUS "clang_rt builtins not auto-detected; set -DCLANG_RT_PATH=/path/to/libclang_rt.builtins.a to link it.")
   endif()
   # Check compile definitions usable at configure-time: the user may pass -D_GNU_SOURCE etc.
-  if(CMAKE_C_FLAGS MATCHES "_GNU_SOURCE" OR CMAKE_C_FLAGS MATCHES "_ALL_SOURCE" OR CMAKE_CXX_FLAGS MATCHES "_GNU_SOURCE" OR CMAKE_CXX_FLAGS MATCHES "_ALL_SOURCE")
+  # but not CMAKE_C_FLAGS MATCHES "_ALL_SOURCE"
+  if(CMAKE_C_FLAGS MATCHES "_GNU_SOURCE" OR CMAKE_CXX_FLAGS MATCHES "_GNU_SOURCE")
     set(C_EXTENSIONS ON)
     set(CXX_EXTENSIONS ON)
   endif()
