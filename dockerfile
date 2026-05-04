@@ -1435,7 +1435,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
 # Stage 2: Build libc++abi against libc++ bootstrap0 (abi-bootstrap0)
 # If you still want to build libc++abi in-stage using bootstrap libc++, point to both the sysroot (for libunwind) and the bootstrap libc++ install.
 RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootstrap0 && \
-    /work/run_cmake_build.sh llvm-project/libcxxabi /work/build-libcxxabi-bootstrap0 \
+    /work/run_cmake_build.sh /work/llvm-project/libcxxabi /work/build-libcxxabi-bootstrap0 \
       -G Ninja \
       -DCMAKE_C_COMPILER=${HOST_CC} \
       -DCMAKE_CXX_COMPILER=${HOST_CXX} \
@@ -1464,7 +1464,7 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
 
 # Stage 3: Rebuild libc++ (stage1) linking against libc++abi-bootstrap0
 RUN mkdir -p /work/build-libcxx-stage1 && cd /work/build-libcxx-stage1 \
-    /work/run_cmake_build.sh llvm-project/libcxx /work/build-libcxx-stage1 \
+    /work/run_cmake_build.sh /work/llvm-project/libcxx /work/build-libcxx-stage1 \
       -G Ninja \
       -DCMAKE_C_COMPILER=${HOST_CC} \
       -DCMAKE_CXX_COMPILER=${HOST_CXX} \
@@ -1477,10 +1477,13 @@ RUN mkdir -p /work/build-libcxx-stage1 && cd /work/build-libcxx-stage1 \
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
       -DCMAKE_INSTALL_PREFIX=/opt/libcxx-stage1 \
       -DLIBCXX_ENABLE_SHARED=ON \
-      -DLIBCXX_ABI_VERSION=1 \
+      -DLIBCXX_USE_COMPILER_RT=ON \
+      -DLIBCXX_ENABLE_EXCEPTIONS=ON \
+      -DLIBCXX_ENABLE_RTTI=ON \
       -DLIBCXX_HAS_MUSL_LIBC=ON \
       -DLIBCXX_ENABLE_THREADS=ON \
       -DLIBCXX_HAS_PTHREAD_API=ON \
+      -DLIBCXXABI_USE_LLVM_UNWINDER=NO \
       -DLIBCXX_INCLUDE_BENCHMARKS=OFF \
       -DLIBCXX_HARDENING_MODE=extensive \
       -DCMAKE_PREFIX_PATH=/opt/libcxxabi-bootstrap0;/opt/libcxx-bootstrap0 \
@@ -1496,7 +1499,7 @@ RUN mkdir -p /work/build-libcxx-stage1 && cd /work/build-libcxx-stage1 \
 
 # Stage 4: Rebuild libc++abi against libc++ stage1 (final ABI)
 RUN mkdir -p /work/build-libcxxabi-final && \
-    /work/run_cmake_build.sh llvm-project/libcxxabi /work/build-libcxxabi-final \
+    /work/run_cmake_build.sh /work/llvm-project/libcxxabi /work/build-libcxxabi-final \
       -G Ninja \
       -DCMAKE_C_COMPILER=${HOST_CC} \
       -DCMAKE_CXX_COMPILER=${HOST_CXX} \
@@ -1523,7 +1526,7 @@ RUN mkdir -p /work/build-libcxxabi-final && \
 
 # Stage 5: Final libc++ rebuild against final libc++abi
 RUN mkdir -p /work/build-libcxx-final && \
-    /work/run_cmake_build.sh llvm-project/libcxx /work/build-libcxx-final \
+    /work/run_cmake_build.sh /work/llvm-project/libcxx /work/build-libcxx-final \
       -G Ninja \
       -DCMAKE_C_COMPILER=${HOST_CC} \
       -DCMAKE_CXX_COMPILER=${HOST_CXX} \
