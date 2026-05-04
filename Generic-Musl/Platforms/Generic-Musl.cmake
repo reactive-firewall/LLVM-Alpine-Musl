@@ -293,8 +293,8 @@ endif()
 if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
   set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "-shared -Xlinker --shared")
   set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "-shared -Xlinker --shared")
-  set(CMAKE_SHARED_MODULE_LINK_C_FLAGS "-shared")
-  set(CMAKE_SHARED_MODULE_LINK_CXX_FLAGS "-shared")
+  set(CMAKE_SHARED_MODULE_LINK_C_FLAGS "-shared -Xlinker --shared")
+  set(CMAKE_SHARED_MODULE_LINK_CXX_FLAGS "-shared -Xlinker --shared")
 
   # Prefer LLD where available
   if(LD_LLD OR LLD_LINK OR LLVM_LLD)
@@ -553,6 +553,12 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   set(CMAKE_SHARED_LIBRARY_RPATH_LINK_C_FLAG "-Xlinker --rpath=")
   set(CMAKE_SHARED_LIBRARY_SONAME_C_FLAG "-Xlinker --soname=")
   set(CMAKE_EXE_EXPORTS_C_FLAG "-Xlinker --export-dynamic")
+
+  # Features for LINK_GROUP generator expression
+  ## RESCAN: request the linker to rescan static libraries until there is
+  ## no pending undefined symbols
+  set(CMAKE_LINK_GROUP_USING_RESCAN "LINKER:--start-group" "LINKER:--end-group")
+  set(CMAKE_LINK_GROUP_USING_RESCAN_SUPPORTED TRUE)
 
   # From Musl's own documentation:
   #   Since 1.1.21, musl supports increasing the default thread

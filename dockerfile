@@ -1432,6 +1432,19 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
     python3 ../llvm-project/libcxx/utils/generate_iwyu_mapping.py -o include/c++/v1/libcxx.imp || true ;\
     cmake --install /work/build-libcxx-bootstrap0 ;
 
+# DEBUG Mark 1
+RUN printf "%s\n" "Installed Libraries (for libcxxabi bootstrap phase):" && \
+    ls -1 ${SYSROOT:-/sysroot}/usr/lib/ && ls -1 ${SYSROOT:-/sysroot}/usr/lib/generic/ && \
+    printf "%s\n" "# (bootstraped libs)" && \
+    ls -1 /opt/libcxx-bootstrap0/lib && \
+    printf "\n" && \
+    printf "%s\n" "key headers found:" && \
+    find ${SYSROOT:-/sysroot}/usr/include /opt/libcxx-bootstrap0/include /stage/usr/include /work/build-libcxx-bootstrap0 /work/llvm-project/libcxxabi -type f -iname "typeinfo" -print 2>/dev/null || true ;\
+    find ${SYSROOT:-/sysroot}/usr/include /opt/libcxx-bootstrap0/include /stage/usr/include /work/build-libcxx-bootstrap0 /work/llvm-project/libcxxabi -type f -iname "exception" -print 2>/dev/null || true ;\
+    find ${SYSROOT:-/sysroot}/usr/include /opt/libcxx-bootstrap0/include /stage/usr/include /work/build-libcxx-bootstrap0 /work/llvm-project/libcxxabi -type f -iname "aligned_alloc.h" -print 2>/dev/null || true ;\
+    find ${SYSROOT:-/sysroot}/usr/include /opt/libcxx-bootstrap0/include /stage/usr/include /work/build-libcxx-bootstrap0 /work/llvm-project/libcxxabi -type f -iname "support.h" -print 2>/dev/null || true ;\
+    printf "\n"
+
 # Stage 2: Build libc++abi against libc++ bootstrap0 (abi-bootstrap0)
 # If you still want to build libc++abi in-stage using bootstrap libc++, point to both the sysroot (for libunwind) and the bootstrap libc++ install.
 RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootstrap0 && \

@@ -6,6 +6,9 @@ include_guard()
 
 macro(__musl_linker_clang lang)
     set(CMAKE_${lang}_COMPILE_OPTIONS_VISIBILITY "-fvisibility=")
+    # linker selection
+    set(CMAKE_${lang}_USING_LINKER_SYSTEM "")
+    set(CMAKE_${lang}_USING_LINKER_LLD "-fuse-ld=lld")
 
     # Features for LINK_LIBRARY generator expression
     ## WHOLE_ARCHIVE: Force loading all members of an archive
