@@ -1448,6 +1448,7 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
       -DCMAKE_INSTALL_PREFIX=/opt/libcxxabi-bootstrap0 \
       -DLIBCXXABI_LIBCXX_PATH=/opt/libcxx-bootstrap0 \
+      -DLIBCXXABI_LIBUNWIND_INCLUDES=${SYS_INCLUDE} \
       -DLIBCXXABI_ENABLE_SHARED=ON \
       -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
       -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
@@ -1459,6 +1460,7 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DCMAKE_PREFIX_PATH=/opt/libcxx-bootstrap0 \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -I/opt/libcxx-bootstrap0/include -I${SYS_INCLUDE}" \
+      -DLIBCXXABI_LINK_FLAGS="-v ${LDFLAGS} -Xlinker --verbose" \
       -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/opt/libcxx-bootstrap0/lib" \
       -DLLVM_ENABLE_RUNTIMES= \
       -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
