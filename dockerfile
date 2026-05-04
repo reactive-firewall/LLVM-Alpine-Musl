@@ -549,7 +549,7 @@ ENV MUSL_PREFIX="/usr"
 
 # may need -Wl,--sysroot=/sysroot
 # may want to play around with -Wl,--allow-shlib-undefined to allow __eh_* undefs (see ehframe.ld)
-ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/sysroot/lib/${MUSL_LDLIB} -fuse-ld=lld -unwindlib=none"
+ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/sysroot/lib/${MUSL_LDLIB} -fuse-ld=lld --unwindlib=none"
 # does NOT require -D__linux__
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT:-/sysroot}/usr/include"
 ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
@@ -657,7 +657,7 @@ ENV MUSL_PREFIX="/usr"
 
 # may need -Xlinker --sysroot=/sysroot OR -Xlinker --dynamic-linker=/lib/libc.so
 # may need to play around with -Wl,--allow-shlib-undefined to allow __eh_* undefs
-# may want -unwindlib=none when building libunwind
+# may want --unwindlib=none when building libunwind
 # may want -Xlinker --exclude-libs=libgcc_s.so.1
 ENV LDFLAGS="-Xlinker --sysroot=/sysroot -Xlinker -L -Xlinker /sysroot/usr/lib -Xlinker -L -Xlinker /sysroot/lib -Xlinker -L -Xlinker /sysroot/usr/lib/generic -Xlinker --unique -Xlinker --dynamic-linker=/sysroot/lib/${MUSL_LDLIB} -fuse-ld=lld -Xlinker --script=/bootstrap/ehframe.ld"
 # may require -D__linux__
@@ -800,7 +800,7 @@ ENV LDFLAGS="-v -fuse-ld=lld -Xlinker --sysroot=/sysroot -Xlinker -L -Xlinker /s
 # Does NOT require -D__ELF__
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -I${SYSROOT:-/sysroot}/usr/include"
 # might need -nostdinc++
-ENV CXXFLAGS="-ffunction-sections -fdata-sections -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
+ENV CXXFLAGS="-ffunction-sections -fdata-sections --unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/mach-o && \
@@ -993,7 +993,7 @@ ENV LDFLAGS="-v -Xlinker --sysroot=/sysroot -Xlinker -L -Xlinker /sysroot/usr/li
 # Does NOT require -D__ELF__
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -iwithsysroot /usr/include"
 # might need -nostdinc++
-ENV CXXFLAGS="-iwithsysroot /usr/include/c++/v1 -ffunction-sections -fdata-sections -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
+ENV CXXFLAGS="-iwithsysroot /usr/include/c++/v1 -ffunction-sections -fdata-sections --unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/mach-o && \
@@ -1140,7 +1140,7 @@ RUN mkdir -p build-libcxx-config && \
 WORKDIR /bootstrap/llvmorg
 
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot /headers -iwithsysroot /usr/include/c++/v1 -iwithsysroot /usr/include"
-ENV CXXFLAGS="-unwindlib=/sysroot/usr/lib/libunwind.so.1.0 -cxx-isystem /headers/usr/include/c++/v1"
+ENV CXXFLAGS="--unwindlib=/sysroot/usr/lib/libunwind.so.1.0 -cxx-isystem /headers/usr/include/c++/v1"
 
 # Install libcxxabi headers too (ABI types required by libc++ headers)
 RUN mkdir -p build-libcxxabi-config && \
@@ -1363,8 +1363,8 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 RUN chmod +x /work/run_cmake_build.sh
 
 # Create helper dirs
-RUN mkdir -p /opt/libcxx-stage1 /opt/libcxxabi-final /opt/libcxx-final /work/builds ;\
-    cp -pfr ${SYSROOT:-/sysroot} /opt/libcxx-bootstrap0 ;\
+RUN mkdir -p /opt/libcxx-stage1 /opt/libcxxabi-final /opt/libcxx-final /work/builds && \
+    cp -pfr ${SYSROOT:-/sysroot} /opt/libcxx-bootstrap0 && \
     cp -pfr ${SYSROOT:-/sysroot} /opt/libcxxabi-bootstrap0 ;
 
 ENV HOST_CC=${CC}
@@ -1374,17 +1374,17 @@ ENV HOST_LD=lld
 # may need -Xlinker --sysroot=/sysroot
 # may want linker flag -Xlinker --nostdlib to prevent linking to any std c++
 # may want to link -Xlinker -l${LLVM_RTLIB_STUB}
-ENV LDFLAGS="-v -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/lib -Xlinker -L -Xlinker ${SYS_LIB}/generic -Xlinker -l${LLVM_RTLIB_STUB} -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB}"
+ENV LDFLAGS="-Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/lib -Xlinker -L -Xlinker ${SYS_LIB}/generic -Xlinker -l${LLVM_RTLIB_STUB} -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB}"
 # Does NOT require -D__ELF__
-ENV CFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT:-/sysroot}/usr/include"
+ENV CFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -Xlinker --pic-veneer -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT:-/sysroot}/usr/include"
 # might need -nostdinc++
-ENV CXXFLAGS="-ffunction-sections -fdata-sections -unwindlib=${SYSROOT:-/sysroot}/usr/lib/libunwind.so.1.0"
+ENV CXXFLAGS="-ffunction-sections -fdata-sections --unwindlib=${SYSROOT:-/sysroot}/usr/lib/libunwind.so.1.0"
 
-RUN "${HOST_CC}" $CFLAGS $LDFLAGS -Qunused-arguments -x c -c /work/__stack_chk_fail_local.c -o /work/__stack_chk_fail_local.o && \
+RUN "${HOST_CC}" $CFLAGS $LDFLAGS -fuse-ld=lld -Qunused-arguments -x c -c /work/__stack_chk_fail_local.c -o /work/__stack_chk_fail_local.o && \
     llvm-ar --format=bsd rcs ${SYSROOT:-/sysroot}/usr/lib/generic/libssp_nonshared.a /work/__stack_chk_fail_local.o && \
     ln -svf generic/libssp_nonshared.a ${SYSROOT:-/sysroot}/usr/lib/libssp_nonshared.a
 
-RUN "${HOST_CXX}" $CFLAGS $CXXFLAGS $LDFLAGS -fuse-ld=lld -Qunused-arguments -x c++ -fno-rtti -fno-exceptions -c /work/bootstrap_cxa_stubs.cpp -o /work/bootstrap_cxa_stubs.o && \
+RUN "${HOST_CXX}" $CFLAGS $CXXFLAGS $LDFLAGS -fuse-ld=lld -Xlinker --relocatable -Qunused-arguments -x c++ -fno-rtti -fno-exceptions -c /work/bootstrap_cxa_stubs.cpp -o /work/bootstrap_cxa_stubs.o && \
     llvm-ar --format=bsd rcs /work/libbootstrap_cxa.a /work/bootstrap_cxa_stubs.o
 
 # may want to play with LIBCXX_TARGET_SUBDIR
@@ -1447,19 +1447,22 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
       -DCMAKE_INSTALL_PREFIX=/opt/libcxxabi-bootstrap0 \
-      -DLIBCXXABI_LIBCXX_PATH=/opt/libcxx-bootstrap0 \
-      -DLIBCXXABI_LIBUNWIND_INCLUDES=${SYS_INCLUDE} \
+      -DLIBCXXABI_LIBCXX_PATH=/work/build-libcxx-bootstrap0 \
+      -DLIBCXXABI_LIBCXX_LIBRARY_PATH=/opt/libcxx-bootstrap0/lib \
       -DLIBCXXABI_ENABLE_SHARED=ON \
       -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
       -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
+      -DLIBCXXABI_LIBUNWIND_INCLUDES=/stage/usr/include \
+      -DLIBCXXABI_LIBUNWIND_LIBRARY=${SYSROOT:-/sysroot}/usr/lib/libunwind.so.1.0 \
       -DLIBCXXABI_USE_COMPILER_RT=ON \
       -DLIBCXXABI_ENABLE_THREADS=ON \
       -DLIBCXXABI_HAS_PTHREAD_LIB=ON \
+      -DLIBCXXABI_HAS_C_LIB=ON \
       -DLIBCXXABI_HAS_CXA_THREAD_ATEXIT_IMPL=FALSE \
       -DLIBCXXABI_HAS_GCC_S_LIB=NO \
       -DCMAKE_PREFIX_PATH=/opt/libcxx-bootstrap0 \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_CXX_FLAGS="${CXXFLAGS} -isystem /opt/libcxx-bootstrap0/include/c++/v1 ${CFLAGS} -Qunused-arguments -I/opt/libcxx-bootstrap0/include -I${SYS_INCLUDE}" \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -I/opt/libcxx-bootstrap0/include -I${SYS_INCLUDE}" \
       -DLIBCXXABI_LINK_FLAGS="-v ${LDFLAGS} -Xlinker --verbose" \
       -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/opt/libcxx-bootstrap0/lib" \
       -DLLVM_ENABLE_RUNTIMES= \
@@ -1631,7 +1634,7 @@ ENV MUSL_PREFIX="/usr"
 
 ENV LDFLAGS="-v -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic"
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -iwithsysroot /usr/include"
-ENV CXXFLAGS="-cxx-isystem /sysroot/usr/include/c++/v1 -unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
+ENV CXXFLAGS="-cxx-isystem /sysroot/usr/include/c++/v1 --unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/mach-o && \
