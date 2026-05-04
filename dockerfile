@@ -1447,7 +1447,7 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
       -DCMAKE_INSTALL_PREFIX=/opt/libcxxabi-bootstrap0 \
-      -DLIBCXXABI_LIBCXX_PATH=/work/build-libcxx-bootstrap0 \
+      -DLIBCXXABI_LIBCXX_PATH=/opt/libcxx-bootstrap0 \
       -DLIBCXXABI_ENABLE_SHARED=ON \
       -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
       -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
