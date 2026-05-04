@@ -1429,8 +1429,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
       -DLIBCXX_INCLUDE_TESTS=OFF && \
-    cd /work/build-libcxx-bootstrap0 && \
-    python3 ../llvm-project/libcxx/libcxx/utils/generate_iwyu_mapping.py -o include/c++/v1/libcxx.imp || true ;\
+    python3 ../llvm-project/libcxx/utils/generate_iwyu_mapping.py -o include/c++/v1/libcxx.imp || true ;\
     cmake --install /work/build-libcxx-bootstrap0 ;
 
 # Stage 2: Build libc++abi against libc++ bootstrap0 (abi-bootstrap0)
@@ -1492,7 +1491,7 @@ RUN mkdir -p /work/build-libcxx-stage1 && cd /work/build-libcxx-stage1 \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -I/opt/libcxx-bootstrap0/include -I/opt/libcxxabi-bootstrap0/include -I${SYS_INCLUDE}" \
       -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /opt/libcxxabi-bootstrap0/lib -Xlinker -L -Xlinker /opt/libcxx-bootstrap0/lib -L${SYS_LIB} -Xlinker --rpath=/opt/libcxxabi-bootstrap0/lib:/opt/libcxx-stage1/lib" && \
     cd /work/build-libcxx-stage1 && \
-    python3 ../llvm-project/libcxx/libcxx/utils/generate_iwyu_mapping.py -o include/c++/v1/libcxx.imp || true ;\
+    python3 ../llvm-project/libcxx/utils/generate_iwyu_mapping.py -o include/c++/v1/libcxx.imp || true ;\
     cmake --install /work/build-libcxx-stage1 ;
 
 # Stage 4: Rebuild libc++abi against libc++ stage1 (final ABI)
@@ -1550,6 +1549,7 @@ RUN mkdir -p /work/build-libcxx-final && \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -I/opt/libcxx-stage1/include -I/opt/libcxxabi-final/include -I${SYS_INCLUDE}" \
       -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /opt/libcxxabi-final/lib -Xlinker -L -Xlinker /opt/libcxx-stage1/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/opt/libcxxabi-final/lib:/opt/libcxx-final/lib" && \
+    python3 ../llvm-project/libcxx/utils/generate_iwyu_mapping.py -o include/c++/v1/libcxx.imp || true ;\
     cmake --install /work/build-libcxx-final ;
 
 # Build test program and link against final libs
