@@ -1233,6 +1233,9 @@ COPY --from=fetcher /fetch/libcxxrt/src /sysroot/usr/include/c++/v1/cxxabi
 COPY --from=build-unwind /stage /stage
 COPY --from=build-libcxxrt /sysroot /stage-cxxrt
 
+# Copy dummy cxx-headers shim into image
+COPY shims/cxx-headers.c /work/cxx-headers.c
+
 # Copy custom Generic-Musl.cmake into the image build context before building the image
 COPY Generic-Musl/Platforms/Generic-Musl.cmake /tmp/Generic-Musl.cmake
 COPY Generic-Musl/Platforms/Generic-Musl-Libcxxrt.cmake /tmp/Generic-Musl-Libcxxrt.cmake
@@ -1433,14 +1436,14 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
     cmake --install /work/build-libcxx-bootstrap0 ;
 
 # WORKAROUND https://github.com/llvm/llvm-project/issues/116088
-RUN clang -fPIC -fuse-ld=lld -Qunused-arguments -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB:-ld-musl-generic.so} -c cxx-headers.c -o cxx-headers.o && \
-clang -shared cxx-headers.o -o libcxx-headers.so \
-    -fuse-ld=lld -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB:-ld-musl-generic.so} \
-    -Xlinker --nostdlib -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/lib -Xlinker --soname=libcxx-headers.so \
-    -Xlinker --auxiliary=libc++.so \
-    -Xlinker --auxiliary=libc.so \
-    -Xlinker --no-gnu-unique -Xlinker --unique \
-    -Xlinker -z -Xlinker relo -Xlinker -z -Xlinker now && \
+RUN clang -ffunction-sections -fdata-sections -fPIC -fuse-ld=lld -Qunused-arguments -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB:-ld-musl-generic.so} -c /work/cxx-headers.c -o /work/cxx-headers.o && \
+    clang -shared /work/cxx-headers.o -o /work/libcxx-headers.so \
+      -fuse-ld=lld -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB:-ld-musl-generic.so} \
+      -Xlinker --nostdlib -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/lib -Xlinker --soname=libcxx-headers.so \
+      -Xlinker --auxiliary=libc++.so \
+      -Xlinker --auxiliary=libc.so \
+      -Xlinker --no-gnu-unique -Xlinker --unique \
+      -Xlinker -z -Xlinker relo -Xlinker -z -Xlinker now && \
     install -m 0755 /opt/libcxx-bootstrap0/lib/libcxx-headers.so /opt/libcxx-bootstrap0/lib/libcxx-headers.so
 
 # DEBUG Mark 1 (find stuff needed by stage 2)
