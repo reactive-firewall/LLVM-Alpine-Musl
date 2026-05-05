@@ -1443,7 +1443,7 @@ RUN clang -ffunction-sections -fdata-sections -fPIC -fuse-ld=lld -Qunused-argume
       -Xlinker --auxiliary=libc++.so \
       -Xlinker --auxiliary=libc.so \
       -Xlinker --no-gnu-unique -Xlinker --unique \
-      -Xlinker -z -Xlinker relo -Xlinker -z -Xlinker now && \
+      -Xlinker -z -Xlinker relro -Xlinker -z -Xlinker now && \
     install -m 0755 /opt/libcxx-bootstrap0/lib/libcxx-headers.so /opt/libcxx-bootstrap0/lib/libcxx-headers.so
 
 # DEBUG Mark 1 (find stuff needed by stage 2)
