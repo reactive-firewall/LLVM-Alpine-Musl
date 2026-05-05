@@ -1444,7 +1444,7 @@ RUN clang -ffunction-sections -fdata-sections -fPIC -fuse-ld=lld -Qunused-argume
       -Xlinker --auxiliary=libc.so \
       -Xlinker --no-gnu-unique -Xlinker --unique \
       -Xlinker -z -Xlinker relro -Xlinker -z -Xlinker now && \
-    install -m 0755 /opt/libcxx-bootstrap0/lib/libcxx-headers.so /opt/libcxx-bootstrap0/lib/libcxx-headers.so
+    install -m 0755 /work/libcxx-headers.so /opt/libcxx-bootstrap0/lib/libcxx-headers.so
 
 # DEBUG Mark 1 (find stuff needed by stage 2)
 # RUN printf "%s\n" "Installed Libraries (for libcxxabi bootstrap phase):" && \
