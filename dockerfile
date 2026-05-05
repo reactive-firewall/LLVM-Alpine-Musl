@@ -1472,10 +1472,11 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DLIBCXXABI_HAS_PTHREAD_LIB=ON \
       -DLIBCXXABI_HAS_C_LIB=ON \
       -DLIBCXXABI_HAS_CXA_THREAD_ATEXIT_IMPL=FALSE \
+      -DLIBCXXABI_HAS_GCC_LIB=NO \
       -DLIBCXXABI_HAS_GCC_S_LIB=NO \
       -DCMAKE_PREFIX_PATH=/opt/libcxx-bootstrap0 \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_CXX_FLAGS="${CXXFLAGS} -I/work/llvm-project/libcxx/src ${CFLAGS} -Qunused-arguments -I/opt/libcxx-bootstrap0/include -I${SYS_INCLUDE}" \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} -I/opt/libcxx-bootstrap0/include/c++/v1 -I/work/llvm-project/libcxx/src ${CFLAGS} -Qunused-arguments -I/opt/libcxx-bootstrap0/include -I${SYS_INCLUDE}" \
       -DLIBCXXABI_LINK_FLAGS="-v ${LDFLAGS} -Xlinker --verbose" \
       -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/opt/libcxx-bootstrap0/lib" \
       -DLLVM_ENABLE_RUNTIMES= \
@@ -1534,6 +1535,9 @@ RUN mkdir -p /work/build-libcxxabi-final && \
       -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
       -DCMAKE_INSTALL_PREFIX=/opt/libcxxabi-final \
+      -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
+      -DLIBCXXABI_LIBUNWIND_INCLUDES=/stage/usr/include \
+      -DLIBCXXABI_LIBUNWIND_LIBRARY=${SYSROOT:-/sysroot}/usr/lib/libunwind.so.1.0 \
       -DLIBCXXABI_ENABLE_SHARED=ON \
       -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
       -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
