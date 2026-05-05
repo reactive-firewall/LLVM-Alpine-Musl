@@ -1441,7 +1441,7 @@ RUN printf "%s\n" "Installed Libraries (for libcxxabi bootstrap phase):" && \
     printf "%s\n" "key headers found:" && \
     find ${SYSROOT:-/sysroot}/usr/include /opt/libcxx-bootstrap0/include /stage/usr/include /work/build-libcxx-bootstrap0 /work/llvm-project/libcxxabi -type f -iname "typeinfo" -print 2>/dev/null || true ;\
     find ${SYSROOT:-/sysroot}/usr/include /opt/libcxx-bootstrap0/include /stage/usr/include /work/build-libcxx-bootstrap0 /work/llvm-project/libcxxabi -type f -iname "exception" -print 2>/dev/null || true ;\
-    find ${SYSROOT:-/sysroot}/usr/include /opt/libcxx-bootstrap0/include /stage/usr/include /work/build-libcxx-bootstrap0 /work/llvm-project/libcxxabi -type f -iname "aligned_alloc.h" -print 2>/dev/null || true ;\
+    find ${SYSROOT:-/sysroot}/usr/include /opt/libcxx-bootstrap0/include /stage/usr/include /work/build-libcxx-bootstrap0 /work/llvm-project/libcxxabi /work/llvm-project/libcxx -type f -iname "aligned_alloc.h" -print 2>/dev/null || true ;\
     find ${SYSROOT:-/sysroot}/usr/include /opt/libcxx-bootstrap0/include /stage/usr/include /work/build-libcxx-bootstrap0 /work/llvm-project/libcxxabi -type f -iname "support.h" -print 2>/dev/null || true ;\
     printf "\n"
 
