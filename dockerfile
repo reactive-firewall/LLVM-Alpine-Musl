@@ -1448,9 +1448,9 @@ RUN "${CC}" -ffunction-sections -fdata-sections -fPIC -fuse-ld=lld -Qunused-argu
       -Xlinker --rpath=/opt/libcxx-bootstrap0/lib \
       -Xlinker -z -Xlinker relro -Xlinker -z -Xlinker now && \
     if command -v llvm-strip >/dev/null 2>&1; then \
-         llvm-strip --strip-unneeded libcxxrt/lib/libcxxrt.so || true; \
+         llvm-strip --strip-unneeded /work/libcxx-headers.so || true; \
       else \
-         strip --strip-unneeded libcxxrt/lib/libcxxrt.so || true; \
+         strip --strip-unneeded /work/libcxx-headers.so || true; \
       fi ; \
     install -m 0755 /work/libcxx-headers.so /opt/libcxx-bootstrap0/usr/lib/libcxx-headers.so && \
     file /opt/libcxx-bootstrap0/usr/lib/libcxx-headers.so && \
@@ -1471,6 +1471,7 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
       -DCMAKE_INSTALL_PREFIX=/opt/libcxxabi-bootstrap0 \
+      -DCMAKE_INSTALL_RPATH=/opt/libcxxabi-bootstrap0/lib \
       -DLIBCXXABI_LIBCXX_PATH=/work/build-libcxx-bootstrap0 \
       -DLIBCXXABI_LIBCXX_LIBRARY_PATH=/opt/libcxx-bootstrap0/lib \
       -DLIBCXXABI_LIBCXX_LIBRARY=/opt/libcxx-bootstrap0/lib/libc++.so \
@@ -1490,7 +1491,7 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DCMAKE_PREFIX_PATH=/opt/libcxx-bootstrap0 \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} -I/opt/libcxx-bootstrap0/include/c++/v1 -I/work/llvm-project/libcxx/src ${CFLAGS} -Qunused-arguments -I/opt/libcxx-bootstrap0/include -I${SYS_INCLUDE}" \
-      -DLIBCXXABI_LINK_FLAGS="--fuse-ld=lld -v ${LDFLAGS} -Xlinker /opt/libcxx-bootstrap0/lib -Xlinker --verbose" \
+      -DLIBCXXABI_LINK_FLAGS="-fuse-ld=lld -v -Xlinker -v ${LDFLAGS} -Xlinker -L -Xlinker /opt/libcxx-bootstrap0/lib -Xlinker --verbose" \
       -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/opt/libcxx-bootstrap0/lib" \
       -DLLVM_ENABLE_RUNTIMES= \
       -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
