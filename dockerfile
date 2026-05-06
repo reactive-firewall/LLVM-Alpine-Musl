@@ -1443,6 +1443,7 @@ RUN clang -ffunction-sections -fdata-sections -fPIC -fuse-ld=lld -Qunused-argume
       -Xlinker --auxiliary=libc++.so \
       -Xlinker --auxiliary=libc.so \
       -Xlinker --no-gnu-unique -Xlinker --unique \
+      -Xlinker --rpath=/opt/libcxx-bootstrap0/lib \
       -Xlinker -z -Xlinker relro -Xlinker -z -Xlinker now && \
     install -m 0755 /work/libcxx-headers.so /opt/libcxx-bootstrap0/lib/libcxx-headers.so && \
     file /opt/libcxx-bootstrap0/lib/libcxx-headers.so
@@ -1477,6 +1478,8 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DCMAKE_INSTALL_PREFIX=/opt/libcxxabi-bootstrap0 \
       -DLIBCXXABI_LIBCXX_PATH=/work/build-libcxx-bootstrap0 \
       -DLIBCXXABI_LIBCXX_LIBRARY_PATH=/opt/libcxx-bootstrap0/lib \
+      -DLIBCXXABI_LIBCXX_LIBRARY=/opt/libcxx-bootstrap0/lib/libc++.so \
+      -DLIBCXXABI_LIBCXX_INCLUDES=/opt/libcxx-bootstrap0/include/c++/v1 \
       -DLIBCXXABI_ENABLE_SHARED=ON \
       -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
       -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
