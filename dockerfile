@@ -1340,6 +1340,8 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:lld \
     cmd:llvm-ar \
     cmd:llvm-ranlib \
+    cmd:llvm-strip \
+    cmd:llvm-objdump \
     file \
     cmd:find
 
@@ -1436,8 +1438,8 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
     cmake --install /work/build-libcxx-bootstrap0 ;
 
 # WORKAROUND https://github.com/llvm/llvm-project/issues/116088
-RUN clang -ffunction-sections -fdata-sections -fPIC -fuse-ld=lld -Qunused-arguments -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB:-ld-musl-generic.so} -c /work/cxx-headers.c -o /work/cxx-headers.o && \
-    clang -shared -Xlinker --shared /work/cxx-headers.o -o /work/libcxx-headers.so \
+RUN "${CC}" -ffunction-sections -fdata-sections -fPIC -fuse-ld=lld -Qunused-arguments -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB:-ld-musl-generic.so} -c /work/cxx-headers.c -o /work/cxx-headers.o && \
+    "${CC}" -shared -Xlinker --shared /work/cxx-headers.o -o /work/libcxx-headers.so \
       -fuse-ld=lld -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB:-ld-musl-generic.so} \
       -Xlinker --nostdlib -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/lib -Xlinker --soname=libcxx-headers.so \
       -Xlinker --auxiliary=libc++.so \
@@ -1445,21 +1447,14 @@ RUN clang -ffunction-sections -fdata-sections -fPIC -fuse-ld=lld -Qunused-argume
       -Xlinker --no-gnu-unique -Xlinker --unique \
       -Xlinker --rpath=/opt/libcxx-bootstrap0/lib \
       -Xlinker -z -Xlinker relro -Xlinker -z -Xlinker now && \
-    install -m 0755 /work/libcxx-headers.so /opt/libcxx-bootstrap0/lib/libcxx-headers.so && \
-    file /opt/libcxx-bootstrap0/lib/libcxx-headers.so
-
-# DEBUG Mark 1 (find stuff needed by stage 2)
-# RUN printf "%s\n" "Installed Libraries (for libcxxabi bootstrap phase):" && \
-#     ls -1 ${SYSROOT:-/sysroot}/usr/lib/ && ls -1 ${SYSROOT:-/sysroot}/usr/lib/generic/ && \
-#     printf "%s\n" "# (bootstraped libs)" && \
-#     ls -1 /opt/libcxx-bootstrap0/lib && \
-#     printf "\n" && \
-#     printf "%s\n" "key headers found:" && \
-#     find ${SYSROOT:-/sysroot}/usr/include /opt/libcxx-bootstrap0/include /stage/usr/include /work/build-libcxx-bootstrap0 /work/llvm-project/libcxxabi -type f -iname "typeinfo" -print 2>/dev/null || true ;\
-#     find ${SYSROOT:-/sysroot}/usr/include /opt/libcxx-bootstrap0/include /stage/usr/include /work/build-libcxx-bootstrap0 /work/llvm-project/libcxxabi -type f -iname "exception" -print 2>/dev/null || true ;\
-#     find ${SYSROOT:-/sysroot}/usr/include /opt/libcxx-bootstrap0/include /stage/usr/include /work/build-libcxx-bootstrap0 /work/llvm-project/libcxxabi /work/llvm-project/libcxx -type f -iname "aligned_alloc.h" -print 2>/dev/null || true ;\
-#     find ${SYSROOT:-/sysroot}/usr/include /opt/libcxx-bootstrap0/include /stage/usr/include /work/build-libcxx-bootstrap0 /work/llvm-project/libcxxabi -type f -iname "support.h" -print 2>/dev/null || true ;\
-#     printf "\n"
+    if command -v llvm-strip >/dev/null 2>&1; then \
+         llvm-strip --strip-unneeded libcxxrt/lib/libcxxrt.so || true; \
+      else \
+         strip --strip-unneeded libcxxrt/lib/libcxxrt.so || true; \
+      fi ; \
+    install -m 0755 /work/libcxx-headers.so /opt/libcxx-bootstrap0/usr/lib/libcxx-headers.so && \
+    file /opt/libcxx-bootstrap0/usr/lib/libcxx-headers.so && \
+    llvm-objdump -harp /opt/libcxx-bootstrap0/usr/lib/libcxx-headers.so
 
 # Stage 2: Build libc++abi against libc++ bootstrap0 (abi-bootstrap0)
 # If you still want to build libc++abi in-stage using bootstrap libc++, point to both the sysroot (for libunwind) and the bootstrap libc++ install.
@@ -1495,7 +1490,8 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DCMAKE_PREFIX_PATH=/opt/libcxx-bootstrap0 \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} -I/opt/libcxx-bootstrap0/include/c++/v1 -I/work/llvm-project/libcxx/src ${CFLAGS} -Qunused-arguments -I/opt/libcxx-bootstrap0/include -I${SYS_INCLUDE}" \
-      -DLIBCXXABI_LINK_FLAGS="--fuse-ld=lld -v ${LDFLAGS} -Xlinker --verbose -Xlinker -L -Xlinker /opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/opt/libcxx-bootstrap0/lib" \
+      -DLIBCXXABI_LINK_FLAGS="--fuse-ld=lld -v ${LDFLAGS} -Xlinker /opt/libcxx-bootstrap0/lib -Xlinker --verbose" \
+      -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/opt/libcxx-bootstrap0/lib" \
       -DLLVM_ENABLE_RUNTIMES= \
       -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
