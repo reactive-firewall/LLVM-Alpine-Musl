@@ -1491,8 +1491,7 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DCMAKE_PREFIX_PATH=/opt/libcxx-bootstrap0 \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} -I/opt/libcxx-bootstrap0/include/c++/v1 -I/work/llvm-project/libcxx/src ${CFLAGS} -Qunused-arguments -I/opt/libcxx-bootstrap0/include -I${SYS_INCLUDE}" \
-      -DLIBCXXABI_LINK_FLAGS="-v ${LDFLAGS} -Xlinker --verbose" \
-      -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/opt/libcxx-bootstrap0/lib" \
+      -DLIBCXXABI_LINK_FLAGS="--fuse-ld=lld -v ${LDFLAGS} -Xlinker --verbose -Xlinker -L -Xlinker /opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/opt/libcxx-bootstrap0/lib" \
       -DLLVM_ENABLE_RUNTIMES= \
       -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
