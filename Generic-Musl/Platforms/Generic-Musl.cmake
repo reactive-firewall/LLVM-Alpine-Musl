@@ -272,12 +272,8 @@ find_program(LLD_LINK lld)  # generic lld
 # set(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS OFF)
 if(_musl_loader)
   if(LD_LLD OR LD_CLANG OR LLD_LINK OR LLVM_LLD)
-    set(_CMAKE_SYSTEM_LINKER_TYPE LLD CACHE INTERNAL "System linker type")
+    set(CMAKE_SYSTEM_LINKER_TYPE LLD CACHE INTERNAL "System linker type")
     set(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS ON CACHE BOOL "Should the flag -shared be used" FORCE)
-    set(CMAKE_C_LINKER_WRAPPER_FLAG "-Xlinker" " ")
-    if(NOT DEFINED CMAKE_CXX_LINKER_WRAPPER_FLAG)
-      set(CMAKE_CXX_LINKER_WRAPPER_FLAG "-Xlinker" " ")
-    endif()
   else()
     if(NOT DEFINED CMAKE_LINKER)
       set(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS OFF CACHE BOOL "Should the flag -shared be used")
@@ -285,22 +281,29 @@ if(_musl_loader)
       set(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS ON CACHE BOOL "Should the flag -shared be used")
     endif()
   endif()
+  set(CMAKE_C_LINKER_WRAPPER_FLAG "-Xlinker" " ")
+  set(CMAKE_CXX_LINKER_WRAPPER_FLAG "-Xlinker" " ")
 else()
   set(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS OFF CACHE BOOL "Should the flag -shared be used")
 endif()
 
 # Shared linking flags when supported
 if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
-  set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "-shared -Xlinker --shared")
-  set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "-shared -Xlinker --shared")
-  set(CMAKE_SHARED_MODULE_LINK_C_FLAGS "-shared -Xlinker --shared")
-  set(CMAKE_SHARED_MODULE_LINK_CXX_FLAGS "-shared -Xlinker --shared")
+  set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "-Xlinker --shared")
+  set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "-Xlinker --shared")
+  set(CMAKE_SHARED_MODULE_LINK_C_FLAGS "-Xlinker --shared")
+  set(CMAKE_SHARED_MODULE_LINK_CXX_FLAGS "-Xlinker --shared")
 
   # Prefer LLD where available
   if(LD_LLD OR LLD_LINK OR LLVM_LLD)
     set(_use_lld ON)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
+    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fuse-ld=lld")
+  endif()
+
+  if (NOT DEFINED CMAKE_SHARED_LINKER_FLAGS_INIT)
+    set(CMAKE_SHARED_LINKER_FLAGS_INIT "")
   endif()
 
   # Set dynamic linker path for musl
@@ -317,18 +320,18 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
     if(_found_dyn_reloc_flag EQUAL -1)
       set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Xlinker --pack-dyn-relocs=relr")
     endif()
-    list(FIND CMAKE_SHARED_LINKER_FLAGS "--unique" _found_musl_lib2)
+    list(FIND CMAKE_SHARED_LINKER_FLAGS_INIT "--unique" _found_musl_lib2)
     if(_found_uniq_flag2 EQUAL -1)
-      set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Xlinker --no-gnu-unique -Xlinker --unique")
+      set(CMAKE_SHARED_LINKER_FLAGS_INIT "${CMAKE_SHARED_LINKER_FLAGS_INIT} -Xlinker --no-gnu-unique -Xlinker --unique")
     endif()
-    list(FIND CMAKE_SHARED_LINKER_FLAGS "--dynamic-linker" _found_dyn_link_flag2)
+    list(FIND CMAKE_SHARED_LINKER_FLAGS_INIT "--dynamic-linker" _found_dyn_link_flag2)
     if(_found_dyn_link_flag2 EQUAL -1)
-      set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Xlinker --dynamic-linker=${_musl_loader}")
+      set(CMAKE_SHARED_LINKER_FLAGS_INIT "${CMAKE_SHARED_LINKER_FLAGS_INIT} -Xlinker --dynamic-linker=${_musl_loader}")
     endif()
     # musl's dynamic loader supports DT_RELR / SHT_RELR
-    list(FIND CMAKE_SHARED_LINKER_FLAGS "--pack-dyn-relocs=relr" _found_dyn_reloc_flag2)
+    list(FIND CMAKE_SHARED_LINKER_FLAGS_INIT "--pack-dyn-relocs=relr" _found_dyn_reloc_flag2)
     if(_found_dyn_reloc_flag2 EQUAL -1)
-      set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Xlinker --pack-dyn-relocs=relr")
+      set(CMAKE_SHARED_LINKER_FLAGS_INIT "${CMAKE_SHARED_LINKER_FLAGS_INIT} -Xlinker --pack-dyn-relocs=relr")
     endif()
   endif()
 
@@ -338,6 +341,9 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
 
   # Conservative security flags
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Xlinker -z -Xlinker relro -Xlinker -z -Xlinker now")
+  if (NOT DEFINED CMAKE_SHARED_LINKER_FLAGS)
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS_INIT}")
+  endif()
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Xlinker -z -Xlinker relro -Xlinker -z -Xlinker now")
 else()
   # Ensure shared lib variables don't advertise support
@@ -539,20 +545,25 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
     set(CMAKE_SHARED_LIBRARY_C_FLAGS "${CMAKE_SHARED_LIBRARY_C_FLAGS} -fseparate-named-sections -fPIC")
   endif()
   set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS "-shared")       # -shared
+  set(CMAKE_SHARED_MODULE_CREATE_C_FLAGS "-shared")       # -shared
   if(NOT DEFINED CMAKE_SHARED_LIBRARY_LINK_C_FLAGS)
     message(STATUS "Detected dynamic linker id: ${CMAKE_LINKER}")
     set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")         # +s, flag for exe link to use shared lib
   endif()
 
   # Not sure if rpaths are used by musl (ld-musl-ARCH.so.1 is hardcoded when linking to musl)
-  set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "-Xlinker --rpath=")       # -rpath
-  # probably works like FreeBSD
-  set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG_SEP ":")   # : or empty
   # Not sure about '-z' (including '-z origin') with musl linker
   set(CMAKE_SHARED_LIBRARY_RPATH_ORIGIN_TOKEN "\$ORIGIN")
-  set(CMAKE_SHARED_LIBRARY_RPATH_LINK_C_FLAG "-Xlinker --rpath=")
-  set(CMAKE_SHARED_LIBRARY_SONAME_C_FLAG "-Xlinker --soname=")
-  set(CMAKE_EXE_EXPORTS_C_FLAG "-Xlinker --export-dynamic")
+  foreach(lang C CXX)
+    foreach(type SHARED_LIBRARY SHARED_MODULE EXE)
+      set(CMAKE_${type}_RUNTIME_${lang}_FLAG "-Xlinker --enable-new-dtags -Xlinker --rpath=")
+      set(CMAKE_${type}_RPATH_LINK_${lang}_FLAG "-Xlinker --disable-new-dtags -Xlinker --rpath=")
+      # probably works like FreeBSD
+      set(CMAKE_${type}_RUNTIME_${lang}_FLAG_SEP ":")   # : or empty
+      set(CMAKE_${type}_SONAME_${lang}_FLAG "-Xlinker --soname=")
+      set(CMAKE_${type}_EXPORTS_${lang}_FLAG "-Xlinker --export-dynamic")
+    endforeach()
+  endforeach()
 
   # Features for LINK_GROUP generator expression
   ## RESCAN: request the linker to rescan static libraries until there is
@@ -589,7 +600,6 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   set(CMAKE_SHARED_LIBRARY_RUNTIME_CXX_FLAG_SEP "${CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG_SEP}")   # : or empty
   set(CMAKE_SHARED_LIBRARY_RPATH_LINK_CXX_FLAG "${CMAKE_SHARED_LIBRARY_RPATH_LINK_C_FLAG}")
   set(CMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG "${CMAKE_SHARED_LIBRARY_SONAME_C_FLAG}")
-  set(CMAKE_EXE_EXPORTS_CXX_FLAG "${CMAKE_EXE_EXPORTS_C_FLAG}")
 
   include(Platform/Linker/Generic-Musl-Linker)
   if(_GENERIC_MUSL_HAVE_CLANG)

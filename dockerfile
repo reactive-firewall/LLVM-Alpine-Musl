@@ -1087,7 +1087,7 @@ RUN mkdir -pv /headers && \
             touch -d "${SOME_DATE_EPOCH}" /headers/${MUSL_SDK_FILE_ARTIFACT} || true ; \
           fi ; \
     done ;\
-    find /headers/usr/include -maxdepth 1 -type f -iname "*.h" -exec sh -c 'for f; do ln -svf "$f" /headers/usr/include/$(basename "$f"); done' _ {} + || true;
+    find ${SYSROOT:-/sysroot}/usr/include -maxdepth 1 -type f -iname "*.h" -exec sh -c 'for f; do ln -svf "$f" /headers/usr/include/$(basename "$f"); done' _ {} + || true;
 
 # WORKAROUND: cmake still thinks that clang++ requires g++
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
@@ -1150,18 +1150,22 @@ RUN mkdir -p build-libcxxabi-config && \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
       -DCMAKE_INSTALL_PREFIX=/headers/usr \
+      -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
       -DLIBCXXABI_INSTALL_HEADERS=ON \
       -DLIBCXXABI_ENABLE_SHARED=OFF \
       -DLIBCXXABI_ENABLE_STATIC=ON \
       -DLIBCXXABI_INSTALL_INCLUDE_TARGET_DIR=include/c++/v1 \
       -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
       -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
+      -DLIBCXXABI_LIBUNWIND_INCLUDES=${SYSROOT:-/sysroot}/usr/include \
       -DLIBCXXABI_USE_COMPILER_RT=ON \
       -DLIBCXXABI_ENABLE_THREADS=ON \
       -DLIBCXXABI_HAS_PTHREAD_LIB=ON \
       -DLIBCXXABI_HAS_CXA_THREAD_ATEXIT_IMPL=FALSE \
+      -DLIBCXXABI_INCLUDE_BENCHMARKS=OFF \
       -DLIBCXXABI_HAS_GCC_S_LIB=NO \
       -DLIBCXXABI_LIBCXX_PATH="/bootstrap/llvmorg/libcxx" \
+      -DLIBCXXABI_LIBCXX_LIBRARY_PATH=/bootstrap/llvmorg/build-libcxx-config/lib \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
@@ -1368,9 +1372,9 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 RUN chmod +x /work/run_cmake_build.sh
 
 # Create helper dirs
-RUN mkdir -p /opt/libcxx-stage1 /opt/libcxxabi-final /opt/libcxx-final /work/builds && \
-    cp -pfr ${SYSROOT:-/sysroot} /opt/libcxx-bootstrap0 && \
-    cp -pfr ${SYSROOT:-/sysroot} /opt/libcxxabi-bootstrap0 ;
+RUN mkdir -p /work/builds/opt/libcxx-stage1 /work/builds/opt/libcxxabi-final /work/builds/opt/libcxx-final /work/builds && \
+    cp -pfr ${SYSROOT:-/sysroot} /work/builds/opt/libcxx-bootstrap0 && \
+    cp -pfr ${SYSROOT:-/sysroot} /work/builds/opt/libcxxabi-bootstrap0 ;
 
 ENV HOST_CC=${CC}
 ENV HOST_CXX=clang++
@@ -1405,9 +1409,11 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
       -DCMAKE_SYSTEM_NAME=Generic-Musl-Libcxxrt \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DLLVM_DEFAULT_TARGET_TRIPLE=${HOST_TRIPLE} \
       -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
-      -DCMAKE_INSTALL_PREFIX=/opt/libcxx-bootstrap0 \
+      -DCMAKE_INSTALL_PREFIX=/work/builds/opt/libcxx-bootstrap0 \
       -DLIBCXX_ENABLE_SHARED=ON \
       -DLIBCXX_USE_COMPILER_RT=ON \
       -DLIBCXX_ENABLE_EXCEPTIONS=ON \
@@ -1427,8 +1433,8 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
       -DLIBCXX_LINK_FLAGS="-v ${LDFLAGS} -Xlinker --verbose" \
-      -DCMAKE_EXE_LINKER_FLAGS="-Xlinker --whole-archive -Xlinker /work/libbootstrap_cxa.a -Xlinker --no-whole-archive -Xlinker --rpath=/opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath-link=${SYS_LIB}" \
-      -DCMAKE_INSTALL_RPATH=/opt/libcxx-bootstrap0/lib \
+      -DCMAKE_EXE_LINKER_FLAGS="-Xlinker --whole-archive -Xlinker /work/libbootstrap_cxa.a -Xlinker --no-whole-archive -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath-link=${SYS_LIB}" \
+      -DCMAKE_INSTALL_RPATH=/work/builds/opt/libcxx-bootstrap0/lib \
       -DLLVM_ENABLE_RUNTIMES= \
       -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
@@ -1440,21 +1446,21 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
 # WORKAROUND https://github.com/llvm/llvm-project/issues/116088
 RUN "${CC}" -ffunction-sections -fdata-sections -fPIC -fuse-ld=lld -Qunused-arguments -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB:-ld-musl-generic.so} -c /work/cxx-headers.c -o /work/cxx-headers.o && \
     "${CC}" -shared -Xlinker --shared /work/cxx-headers.o -o /work/libcxx-headers.so \
-      -fuse-ld=lld -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB:-ld-musl-generic.so} \
+      -fuse-ld=lld -Xlinker --hash-style=both -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB:-ld-musl-generic.so} \
       -Xlinker --nostdlib -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/lib -Xlinker --soname=libcxx-headers.so \
       -Xlinker --auxiliary=libc++.so \
       -Xlinker --auxiliary=libc.so \
       -Xlinker --no-gnu-unique -Xlinker --unique \
-      -Xlinker --rpath=/opt/libcxx-bootstrap0/lib \
+      -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap0/lib \
       -Xlinker -z -Xlinker relro -Xlinker -z -Xlinker now && \
     if command -v llvm-strip >/dev/null 2>&1; then \
          llvm-strip --strip-unneeded /work/libcxx-headers.so || true; \
       else \
          strip --strip-unneeded /work/libcxx-headers.so || true; \
       fi ; \
-    install -m 0755 /work/libcxx-headers.so /opt/libcxx-bootstrap0/usr/lib/libcxx-headers.so && \
-    file /opt/libcxx-bootstrap0/usr/lib/libcxx-headers.so && \
-    llvm-objdump -harp /opt/libcxx-bootstrap0/usr/lib/libcxx-headers.so
+    install -m 0755 /work/libcxx-headers.so /work/builds/opt/libcxx-bootstrap0/usr/lib/libcxx-headers.so && \
+    file /work/builds/opt/libcxx-bootstrap0/usr/lib/libcxx-headers.so && \
+    llvm-objdump -harp /work/builds/opt/libcxx-bootstrap0/usr/lib/libcxx-headers.so
 
 # Stage 2: Build libc++abi against libc++ bootstrap0 (abi-bootstrap0)
 # If you still want to build libc++abi in-stage using bootstrap libc++, point to both the sysroot (for libunwind) and the bootstrap libc++ install.
@@ -1470,33 +1476,32 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
       -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
-      -DCMAKE_INSTALL_PREFIX=/opt/libcxxabi-bootstrap0 \
-      -DCMAKE_INSTALL_RPATH=/opt/libcxxabi-bootstrap0/lib \
+      -DCMAKE_INSTALL_PREFIX=/work/builds/opt/libcxxabi-bootstrap0 \
+      -DCMAKE_INSTALL_RPATH=/work/builds/opt/libcxxabi-bootstrap0/lib \
       -DLIBCXXABI_LIBCXX_PATH=/work/build-libcxx-bootstrap0 \
-      -DLIBCXXABI_LIBCXX_LIBRARY_PATH=/opt/libcxx-bootstrap0/lib \
-      -DLIBCXXABI_LIBCXX_LIBRARY=/opt/libcxx-bootstrap0/lib/libc++.so \
-      -DLIBCXXABI_LIBCXX_INCLUDES=/opt/libcxx-bootstrap0/include/c++/v1 \
+      -DLIBCXXABI_LIBCXX_LIBRARY_PATH=/work/builds/opt/libcxx-bootstrap0/lib \
       -DLIBCXXABI_ENABLE_SHARED=ON \
       -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
       -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
-      -DLIBCXXABI_LIBUNWIND_INCLUDES=/stage/usr/include \
-      -DLIBCXXABI_LIBUNWIND_LIBRARY=${SYSROOT:-/sysroot}/usr/lib/libunwind.so.1.0 \
+      -DLIBCXXABI_LIBUNWIND_INCLUDES=${SYSROOT:-/sysroot}/usr/include \
       -DLIBCXXABI_USE_COMPILER_RT=ON \
       -DLIBCXXABI_ENABLE_THREADS=ON \
       -DLIBCXXABI_HAS_PTHREAD_LIB=ON \
       -DLIBCXXABI_HAS_C_LIB=ON \
+      -DLIBCXXABI_BAREMETAL=ON \
       -DLIBCXXABI_HAS_CXA_THREAD_ATEXIT_IMPL=FALSE \
-      -DLIBCXXABI_HAS_GCC_LIB=NO \
+      -DLIBCXXABI_INCLUDE_BENCHMARKS=OFF \
       -DLIBCXXABI_HAS_GCC_S_LIB=NO \
-      -DCMAKE_PREFIX_PATH=/opt/libcxx-bootstrap0 \
+      -DCMAKE_PREFIX_PATH=/work/builds/opt/libcxx-bootstrap0 \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_CXX_FLAGS="${CXXFLAGS} -I/opt/libcxx-bootstrap0/include/c++/v1 -I/work/llvm-project/libcxx/src ${CFLAGS} -Qunused-arguments -I/opt/libcxx-bootstrap0/include -I${SYS_INCLUDE} -v -fuse-ld=lld -v -Xlinker -v" \
-      -DLIBCXXABI_LINK_FLAGS="-v -fuse-ld=lld -v -Xlinker -v ${LDFLAGS} -Xlinker -L -Xlinker /opt/libcxx-bootstrap0/lib -Xlinker --verbose" \
-      -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/opt/libcxx-bootstrap0/lib" \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -fuse-ld=lld" \
+      -DLIBCXXABI_COMPILE_FLAGS="-I/work/builds/opt/libcxx-bootstrap0/include/c++/v1 -I/work/llvm-project/libcxx/src -I/work/builds/opt/libcxx-bootstrap0/include -I${SYS_INCLUDE} -fuse-ld=lld -v" \
+      -DLIBCXXABI_LINK_FLAGS="-fuse-ld=lld -v -Xlinker --nostdlib ${LDFLAGS} -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker --verbose -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap0/lib" \
+      -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap0/lib" \
       -DLLVM_ENABLE_RUNTIMES= \
-      -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+      -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
       -DLIBCXXABI_INCLUDE_TESTS=OFF && \
     cmake --install /work/build-libcxxabi-bootstrap0 ;
 
@@ -1513,7 +1518,7 @@ RUN mkdir -p /work/build-libcxx-stage1 && cd /work/build-libcxx-stage1 \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
-      -DCMAKE_INSTALL_PREFIX=/opt/libcxx-stage1 \
+      -DCMAKE_INSTALL_PREFIX=/work/builds/opt/libcxx-stage1 \
       -DLIBCXX_ENABLE_SHARED=ON \
       -DLIBCXX_USE_COMPILER_RT=ON \
       -DLIBCXX_ENABLE_EXCEPTIONS=ON \
@@ -1524,13 +1529,13 @@ RUN mkdir -p /work/build-libcxx-stage1 && cd /work/build-libcxx-stage1 \
       -DLIBCXXABI_USE_LLVM_UNWINDER=NO \
       -DLIBCXX_INCLUDE_BENCHMARKS=OFF \
       -DLIBCXX_HARDENING_MODE=extensive \
-      -DCMAKE_PREFIX_PATH=/opt/libcxxabi-bootstrap0;/opt/libcxx-bootstrap0 \
+      -DCMAKE_PREFIX_PATH=/work/builds/opt/libcxxabi-bootstrap0;/work/builds/opt/libcxx-bootstrap0 \
       -DLIBCXX_CXX_ABI=libcxxabi \
-      -DLIBCXX_CXX_ABI_LIBRARY_PATH=/opt/libcxxabi-bootstrap0/lib \
-      -DLIBCXX_CXX_ABI_INCLUDE_PATHS=/opt/libcxxabi-bootstrap0/include \
+      -DLIBCXX_CXX_ABI_LIBRARY_PATH=/work/builds/opt/libcxxabi-bootstrap0/lib \
+      -DLIBCXX_CXX_ABI_INCLUDE_PATHS=/work/builds/opt/libcxxabi-bootstrap0/include \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -I/opt/libcxx-bootstrap0/include -I/opt/libcxxabi-bootstrap0/include -I${SYS_INCLUDE}" \
-      -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /opt/libcxxabi-bootstrap0/lib -Xlinker -L -Xlinker /opt/libcxx-bootstrap0/lib -L${SYS_LIB} -Xlinker --rpath=/opt/libcxxabi-bootstrap0/lib:/opt/libcxx-stage1/lib" && \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -I/work/builds/opt/libcxx-bootstrap0/include -I/work/builds/opt/libcxxabi-bootstrap0/include -I${SYS_INCLUDE}" \
+      -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /work/builds/opt/libcxxabi-bootstrap0/lib -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -L${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxxabi-bootstrap0/lib:/work/builds/opt/libcxx-stage1/lib" && \
     cd /work/build-libcxx-stage1 && \
     python3 ../llvm-project/libcxx/utils/generate_iwyu_mapping.py -o include/c++/v1/libcxx.imp || true ;\
     cmake --install /work/build-libcxx-stage1 ;
@@ -1548,7 +1553,7 @@ RUN mkdir -p /work/build-libcxxabi-final && \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
-      -DCMAKE_INSTALL_PREFIX=/opt/libcxxabi-final \
+      -DCMAKE_INSTALL_PREFIX=/work/builds/opt/libcxxabi-final \
       -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
       -DLIBCXXABI_LIBUNWIND_INCLUDES=/stage/usr/include \
       -DLIBCXXABI_LIBUNWIND_LIBRARY=${SYSROOT:-/sysroot}/usr/lib/libunwind.so.1.0 \
@@ -1559,10 +1564,10 @@ RUN mkdir -p /work/build-libcxxabi-final && \
       -DLIBCXXABI_HAS_PTHREAD_LIB=ON \
       -DLIBCXXABI_HAS_CXA_THREAD_ATEXIT_IMPL=FALSE \
       -DLIBCXXABI_HAS_GCC_S_LIB=NO \
-      -DCMAKE_PREFIX_PATH=/opt/libcxx-stage1 \
+      -DCMAKE_PREFIX_PATH=/work/builds/opt/libcxx-stage1 \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -I/opt/libcxx-stage1/include -I${SYS_INCLUDE}" \
-      -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /opt/libcxx-stage1/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/opt/libcxx-stage1/lib" && \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -I/work/builds/opt/libcxx-stage1/include -I${SYS_INCLUDE}" \
+      -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /work/builds/opt/libcxx-stage1/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-stage1/lib" && \
     cmake --install /work/build-libcxxabi-final ;
 
 # Stage 5: Final libc++ rebuild against final libc++abi
@@ -1578,7 +1583,7 @@ RUN mkdir -p /work/build-libcxx-final && \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
-      -DCMAKE_INSTALL_PREFIX=/opt/libcxx-final \
+      -DCMAKE_INSTALL_PREFIX=/work/builds/opt/libcxx-final \
       -DLIBCXX_ENABLE_SHARED=ON \
       -DLIBCXX_ABI_VERSION=1 \
       -DLIBCXX_HAS_MUSL_LIBC=ON \
@@ -1586,20 +1591,20 @@ RUN mkdir -p /work/build-libcxx-final && \
       -DLIBCXX_HAS_PTHREAD_API=ON \
       -DLIBCXX_INCLUDE_BENCHMARKS=OFF \
       -DLIBCXX_HARDENING_MODE=extensive \
-      -DCMAKE_PREFIX_PATH=/opt/libcxxabi-final;/opt/libcxx-stage1 \
+      -DCMAKE_PREFIX_PATH=/work/builds/opt/libcxxabi-final;/work/builds/opt/libcxx-stage1 \
       -DLIBCXX_CXX_ABI=libcxxabi \
-      -DLIBCXX_CXX_ABI_LIBRARY_PATH=/opt/libcxxabi-final/lib \
-      -DLIBCXX_CXX_ABI_INCLUDE_PATHS=/opt/libcxxabi-final/include \
+      -DLIBCXX_CXX_ABI_LIBRARY_PATH=/work/builds/opt/libcxxabi-final/lib \
+      -DLIBCXX_CXX_ABI_INCLUDE_PATHS=/work/builds/opt/libcxxabi-final/include \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -I/opt/libcxx-stage1/include -I/opt/libcxxabi-final/include -I${SYS_INCLUDE}" \
-      -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /opt/libcxxabi-final/lib -Xlinker -L -Xlinker /opt/libcxx-stage1/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/opt/libcxxabi-final/lib:/opt/libcxx-final/lib" && \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -I/work/builds/opt/libcxx-stage1/include -I/work/builds/opt/libcxxabi-final/include -I${SYS_INCLUDE}" \
+      -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /work/builds/opt/libcxxabi-final/lib -Xlinker -L -Xlinker /work/builds/opt/libcxx-stage1/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxxabi-final/lib:/work/builds/opt/libcxx-final/lib" && \
     python3 ../llvm-project/libcxx/utils/generate_iwyu_mapping.py -o include/c++/v1/libcxx.imp || true ;\
     cmake --install /work/build-libcxx-final ;
 
 # Build test program and link against final libs
 RUN ${HOST_CXX} -std=c++17 /work/test_exception.cpp -o /work/test_exception \
-    -L/opt/libcxx-final/lib -lc++ -L/opt/libcxxabi-final/lib -lc++abi \
-    -Xlinker --rpath=/opt/libcxxabi-final/lib:/opt/libcxx-final/lib
+    -L/work/builds/opt/libcxx-final/lib -lc++ -L/work/builds/opt/libcxxabi-final/lib -lc++abi \
+    -Xlinker --rpath=/work/builds/opt/libcxxabi-final/lib:/work/builds/opt/libcxx-final/lib
 
 CMD ["/work/test_exception"]
 
@@ -1614,7 +1619,7 @@ COPY --from=sysroot /sysroot /sysroot
 COPY --from=build-unwind /stage /stage
 COPY --from=build-libcxxrt /sysroot /stage-libcxxrt
 COPY --from=libcxxheaders /headers /stage-cxx
-COPY --from=build-libcxx /opt/libcxx-final /stage-cxx-root
+COPY --from=build-libcxx /work/builds/opt/libcxx-final /stage-cxx-root
 
 # Copy custom Generic-Musl.cmake into the image build context before building the image
 COPY Generic-Musl/Platforms/Generic-Musl.cmake /tmp/Generic-Musl.cmake
