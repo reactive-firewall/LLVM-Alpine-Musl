@@ -1473,6 +1473,8 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DLLVM_DEFAULT_TARGET_TRIPLE=${HOST_TRIPLE} \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
       -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
@@ -1494,8 +1496,7 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DLIBCXXABI_HAS_GCC_S_LIB=NO \
       -DCMAKE_PREFIX_PATH=/work/builds/opt/libcxx-bootstrap0 \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_CXX_FLAGS="${CXXFLAGS} -stdlib++-isystem /work/builds/opt/libcxx-bootstrap0/include/c++/v1 -I/work/llvm-project/libcxx/src ${CFLAGS} -Qunused-arguments -I/work/builds/opt/libcxx-bootstrap0/include -I${SYS_INCLUDE} -fuse-ld=lld" \
-      -DLIBCXXABI_ADDITIONAL_COMPILE_FLAGS="-I/work/builds/opt/libcxx-bootstrap0/include/c++/v1;-I/work/llvm-project/libcxx/src;-I/work/builds/opt/libcxx-bootstrap0/include;-I${SYS_INCLUDE};-fuse-ld=lld;-v" \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} -stdlib++-isystem /work/builds/opt/libcxx-bootstrap0/include/c++/v1 -I/work/builds/opt/libcxx-bootstrap0/include/c++/v1 -I/work/llvm-project/libcxx/src -I/work/builds/opt/libcxx-bootstrap0/include ${CFLAGS} -Qunused-arguments -I/work/builds/opt/libcxx-bootstrap0/include -isystem ${SYS_INCLUDE} -fuse-ld=lld" \
       -DCMAKE_LINK_FLAGS="-fuse-ld=lld -v -Xlinker --nostdlib ${LDFLAGS} -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker --verbose -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap0/lib --rpath=${SYSROOT:-/sysroot}/usr/lib" \
       -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap0/lib" \
       -DLLVM_ENABLE_RUNTIMES= \
@@ -1516,6 +1517,8 @@ RUN mkdir -p /work/build-libcxx-stage1 && cd /work/build-libcxx-stage1 \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DLLVM_DEFAULT_TARGET_TRIPLE=${HOST_TRIPLE} \
       -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
       -DCMAKE_INSTALL_PREFIX=/work/builds/opt/libcxx-stage1 \
@@ -1551,6 +1554,8 @@ RUN mkdir -p /work/build-libcxxabi-final && \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DLLVM_DEFAULT_TARGET_TRIPLE=${HOST_TRIPLE} \
       -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
       -DCMAKE_INSTALL_PREFIX=/work/builds/opt/libcxxabi-final \
