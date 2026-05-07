@@ -1506,6 +1506,8 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DLIBCXXABI_INCLUDE_TESTS=OFF && \
     cmake --install /work/build-libcxxabi-bootstrap0 ;
 
+ENV CXXFLAGS="-ffunction-sections -fdata-sections --unwindlib=${SYSROOT:-/sysroot}/usr/lib/libunwind.so.1.0 -stdlib=libc++ -stdlib++-isystem /work/builds/opt/libcxxabi-bootstrap0/include/c++/v1 -stdlib++-isystem /work/builds/opt/libcxx-bootstrap0/include/c++/v1"
+
 # Stage 3: Rebuild libc++ linking against libcxxabi-bootstrap0 (round-trip libc++ bootstrap1)
 RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 && \
     /work/run_cmake_build.sh /work/llvm-project/libcxx /work/build-libcxx-bootstrap1 \
@@ -1539,19 +1541,20 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DLIBCXX_ENABLE_NEW_DELETE_DEFINITIONS=ON \
       -DLIBCXX_INCLUDE_TESTS=OFF \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -stdlib++-isystem /work/builds/opt/libcxx-bootstrap0/include/c++/v1 -stdlib++-isystem /work/builds/opt/libcxxabi-bootstrap0/include/c++/v1" \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} -I/work/builds/opt/libcxxabi-bootstrap0/include/c++/v1 ${CFLAGS} -Qunused-arguments" \
       -DLIBCXX_LINK_FLAGS="-v ${LDFLAGS} -Xlinker --verbose" \
       -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap1/lib -Xlinker --rpath-link=/work/builds/opt/libcxx-bootstrap0/lib -Xlinker --rpath-link=${SYS_LIB}" \
       -DCMAKE_INSTALL_RPATH=/work/builds/opt/libcxx-bootstrap1/lib \
+      -DLLVM_ENABLE_RUNTIMES= \
       -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY && \
+    python3 ../llvm-project/libcxx/utils/generate_iwyu_mapping.py -o include/c++/v1/libcxx.imp || true ;\
     cmake --install /work/build-libcxx-bootstrap1 && \
     find /work/builds/opt/libcxx-bootstrap1 -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true ;
 
 # stage-install into sysroot so next libcxxabi round uses it
-RUN cp -a /work/builds/opt/libcxx-bootstrap1/lib/* ${SYSROOT:-/sysroot}/usr/lib/ || true && \
-    cp -a /work/builds/opt/libcxx-bootstrap1/include/c++/v1/* ${SYSROOT:-/sysroot}/usr/include/c++/v1/ || true
+ENV CXXFLAGS="-ffunction-sections -fdata-sections --unwindlib=${SYSROOT:-/sysroot}/usr/lib/libunwind.so.1.0 -stdlib=libc++ -stdlib++-isystem /work/builds/opt/libcxx-bootstrap1/include/c++/v1"
 
 # --- Stage 4: Build final libcxxabi using round-tripped libc++ (libcxxabi-final) ---
 RUN mkdir -p /work/build-libcxxabi-final && cd /work/build-libcxxabi-final && \
@@ -1594,6 +1597,8 @@ RUN mkdir -p /work/build-libcxxabi-final && cd /work/build-libcxxabi-final && \
   find /work/builds/opt/libcxxabi-final -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true ;
 
 # install final libcxxabi into sysroot (overlays)
+ENV CXXFLAGS="-ffunction-sections -fdata-sections --unwindlib=${SYSROOT:-/sysroot}/usr/lib/libunwind.so.1.0 -stdlib=libc++ -stdlib++-isystem /work/builds/opt/libcxxabi-final/include/c++/v1 -stdlib++-isystem /work/builds/opt/libcxx-bootstrap1/include/c++/v1"
+
 RUN cp -a /work/builds/opt/libcxxabi-final/lib/* ${SYSROOT:-/sysroot}/usr/lib/ || true && \
     cp -a /work/builds/opt/libcxxabi-final/include/* ${SYSROOT:-/sysroot}/usr/include/ || true
 
