@@ -1539,7 +1539,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DLIBCXX_ENABLE_NEW_DELETE_DEFINITIONS=ON \
       -DLIBCXX_INCLUDE_TESTS=OFF \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -stdlib++-isystem /work/builds/opt/libcxx-bootstrap0/include/c++/v1" \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -stdlib++-isystem /work/builds/opt/libcxx-bootstrap0/include/c++/v1 -stdlib++-isystem /work/builds/opt/libcxxabi-bootstrap0/include/c++/v1" \
       -DLIBCXX_LINK_FLAGS="-v ${LDFLAGS} -Xlinker --verbose" \
       -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap1/lib -Xlinker --rpath-link=/work/builds/opt/libcxx-bootstrap0/lib -Xlinker --rpath-link=${SYS_LIB}" \
       -DCMAKE_INSTALL_RPATH=/work/builds/opt/libcxx-bootstrap1/lib \
