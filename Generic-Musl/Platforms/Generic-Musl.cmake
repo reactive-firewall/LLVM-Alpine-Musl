@@ -338,6 +338,7 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
   # From Musl's own documentation:
   #   It is recommended that distributions build GCC with multilib disabled,
   #   and use library directories named lib.
+  # -fPIC -Xlinker --pic-veneer -Xlinker -z -Xlinker relro -Xlinker -z -Xlinker now
 
   # Conservative security flags
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Xlinker -z -Xlinker relro -Xlinker -z -Xlinker now")
