@@ -1483,7 +1483,7 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DLIBCXXABI_ENABLE_SHARED=ON \
       -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
       -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
-      -DLIBCXXABI_LIBUNWIND_INCLUDES=${SYSROOT:-/sysroot}/usr/include \
+      -DLIBCXXABI_LIBUNWIND_INCLUDES=/stage/usr/include \
       -DLIBCXXABI_USE_COMPILER_RT=ON \
       -DLIBCXXABI_ENABLE_THREADS=ON \
       -DLIBCXXABI_HAS_PTHREAD_LIB=ON \
@@ -1494,9 +1494,9 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DLIBCXXABI_HAS_GCC_S_LIB=NO \
       -DCMAKE_PREFIX_PATH=/work/builds/opt/libcxx-bootstrap0 \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments -fuse-ld=lld" \
-      -DLIBCXXABI_ADDITIONAL_COMPILE_FLAGS="-stdlib++-isystem /work/builds/opt/libcxx-bootstrap0/include/c++/v1 -I/work/llvm-project/libcxx/src -I/work/builds/opt/libcxx-bootstrap0/include -I${SYS_INCLUDE} -fuse-ld=lld -v" \
-      -DLIBCXXABI_LINK_FLAGS="-fuse-ld=lld -v -Xlinker --nostdlib ${LDFLAGS} -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker --verbose -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap0/lib" \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} -stdlib++-isystem /work/builds/opt/libcxx-bootstrap0/include/c++/v1 -I/work/llvm-project/libcxx/src ${CFLAGS} -Qunused-arguments -I/work/builds/opt/libcxx-bootstrap0/include -I${SYS_INCLUDE} -fuse-ld=lld" \
+      -DLIBCXXABI_ADDITIONAL_COMPILE_FLAGS="-I/work/builds/opt/libcxx-bootstrap0/include/c++/v1 -I/work/llvm-project/libcxx/src -I/work/builds/opt/libcxx-bootstrap0/include -I${SYS_INCLUDE} -fuse-ld=lld -v" \
+      -DLIBCXXABI_LINK_FLAGS="-fuse-ld=lld -v -Xlinker --nostdlib ${LDFLAGS} -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker --verbose -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap0/lib --rpath=${SYSROOT:-/sysroot}/usr/lib" \
       -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap0/lib" \
       -DLLVM_ENABLE_RUNTIMES= \
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
