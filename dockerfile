@@ -1451,16 +1451,16 @@ RUN "${CC}" -ffunction-sections -fdata-sections -fPIC -fuse-ld=lld -Qunused-argu
       -Xlinker --auxiliary=libc++.so \
       -Xlinker --auxiliary=libc.so \
       -Xlinker --no-gnu-unique -Xlinker --unique \
-      -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap0/lib \
+      -Xlinker --rpath=${SYSROOT:-/sysroot}/usr/lib \
       -Xlinker -z -Xlinker relro -Xlinker -z -Xlinker now && \
     if command -v llvm-strip >/dev/null 2>&1; then \
          llvm-strip --strip-unneeded /work/libcxx-headers.so || true; \
       else \
          strip --strip-unneeded /work/libcxx-headers.so || true; \
       fi ; \
-    install -m 0755 /work/libcxx-headers.so /work/builds/opt/libcxx-bootstrap0/usr/lib/libcxx-headers.so && \
-    file /work/builds/opt/libcxx-bootstrap0/usr/lib/libcxx-headers.so && \
-    llvm-objdump -harp /work/builds/opt/libcxx-bootstrap0/usr/lib/libcxx-headers.so
+    install -m 0755 /work/libcxx-headers.so ${SYSROOT:-/sysroot}/usr/lib/libcxx-headers.so && \
+    file ${SYSROOT:-/sysroot}/usr/lib/libcxx-headers.so && \
+    llvm-objdump -harp ${SYSROOT:-/sysroot}/usr/lib/libcxx-headers.so | grep -iFe "AUXILIARY" ;
 
 # Stage 2: Build libc++abi against libc++ bootstrap0 (abi-bootstrap0)
 # If you still want to build libc++abi in-stage using bootstrap libc++, point to both the sysroot (for libunwind) and the bootstrap libc++ install.
