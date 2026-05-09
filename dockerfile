@@ -1249,7 +1249,6 @@ COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cma
 # Copy helper scripts and sources into the image
 # (Ensure these files exist next to the Dockerfile when building)
 COPY payloads/bin/run_cmake_build.sh /work/run_cmake_build.sh
-COPY payloads/bin/arm_diagnostic_script.sh /work/arm_diagnostic_script.sh
 COPY shims/bootstrap_cxa_stubs.cpp /work/bootstrap_cxa_stubs.cpp
 COPY shims/__stack_chk_fail_local.c /work/__stack_chk_fail_local.c
 COPY payloads/tests/test_exception.cpp /work/test_exception.cpp
@@ -1372,7 +1371,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:g++
 # but we remove it anyway afterwards
 
-RUN chmod +x /work/run_cmake_build.sh && chmod +x /work/arm_diagnostic_script.sh
+RUN chmod +x /work/run_cmake_build.sh
 
 # Create helper dirs
 RUN mkdir -p /work/builds/opt/libcxx-bootstrap1 /work/builds/opt/libcxxabi-final /work/builds/opt/libcxx-final /work/builds && \
@@ -1503,16 +1502,45 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DCMAKE_PREFIX_PATH=/work/builds/opt/libcxx-bootstrap0 \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} -stdlib++-isystem /work/builds/opt/libcxx-bootstrap0/include/c++/v1 -I/work/builds/opt/libcxx-bootstrap0/include/c++/v1 -I/work/llvm-project/libcxx/src -I/work/builds/opt/libcxx-bootstrap0/include ${CFLAGS} -Qunused-arguments -I/work/builds/opt/libcxx-bootstrap0/include -isystem ${SYS_INCLUDE} -fuse-ld=lld" \
-      -DCMAKE_LINK_FLAGS="-rtlib=compiler-rt ${CXX_UNWINDER_FLAGS} -fno-math-errno -fPIC -fuse-ld=lld -v -Xlinker --nostdlib ${LDFLAGS} -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker --verbose -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap0/lib --rpath=${SYSROOT:-/sysroot}/usr/lib" \
-      -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap0/lib" \
+      -DCMAKE_LINK_FLAGS="-rtlib=compiler-rt $CXX_UNWINDER_FLAGS -fno-math-errno -fPIC -fuse-ld=lld -v -Xlinker --nostdlib ${LDFLAGS} -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker --verbose -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap0/lib --rpath=${SYSROOT:-/sysroot}/usr/lib:/work/builds/opt/libcxx-bootstrap0/lib" \
+      -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxxabi-bootstrap0/lib:/work/builds/opt/libcxx-bootstrap0/lib:${SYS_LIB}" \
       -DLLVM_ENABLE_RUNTIMES= \
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
       -DLIBCXXABI_INCLUDE_TESTS=OFF && \
-    cmake --install /work/build-libcxxabi-bootstrap0 || OBJ_PATH="/work/build-libcxxabi-bootstrap0/src/CMakeFiles/cxxabi_shared_objects.dir/cxa_exception.cpp.o" BUILD_DIR="/work/build-libcxxabi-bootstrap0" /work/arm_diagnostic_script.sh;
+    cmake --install /work/build-libcxxabi-bootstrap0
 
-ENV CXXFLAGS="-ffunction-sections -fdata-sections --unwindlib=${SYSROOT:-/sysroot}/usr/lib/libunwind.so.1.0 -stdlib=libc++ -stdlib++-isystem /work/builds/opt/libcxxabi-bootstrap0/include/c++/v1 -stdlib++-isystem /work/builds/opt/libcxx-bootstrap0/include/c++/v1"
+# DEBUG missing stuff
+RUN ls -lap /work/builds/opt/libcxx-bootstrap0/lib && \
+    for SOME_LIB_NAME in "libc++" "libc++experimental" "libc++abi" ; do \
+      for SOME_SUFFIX in ".so" ".so.1" ".so.1.0" ; do \
+        if [ -f "/work/builds/opt/libcxx-bootstrap0/lib/${LIB_NAME}${SOME_SUFFIX:-}" ] ; then \
+          if command -v llvm-strip >/dev/null 2>&1; then \
+             llvm-strip --strip-unneeded "/work/builds/opt/libcxx-bootstrap0/lib/${LIB_NAME}${SOME_SUFFIX:-}" || true; \
+          else \
+             strip --strip-unneeded "/work/builds/opt/libcxx-bootstrap0/lib/${LIB_NAME}${SOME_SUFFIX:-}" || true; \
+          fi ; \
+        fi ; \
+        if [ -f "/work/builds/opt/libcxxabi-bootstrap0/lib/${LIB_NAME}${SOME_SUFFIX:-}" ] ; then \
+          if command -v llvm-strip >/dev/null 2>&1; then \
+             llvm-strip --strip-unneeded "/work/builds/opt/libcxxabi-bootstrap0/lib/${LIB_NAME}${SOME_SUFFIX:-}" || true; \
+          else \
+             strip --strip-unneeded "/work/builds/opt/libcxxabi-bootstrap0/lib/${LIB_NAME}${SOME_SUFFIX:-}" || true; \
+          fi ; \
+        fi ; \
+      done ;\
+      for SOME_SUFFIX in ".a" ".so" ".so.1" ".so.1.0" ; do \
+        if [ -f "/work/builds/opt/libcxx-bootstrap0/lib/${LIB_NAME}${SOME_SUFFIX:-}" ] ; then \
+          file "/work/builds/opt/libcxx-bootstrap0/lib/${LIB_NAME}${SOME_SUFFIX:-}" || true; \
+        fi ; \
+        if [ -f "/work/builds/opt/libcxxabi-bootstrap0/lib/${LIB_NAME}${SOME_SUFFIX:-}" ] ; then \
+          file "/work/builds/opt/libcxxabi-bootstrap0/lib/${LIB_NAME}${SOME_SUFFIX:-}" || true; \
+        fi ; \
+      done ;\
+    done ;
+
+ENV CXXFLAGS="-ffunction-sections -fdata-sections --unwindlib=${SYSROOT:-/sysroot}/usr/lib/libunwind.so.1.0 -stdlib=libc++ -stdlib++-isystem /work/builds/opt/libcxx-bootstrap1/include/c++/v1"
 
 # Stage 3: Rebuild libc++ linking against libcxxabi-bootstrap0 (round-trip libc++ bootstrap1)
 RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 && \
@@ -1543,7 +1571,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DLIBCXX_ABI_VERSION=1 \
       -DLIBCXX_CXX_ABI=libcxxabi \
       -DLIBCXX_CXX_ABI_LIBRARY_PATH=/work/builds/opt/libcxxabi-bootstrap0/lib \
-      -DLIBCXX_CXX_ABI_INCLUDE_PATHS="/work/builds/opt/libcxxabi-bootstrap0/include /${SYS_INCLUDE}/c++/v1/cxxabi" \
+      -DLIBCXX_CXX_ABI_INCLUDE_PATHS="/work/builds/opt/libcxxabi-bootstrap0/include/c++/v1" \
       -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=OFF \
       -DLIBCXX_ENABLE_NEW_DELETE_DEFINITIONS=ON \
       -DLIBCXX_INCLUDE_TESTS=OFF \
