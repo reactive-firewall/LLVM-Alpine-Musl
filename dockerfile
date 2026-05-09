@@ -1294,9 +1294,10 @@ ARG SOME_DATE_EPOCH
 ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
 
 ENV SYSROOT=/sysroot
-ENV SYS_LIB=${SYSROOT:-/sysroot}/usr/lib
-ENV SYS_INCLUDE=${SYSROOT:-/sysroot}/usr/include
 ENV MUSL_PREFIX="/usr"
+ENV SYS_LIB=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib
+ENV SYS_INCLUDE=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/include
+
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/mach-o && \
@@ -1315,8 +1316,8 @@ RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/mach-o && \
 
 # Ensure unwind has canonical name (example: /usr/lib/libunwind.so -> /usr/lib/libunwind.so.1.0)
 RUN set -eux \
-    && ln -fns libunwind.so.1.0 ${SYSROOT:-/sysroot}/lib/libunwind.so.1 && \
-    ln -fns libunwind.so.1 ${SYSROOT:-/sysroot}/lib/libunwind.so
+    && ln -fns libunwind.so.1.0 ${SYS_LIB}/libunwind.so.1 && \
+    ln -fns libunwind.so.1 ${SYS_LIB}/libunwind.so
 
 # overlay the libcxxrt
 RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi && \
@@ -1387,18 +1388,18 @@ ENV HOST_LD=lld
 # may want to link -Xlinker -l${LLVM_RTLIB_STUB}
 ENV LDFLAGS="-v -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/lib -Xlinker -L -Xlinker ${SYS_LIB}/generic -Xlinker -l${LLVM_RTLIB_STUB} -Xlinker --exclude-libs=libgcc_s.so.1 -Xlinker --exclude-libs=libgcc_s.so -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB}"
 # Does NOT require -D__ELF__
-ENV CFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -Xlinker --pic-veneer -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT:-/sysroot}/usr/include"
+ENV CFLAGS="--no-default-config --target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -Xlinker --pic-veneer -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT:-/sysroot}/usr/include"
 # might need -nostdinc++
-ENV CXXFLAGS="-ffunction-sections -fdata-sections --unwindlib=${SYSROOT:-/sysroot}/usr/lib/libunwind.so.1.0"
+ENV CXXFLAGS="-ffunction-sections -fdata-sections --unwindlib=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib/libunwind.so.1.0"
 
 # force the correct libunwinder
-ENV CXX_UNWINDER_FLAGS="--unwindlib=${SYSROOT:-/sysroot}/usr/lib/libunwind.so.1.0"
+ENV CXX_UNWINDER_FLAGS="--unwindlib=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib/libunwind.so.1.0"
 
-RUN "${HOST_CC}" $CFLAGS $LDFLAGS -O2 -fuse-ld=lld -Qunused-arguments -x c -c /work/__stack_chk_fail_local.c -o /work/__stack_chk_fail_local.o && \
+RUN "${HOST_CC}" $CFLAGS -fuse-ld=lld $LDFLAGS -O2 -Qunused-arguments -x c -c /work/__stack_chk_fail_local.c -o /work/__stack_chk_fail_local.o && \
     llvm-ar --format=bsd rcs ${SYSROOT:-/sysroot}/usr/lib/generic/libssp_nonshared.a /work/__stack_chk_fail_local.o && \
     ln -svf generic/libssp_nonshared.a ${SYSROOT:-/sysroot}/usr/lib/libssp_nonshared.a
 
-RUN "${HOST_CXX}" $CXXFLAGS $CFLAGS $LDFLAGS -fuse-ld=lld -Qunused-arguments -x c++ -fno-rtti -fno-exceptions -c /work/bootstrap_cxa_stubs.cpp -o /work/bootstrap_cxa_stubs.o && \
+RUN "${HOST_CXX}" $CXXFLAGS $CFLAGS -fuse-ld=lld -Xlinker -Bdynamic -Xlinker --relocatable $LDFLAGS -Qunused-arguments -x c++ -fno-rtti -fno-exceptions -c /work/bootstrap_cxa_stubs.cpp -o /work/bootstrap_cxa_stubs.o && \
     llvm-ar --format=bsd rcs /work/libbootstrap_cxa.a /work/bootstrap_cxa_stubs.o
 
 # may want to play with LIBCXX_TARGET_SUBDIR
@@ -1438,7 +1439,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
       -DLIBCXX_LINK_FLAGS="${CXX_UNWINDER_FLAGS} -v ${LDFLAGS} -Xlinker --verbose" \
-      -DCMAKE_EXE_LINKER_FLAGS="${CXX_UNWINDER_FLAGS} -Xlinker --whole-archive -Xlinker /work/libbootstrap_cxa.a -Xlinker --no-whole-archive -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath-link=${SYS_LIB}" \
+      -DCMAKE_EXE_LINKER_FLAGS="${CXX_UNWINDER_FLAGS} -Xlinker -Bdynamic -Xlinker --whole-archive -Xlinker /work/libbootstrap_cxa.a -Xlinker --no-whole-archive -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath-link=${SYS_LIB}" \
       -DCMAKE_INSTALL_RPATH=/work/builds/opt/libcxx-bootstrap0/lib \
       -DLLVM_ENABLE_RUNTIMES= \
       -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
@@ -1452,10 +1453,12 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
 RUN "${CC}" $CXXFLAGS $CFLAGS -Qunused-arguments -fuse-ld=lld -Qunused-arguments -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB:-ld-musl-generic.so} -c /work/cxx-headers.c -o /work/cxx-headers.o && \
     "${CC}" $CFLAGS $CXX_UNWINDER_FLAGS -Qunused-arguments -shared -Xlinker --shared /work/cxx-headers.o -o /work/libcxx-headers.so \
       -fuse-ld=lld -Xlinker --hash-style=both -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB:-ld-musl-generic.so} \
-      -Xlinker --nostdlib -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/lib -Xlinker --soname=libcxx-headers.so \
+      -Xlinker --nostdlib -Xlinker -Bdynamic -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/lib -Xlinker --soname=libcxx-headers.so \
       -Xlinker --auxiliary=libc++.so \
+      -Xlinker --auxiliary=libcxxrt.so \
       -Xlinker --auxiliary=libc.so \
       -Xlinker --no-gnu-unique -Xlinker --unique \
+      -Xlinker --Bno-symbolic \
       -Xlinker --rpath=${SYSROOT:-/sysroot}/usr/lib \
       -Xlinker -z -Xlinker relro -Xlinker -z -Xlinker now && \
     if command -v llvm-strip >/dev/null 2>&1; then \
@@ -1501,8 +1504,8 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DLIBCXXABI_HAS_GCC_S_LIB=NO \
       -DCMAKE_PREFIX_PATH=/work/builds/opt/libcxx-bootstrap0 \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_CXX_FLAGS="${CXXFLAGS} -stdlib++-isystem /work/builds/opt/libcxx-bootstrap0/include/c++/v1 -I/work/builds/opt/libcxx-bootstrap0/include/c++/v1 -I/work/llvm-project/libcxx/src -I/work/builds/opt/libcxx-bootstrap0/include ${CFLAGS} -Qunused-arguments -I/work/builds/opt/libcxx-bootstrap0/include -isystem ${SYS_INCLUDE} -fuse-ld=lld" \
-      -DCMAKE_LINK_FLAGS="-rtlib=compiler-rt $CXX_UNWINDER_FLAGS -fno-math-errno -fPIC -fuse-ld=lld -v -Xlinker --nostdlib ${LDFLAGS} -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker --verbose -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap0/lib --rpath=${SYSROOT:-/sysroot}/usr/lib:/work/builds/opt/libcxx-bootstrap0/lib" \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} -I/work/builds/opt/libcxx-bootstrap0/include/c++/v1 -I/work/builds/opt/libcxx-bootstrap0/include/c++/v1 -I/work/llvm-project/libcxx/src -I/work/builds/opt/libcxx-bootstrap0/include ${CFLAGS} -Qunused-arguments -I/work/builds/opt/libcxx-bootstrap0/include -isystem ${SYS_INCLUDE} -fuse-ld=lld" \
+      -DCMAKE_LINK_FLAGS="-rtlib=compiler-rt $CXX_UNWINDER_FLAGS -fno-math-errno -fPIC -fuse-ld=lld -v -Xlinker --nostdlib ${LDFLAGS} -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker --verbose -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap0/lib:${SYSROOT:-/sysroot}/usr/lib:/work/builds/opt/libcxx-bootstrap0/lib" \
       -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxxabi-bootstrap0/lib:/work/builds/opt/libcxx-bootstrap0/lib:${SYS_LIB}" \
       -DLLVM_ENABLE_RUNTIMES= \
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \

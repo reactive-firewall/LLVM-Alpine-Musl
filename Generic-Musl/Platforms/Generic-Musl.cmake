@@ -352,7 +352,12 @@ else()
   set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
   set(CMAKE_SHARED_MODULE_LINK_C_FLAGS "")
   set(CMAKE_SHARED_MODULE_LINK_CXX_FLAGS "")
+
 endif()
+
+# TODO: handle adding excludes when linking clang_rt
+#-Xlinker --exclude-libs=libgcc_s.so.1 -Xlinker --exclude-libs=libgcc_s.so -Xlinker --exclude-libs=libgcc_s.a
+#-nobuiltininc
 
 # Add clang_rt if found
 if(DEFINED CLANG_RT_PATH AND EXISTS "${CLANG_RT_PATH}")
@@ -462,11 +467,11 @@ endif()
 set(_candidates
   "26;202600L"   # provisional C26
   "23;202311L"   # Clang / provisional C23
-  "23;202300L"
-  "17;201710L"
-  "11;201112L"
-  "99;199901L"
-  "90;199409L"
+  "23;202300L"   # musl does not directly support >= C23
+  "17;201710L"   # experimental for musl (mostly ignored)
+  "11;201112L"   # musl should provide _Noreturn for gnu-c (also needs -D_GNUC_ to enable)
+  "99;199901L"   # musl should provide __inline & __restrict for compatibility with gnu-c
+  "90;199409L"   # safe for musl (ignored)
 )
 
 # Does the musl build provide Annex K? (default: OFF)
@@ -621,6 +626,12 @@ else()
   message(STATUS "Shared libraries disabled (missing musl loader or suitable linker).")
   # (musl) targets without hardcoded linkers don't support shared libraries
   set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS FALSE)
+endif()
+
+# CMP0079: allow target_link_libraries() use with targets in other directories
+# New in CMake 3.13: https://cmake.org/cmake/help/latest/policy/CMP0079.html
+if(POLICY CMP0079)
+  cmake_policy(SET CMP0079 NEW)
 endif()
 
 # CMP0164: add_library() rejects SHARED libraries when not supported by the platform.
