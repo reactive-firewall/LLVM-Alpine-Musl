@@ -1386,7 +1386,7 @@ ENV HOST_LD=lld
 # may need -Xlinker --sysroot=/sysroot
 # may want linker flag -Xlinker --nostdlib to prevent linking to any std c++
 # may want to link -Xlinker -l${LLVM_RTLIB_STUB}
-ENV LDFLAGS="-v -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/lib -Xlinker -L -Xlinker ${SYS_LIB}/generic -Xlinker -l${LLVM_RTLIB_STUB} -Xlinker --exclude-libs=libgcc_s.so.1 -Xlinker --exclude-libs=libgcc_s.so -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB}"
+ENV LDFLAGS="-v -Xlinker --trace-symbol=_Unwind_Resume -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/lib -Xlinker -L -Xlinker ${SYS_LIB}/generic -Xlinker -l${LLVM_RTLIB_STUB} -Xlinker --exclude-libs=libgcc_s.so.1 -Xlinker --exclude-libs=libgcc_s.so -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB}"
 # Does NOT require -D__ELF__
 ENV CFLAGS="--no-default-config --target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -Xlinker --pic-veneer -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT:-/sysroot}/usr/include"
 # might need -nostdinc++
@@ -1505,7 +1505,7 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DCMAKE_PREFIX_PATH=/work/builds/opt/libcxx-bootstrap0 \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} -I/work/builds/opt/libcxx-bootstrap0/include/c++/v1 -I/work/builds/opt/libcxx-bootstrap0/include/c++/v1 -I/work/llvm-project/libcxx/src -I/work/builds/opt/libcxx-bootstrap0/include ${CFLAGS} -Qunused-arguments -I/work/builds/opt/libcxx-bootstrap0/include -isystem ${SYS_INCLUDE} -fuse-ld=lld" \
-      -DCMAKE_LINK_FLAGS="-rtlib=compiler-rt $CXX_UNWINDER_FLAGS -fno-math-errno -fPIC -fuse-ld=lld -v -Xlinker --nostdlib ${LDFLAGS} -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker --verbose -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap0/lib:${SYSROOT:-/sysroot}/usr/lib:/work/builds/opt/libcxx-bootstrap0/lib" \
+      -DCMAKE_LINK_FLAGS="-rtlib=compiler-rt $CXX_UNWINDER_FLAGS -fno-math-errno -fPIC -fuse-ld=lld -v -Xlinker --why-live=_Unwind_Resume -Xlinker --nostdlib ${LDFLAGS} -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker --verbose -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap0/lib:${SYSROOT:-/sysroot}/usr/lib:/work/builds/opt/libcxx-bootstrap0/lib" \
       -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxxabi-bootstrap0/lib:/work/builds/opt/libcxx-bootstrap0/lib:${SYS_LIB}" \
       -DLLVM_ENABLE_RUNTIMES= \
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
