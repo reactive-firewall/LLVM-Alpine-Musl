@@ -1234,6 +1234,7 @@ WORKDIR /work
 # copy sources (llvmorg is the llvm-project checkout root)
 COPY --from=fetcher /fetch/llvmorg /work/llvm-project
 COPY --from=sysroot /sysroot /sysroot
+COPY --from=fetcher /fetch/llvmorg /work/llvm-project-stage1
 COPY --from=fetcher /fetch/libcxxrt/src /sysroot/usr/include/c++/v1/cxxabi
 COPY --from=build-unwind /stage /stage
 COPY --from=build-libcxxrt /sysroot /stage-cxxrt
@@ -1542,6 +1543,15 @@ RUN ls -lap /work/builds/opt/libcxx-bootstrap0/lib && \
       done ;\
     done ;
 
+WORKDIR /work
+
+# reset the llvm project source for next stage
+RUN mkdir -p -m 755 /work/bootstrap-stage && \
+    mv -vf /work/llvm-project /work/bootstrap-stage/llvm-project && \
+    ls -lp /work/ && \
+    mv -vf /work/llvm-project-stage1 /work/llvm-project && \
+    ls -lp /work/ && touch -d "${SOME_DATE_EPOCH}" /work/llvm-project ;
+
 ENV CXXFLAGS="-ffunction-sections -fdata-sections --unwindlib=${SYSROOT:-/sysroot}/usr/lib/libunwind.so.1.0 -stdlib=libc++ -stdlib++-isystem /work/builds/opt/libcxx-bootstrap1/include/c++/v1"
 
 # Stage 3: Rebuild libc++ linking against libcxxabi-bootstrap0 (round-trip libc++ bootstrap1)
@@ -1635,8 +1645,9 @@ RUN mkdir -p /work/build-libcxxabi-final && cd /work/build-libcxxabi-final && \
 # install final libcxxabi into sysroot (overlays)
 ENV CXXFLAGS="-ffunction-sections -fdata-sections --unwindlib=${SYSROOT:-/sysroot}/usr/lib/libunwind.so.1.0 -stdlib=libc++ -stdlib++-isystem /work/builds/opt/libcxxabi-final/include/c++/v1 -stdlib++-isystem /work/builds/opt/libcxx-bootstrap1/include/c++/v1"
 
-RUN cp -a /work/builds/opt/libcxxabi-final/lib/* ${SYSROOT:-/sysroot}/usr/lib/ || true && \
-    cp -a /work/builds/opt/libcxxabi-final/include/* ${SYSROOT:-/sysroot}/usr/include/ || true
+# overlay the libcxxabi
+RUN cp -pnr /work/builds/opt/libcxxabi-final/include/c++/v1 ${SYSROOT:-/sysroot}/usr/include/c++/v1 && \
+    cp -pnr /work/builds/opt/libcxxabi-final/lib/libc++abi.so ${SYSROOT:-/sysroot}/usr/libc++abi.so
 
 # --- Stage 5: Build final libc++ against final libcxxabi (libcxx-final) and smoke test ---
 RUN mkdir -p /work/build-libcxx-final && cd /work/build-libcxx-final && \
