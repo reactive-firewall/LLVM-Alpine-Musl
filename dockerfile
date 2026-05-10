@@ -1180,7 +1180,9 @@ RUN mkdir -p build-libcxxabi-config && \
     cmake --install . || true ;\
     [ -d /headers/usr/include/c++/v1 ] && \
     [ -f /headers/usr/include/c++/v1/__config ] && \
-    [ -f /headers/usr/include/c++/v1/cxxabi.h ] || true ;
+    [ -f /headers/usr/include/c++/v1/__cxxabi_config.h ] && \
+    [ -f /headers/usr/include/c++/v1/cxxabi.h ] || \
+    printf "\n%s\n\n" "Warning: missing expected C++ headers" ;
 
 # Quick, trivial compile-time test that the headers are usable:
 # compile-only (no linking) a small C++ snippet using the installed headers.
@@ -1518,27 +1520,27 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
 RUN ls -lap /work/builds/opt/libcxx-bootstrap0/lib && \
     for SOME_LIB_NAME in "libc++" "libc++experimental" "libc++abi" ; do \
       for SOME_SUFFIX in ".so" ".so.1" ".so.1.0" ; do \
-        if [ -f "/work/builds/opt/libcxx-bootstrap0/lib/${LIB_NAME}${SOME_SUFFIX:-}" ] ; then \
+        if [ -f "/work/builds/opt/libcxx-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" ] ; then \
           if command -v llvm-strip >/dev/null 2>&1; then \
-             llvm-strip --strip-unneeded "/work/builds/opt/libcxx-bootstrap0/lib/${LIB_NAME}${SOME_SUFFIX:-}" || true; \
+             llvm-strip --strip-unneeded "/work/builds/opt/libcxx-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" || true; \
           else \
-             strip --strip-unneeded "/work/builds/opt/libcxx-bootstrap0/lib/${LIB_NAME}${SOME_SUFFIX:-}" || true; \
+             strip --strip-unneeded "/work/builds/opt/libcxx-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" || true; \
           fi ; \
         fi ; \
-        if [ -f "/work/builds/opt/libcxxabi-bootstrap0/lib/${LIB_NAME}${SOME_SUFFIX:-}" ] ; then \
+        if [ -f "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" ] ; then \
           if command -v llvm-strip >/dev/null 2>&1; then \
-             llvm-strip --strip-unneeded "/work/builds/opt/libcxxabi-bootstrap0/lib/${LIB_NAME}${SOME_SUFFIX:-}" || true; \
+             llvm-strip --strip-unneeded "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" || true; \
           else \
-             strip --strip-unneeded "/work/builds/opt/libcxxabi-bootstrap0/lib/${LIB_NAME}${SOME_SUFFIX:-}" || true; \
+             strip --strip-unneeded "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" || true; \
           fi ; \
         fi ; \
       done ;\
-      for SOME_SUFFIX in ".a" ".so" ".so.1" ".so.1.0" ; do \
-        if [ -f "/work/builds/opt/libcxx-bootstrap0/lib/${LIB_NAME}${SOME_SUFFIX:-}" ] ; then \
-          file "/work/builds/opt/libcxx-bootstrap0/lib/${LIB_NAME}${SOME_SUFFIX:-}" || true; \
+      for SOME_SUFFIX_R2 in ".a" ".so" ".so.1" ".so.1.0" ; do \
+        if [ -f "/work/builds/opt/libcxx-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ] ; then \
+          file "/work/builds/opt/libcxx-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" || true; \
         fi ; \
-        if [ -f "/work/builds/opt/libcxxabi-bootstrap0/lib/${LIB_NAME}${SOME_SUFFIX:-}" ] ; then \
-          file "/work/builds/opt/libcxxabi-bootstrap0/lib/${LIB_NAME}${SOME_SUFFIX:-}" || true; \
+        if [ -f "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ] ; then \
+          file "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" || true; \
         fi ; \
       done ;\
     done ;
