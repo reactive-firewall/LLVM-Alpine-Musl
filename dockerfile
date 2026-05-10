@@ -1543,7 +1543,11 @@ RUN ls -lap /work/builds/opt/libcxx-bootstrap0/lib && \
           file "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" || true; \
         fi ; \
       done ;\
-    done ;
+    done ;\
+    ld.lld --verbose --nostdlib -L /work/builds/opt/libcxx-bootstrap0/lib/ --library=c++ | grep -iFe "unable to find library" || true ;\
+    ld.lld --verbose --nostdlib -L /work/builds/opt/libcxx-bootstrap0/lib/ --library=c++experemental | grep -iFe "unable to find library" || true ;\
+    ld.lld --verbose --nostdlib -L /work/builds/opt/libcxxabi-bootstrap0/lib/ --library=c++abi | grep -iFe "unable to find library" || true ;
+
 
 WORKDIR /work
 
@@ -1554,7 +1558,10 @@ RUN mkdir -p -m 755 /work/bootstrap-stage && \
     mv -vf /work/llvm-project-stage1 /work/llvm-project && \
     ls -lp /work/ && touch -d "${SOME_DATE_EPOCH}" /work/llvm-project ;
 
-ENV CXXFLAGS="-ffunction-sections -fdata-sections --unwindlib=${SYSROOT:-/sysroot}/usr/lib/libunwind.so.1.0 -stdlib=libc++ -stdlib++-isystem /work/builds/opt/libcxx-bootstrap1/include/c++/v1"
+# stage 3 changes from stage 1
+# use new staging path
+# swap to abi NEW/DELETE DEFINITIONS and thus disable LIBCXX_ENABLE_NEW_DELETE_DEFINITIONS
+# use ABI=libcxxabi (from stage 2)
 
 # Stage 3: Rebuild libc++ linking against libcxxabi-bootstrap0 (round-trip libc++ bootstrap1)
 RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 && \
@@ -1586,13 +1593,15 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DLIBCXX_CXX_ABI=libcxxabi \
       -DLIBCXX_CXX_ABI_LIBRARY_PATH=/work/builds/opt/libcxxabi-bootstrap0/lib \
       -DLIBCXX_CXX_ABI_INCLUDE_PATHS="/work/builds/opt/libcxxabi-bootstrap0/include/c++/v1" \
-      -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=OFF \
-      -DLIBCXX_ENABLE_NEW_DELETE_DEFINITIONS=ON \
+      -DLIBCXX_STATICALLY_LINK_ABI_IN_STATIC_LIBRARY=ON \
+      -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=ON \
+      -DLIBCXX_STATICALLY_LINK_ABI_IN_SHARED_LIBRARY=OFF \
+      -DLIBCXX_ENABLE_NEW_DELETE_DEFINITIONS=OFF \
       -DLIBCXX_INCLUDE_TESTS=OFF \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_CXX_FLAGS="${CXXFLAGS} -I/work/builds/opt/libcxxabi-bootstrap0/include/c++/v1 ${CFLAGS} -Qunused-arguments" \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} -stdlib=libc++ -I/work/builds/opt/libcxxabi-bootstrap0/include/c++/v1 ${CFLAGS} -Qunused-arguments" \
       -DLIBCXX_LINK_FLAGS="${CXX_UNWINDER_FLAGS} -v ${LDFLAGS} -Xlinker --verbose" \
-      -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap1/lib -Xlinker --rpath-link=/work/builds/opt/libcxx-bootstrap0/lib -Xlinker --rpath-link=${SYS_LIB}" \
+      -DCMAKE_EXE_LINKER_FLAGS="${CXX_UNWINDER_FLAGS} -Xlinker -Bdynamic -Xlinker -L -Xlinker /work/builds/opt/libcxxabi-bootstrap0/lib -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap1/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap1/lib -Xlinker --rpath-link=/work/builds/opt/libcxxabi-bootstrap0/lib -Xlinker --rpath-link=${SYS_LIB}" \
       -DCMAKE_INSTALL_RPATH=/work/builds/opt/libcxx-bootstrap1/lib \
       -DLLVM_ENABLE_RUNTIMES= \
       -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
@@ -1601,9 +1610,6 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
     python3 ../llvm-project/libcxx/utils/generate_iwyu_mapping.py -o include/c++/v1/libcxx.imp || true ;\
     cmake --install /work/build-libcxx-bootstrap1 && \
     find /work/builds/opt/libcxx-bootstrap1 -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true ;
-
-# stage-install into sysroot so next libcxxabi round uses it
-ENV CXXFLAGS="-ffunction-sections -fdata-sections --unwindlib=${SYSROOT:-/sysroot}/usr/lib/libunwind.so.1.0 -stdlib=libc++ -stdlib++-isystem /work/builds/opt/libcxx-bootstrap1/include/c++/v1"
 
 # --- Stage 4: Build final libcxxabi using round-tripped libc++ (libcxxabi-final) ---
 RUN mkdir -p /work/build-libcxxabi-final && cd /work/build-libcxxabi-final && \
@@ -1634,7 +1640,7 @@ RUN mkdir -p /work/build-libcxxabi-final && cd /work/build-libcxxabi-final && \
     -DLIBCXXABI_HAS_C_LIB=ON \
     -DLIBCXXABI_INCLUDE_TESTS=OFF \
     -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-    -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -stdlib++-isystem /work/builds/opt/libcxx-bootstrap1/include/c++/v1 -I/work/builds/opt/libcxx-bootstrap1/include/c++/v1 -isystem ${SYS_INCLUDE}" \
+    -DCMAKE_CXX_FLAGS="${CXXFLAGS} -stdlib++-isystem /work/builds/opt/libcxx-bootstrap1/include/c++/v1 -I/work/builds/opt/libcxx-bootstrap1/include/c++/v1 ${CFLAGS} -isystem ${SYS_INCLUDE}" \
     -DCMAKE_LINK_FLAGS="${CXX_UNWINDER_FLAGS} -rtlib=compiler-rt -fPIC -fuse-ld=lld -v ${LDFLAGS} -Xlinker --nostdlib -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap1/lib -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap1/lib -Xlinker --rpath=${SYSROOT:-/sysroot}/usr/lib" \
     -DCMAKE_EXE_LINKER_FLAGS="${CXX_UNWINDER_FLAGS} -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap1/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap1/lib" \
     -DCMAKE_INSTALL_RPATH=/work/builds/opt/libcxxabi-final/lib \
