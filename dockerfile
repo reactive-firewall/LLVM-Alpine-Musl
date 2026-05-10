@@ -1498,7 +1498,6 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DLIBCXXABI_ENABLE_THREADS=ON \
       -DLIBCXXABI_HAS_PTHREAD_LIB=ON \
       -DLIBCXXABI_HAS_C_LIB=ON \
-      -DLIBCXXABI_BAREMETAL=ON \
       -DLIBCXXABI_HAS_CXA_THREAD_ATEXIT_IMPL=FALSE \
       -DLIBCXXABI_INCLUDE_BENCHMARKS=OFF \
       -DLIBCXXABI_HAS_GCC_S_LIB=NO \
@@ -1621,7 +1620,6 @@ RUN mkdir -p /work/build-libcxxabi-final && cd /work/build-libcxxabi-final && \
     -DLIBCXXABI_ENABLE_THREADS=ON \
     -DLIBCXXABI_HAS_PTHREAD_LIB=ON \
     -DLIBCXXABI_HAS_C_LIB=ON \
-    -DLIBCXXABI_BAREMETAL=ON \
     -DLIBCXXABI_INCLUDE_TESTS=OFF \
     -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
     -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -stdlib++-isystem /work/builds/opt/libcxx-bootstrap1/include/c++/v1 -I/work/builds/opt/libcxx-bootstrap1/include/c++/v1 -isystem ${SYS_INCLUDE}" \
