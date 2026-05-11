@@ -1547,11 +1547,11 @@ RUN ls -lap /work/builds/opt/libcxx-bootstrap0/lib && \
       for SOME_SUFFIX_R2 in ".a" ".so" ".so.1" ".so.1.0" ; do \
         if [ -f "/work/builds/opt/libcxx-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ] ; then \
           file "/work/builds/opt/libcxx-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" || true; \
-          llvm-objdump -hap "/work/builds/opt/libcxx-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}"
+          llvm-objdump -hap "/work/builds/opt/libcxx-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ;\
         fi ; \
         if [ -f "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ] ; then \
           file "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" || true; \
-          llvm-objdump -hap "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}"
+          llvm-objdump -hap "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ;\
         fi ; \
       done ;\
     done ;\
