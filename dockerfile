@@ -1717,7 +1717,8 @@ RUN mkdir -p /usr/share/cmake/Modules/Platform \
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
   apk update && \
   apk add --no-cache \
-    cmd:clang++
+    cmd:clang++ \
+    cmd:g++
 # but we remove it anyway afterwards
 
 RUN chmod +x /work/run_cmake_build.sh
