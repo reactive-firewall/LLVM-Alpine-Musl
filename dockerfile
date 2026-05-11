@@ -1675,7 +1675,7 @@ RUN  touch -d "${SOME_DATE_EPOCH}" ${SYSROOT:-/sysroot}/usr/lib && \
         usr/lib/libc++.so \
         usr/lib/libc++abi.so \
         usr/lib/libc++experimental.a ; do \
-          if [ -f /stage-bootstrap/${CXXSTD_FILE_ARTIFACT} ] ; then
+          if [ -f /stage-bootstrap/${CXXSTD_FILE_ARTIFACT} ] ; then \
             cp -vf /stage-bootstrap/${CXXSTD_FILE_ARTIFACT} ${SYSROOT:-/sysroot}/${CXXSTD_FILE_ARTIFACT} || true ; \
             touch -d "${SOME_DATE_EPOCH}" ${SYSROOT:-/sysroot}/${CXXSTD_FILE_ARTIFACT} || true ; \
           fi ;\
