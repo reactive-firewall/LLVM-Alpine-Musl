@@ -1760,7 +1760,7 @@ ENV CXX_UNWINDER_FLAGS="--unwindlib=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib
 
 # Stage 3: Rebuild libc++ linking against libcxxabi-bootstrap0 (round-trip libc++ bootstrap1)
 RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 && \
-    /work/run_cmake_build.sh /work/llvm-project/libcxx /work/build-libcxx-bootstrap1 \
+    /work/run_cmake_build.sh /work/llvm-project/runtimes /work/build-libcxx-bootstrap1 \
       -G Ninja \
       -DCMAKE_C_COMPILER=${HOST_CC} \
       -DCMAKE_CXX_COMPILER=${HOST_CXX} \
@@ -1795,13 +1795,24 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DLIBCXX_LINK_FLAGS="${CXX_UNWINDER_FLAGS} -v ${LDFLAGS} -Xlinker --verbose" \
       -DCMAKE_EXE_LINKER_FLAGS="${CXX_UNWINDER_FLAGS} -Xlinker -Bdynamic -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap1/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap1/lib -Xlinker --rpath-link=${SYS_LIB}" \
       -DCMAKE_INSTALL_RPATH=/work/builds/opt/libcxx-bootstrap1/lib \
-      -DLLVM_ENABLE_RUNTIMES= \
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
-      -DLIBCXXABI_INCLUDE_TESTS=OFF && \
-    python3 ../llvm-project/libcxx/utils/generate_iwyu_mapping.py -o include/c++/v1/libcxx.imp || true ;\
+      -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi" \
+      -DLIBCXXABI_USE_COMPILER_RT=ON \
+      -DLIBCXXABI_ENABLE_SHARED=ON \
+      -DLIBCXXABI_ENABLE_STATIC=OFF \
+      -DLIBCXXABI_USE_COMPILER_RT=ON \
+      -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
+      -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
+      -DLIBCXXABI_LIBUNWIND_INCLUDES=/stage/usr/include \
+      -DLIBCXXABI_ENABLE_THREADS=ON \
+      -DLIBCXXABI_HAS_PTHREAD_LIB=ON \
+      -DLIBCXXABI_HAS_C_LIB=ON && \
     cmake --install /work/build-libcxx-bootstrap1
+
+# python3 ../llvm-project/libcxx/utils/generate_iwyu_mapping.py -o include/c++/v1/libcxx.imp || true ;
+
 
 # --- Stage 4: Build final libcxxabi using round-tripped libc++ (libcxxabi-final) ---
 RUN mkdir -p /work/build-libcxxabi-final && cd /work/build-libcxxabi-final && \
