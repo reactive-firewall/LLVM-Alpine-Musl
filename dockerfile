@@ -1228,15 +1228,14 @@ RUN for MUSL_SDK_FILE_ARTIFACT in bin sbin lib libexec \
 RUN ls -l -r /headers/usr/include || true && \
     find /headers/usr/include -type f -exec file {} + || true;
 
-# --- MARK for round-trip bootstrap build of libcxxabi.so
-FROM --platform="linux/${TARGETARCH}" alpine:latest AS build-libcxx
+# --- MARK 1 of 3 for round-trip bootstrap build of libcxxabi.so
+FROM --platform="linux/${TARGETARCH}" alpine:latest AS build-libcxx-bs
 
 WORKDIR /work
 
 # copy sources (llvmorg is the llvm-project checkout root)
 COPY --from=fetcher /fetch/llvmorg /work/llvm-project
 COPY --from=sysroot /sysroot /sysroot
-COPY --from=fetcher /fetch/llvmorg /work/llvm-project-stage1
 COPY --from=fetcher /fetch/libcxxrt/src /sysroot/usr/include/c++/v1/cxxabi
 COPY --from=build-unwind /stage /stage
 COPY --from=build-libcxxrt /sysroot /stage-cxxrt
@@ -1252,6 +1251,7 @@ COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cma
 # Copy helper scripts and sources into the image
 # (Ensure these files exist next to the Dockerfile when building)
 COPY payloads/bin/run_cmake_build.sh /work/run_cmake_build.sh
+COPY payloads/bin/run_post_build_strip.sh /work/run_post_build_strip.sh
 COPY shims/bootstrap_cxa_stubs.cpp /work/bootstrap_cxa_stubs.cpp
 COPY shims/__stack_chk_fail_local.c /work/__stack_chk_fail_local.c
 COPY payloads/tests/test_exception.cpp /work/test_exception.cpp
@@ -1518,12 +1518,15 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
 
 WORKDIR /work
 
-# reset the llvm project source for next stage
-RUN mkdir -p -m 755 /work/bootstrap-stage && \
-    mv -vf /work/llvm-project /work/bootstrap-stage/llvm-project && \
-    ls -lp /work/ && \
-    mv -vf /work/llvm-project-stage1 /work/llvm-project && \
-    ls -lp /work/ && touch -d "${SOME_DATE_EPOCH}" /work/llvm-project ;
+# cleanup and reset the llvm project source for next stage
+RUN mkdir -p -m 755 /bootstrap-stage && \
+    { rm -vfrd /work/llvm-project/ || true ;} && \
+    rm -vfrd /work/build-libcxxabi-bootstrap0/ && \
+    rm -vfrd /work/build-libcxx-bootstrap0/ && \
+    { rm -vf /work/libbootstrap_cxa.{a,o,c,cpp} || true ;} && \
+    { rm -vf /work/libssp_nonshared.{a,o,c} || true ;} && \
+    chmod +x /work/run_post_build_strip.sh && \
+    ls -lp /work/ ;
 
 # DEBUG missing stuff
 RUN ls -lap /work/builds/opt/libcxx-bootstrap0/lib && \
@@ -1535,6 +1538,7 @@ RUN ls -lap /work/builds/opt/libcxx-bootstrap0/lib && \
           else \
              strip --strip-unneeded "/work/builds/opt/libcxx-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" || true; \
           fi ; \
+          llvm-objdump -hd "/work/builds/opt/libcxx-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" ;\
         fi ; \
         if [ -f "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" ] ; then \
           if command -v llvm-strip >/dev/null 2>&1; then \
@@ -1542,22 +1546,211 @@ RUN ls -lap /work/builds/opt/libcxx-bootstrap0/lib && \
           else \
              strip --strip-unneeded "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" || true; \
           fi ; \
+          llvm-objdump -hd "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" ;\
         fi ; \
       done ;\
       for SOME_SUFFIX_R2 in ".a" ".so" ".so.1" ".so.1.0" ; do \
         if [ -f "/work/builds/opt/libcxx-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ] ; then \
-          file "/work/builds/opt/libcxx-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" || true; \
-          llvm-objdump -hap "/work/builds/opt/libcxx-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ;\
+          install -m 755 "/work/builds/opt/libcxx-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" "${SYSROOT:-/sysroot}/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ;\
+          /work/run_post_build_strip.sh "${SYSROOT:-/sysroot}/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ;\
+          file "${SYSROOT:-/sysroot}/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" || true; \
         fi ; \
         if [ -f "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ] ; then \
-          file "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" || true; \
-          llvm-objdump -hap "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ;\
+          install -m 755 "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" "${SYSROOT:-/sysroot}/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ;\
+          /work/run_post_build_strip.sh "${SYSROOT:-/sysroot}/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ;\
+          file "${SYSROOT:-/sysroot}/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" || true; \
         fi ; \
       done ;\
-    done ;\
-    ld.lld --verbose --nostdlib -L /work/builds/opt/libcxx-bootstrap0/lib/ --library=c++ | grep -iFe "unable to find library" || true ;\
-    ld.lld --verbose --nostdlib -L /work/builds/opt/libcxxabi-bootstrap0/lib/ --library=c++abi | grep -iFe "unable to find library" || true ;\
-    rm -vf ./a.out || true ;
+    done ;
+
+# --- MARK for round-trip bootstrap build of libcxxabi.so
+FROM --platform="linux/${TARGETARCH}" alpine:latest AS build-libcxx-stage0
+
+WORKDIR /work
+
+# copy sources (llvmorg is the llvm-project checkout root)
+COPY --from=fetcher /fetch/llvmorg /work/llvm-project
+COPY --from=sysroot /sysroot /sysroot
+# should not need this now
+# COPY --from=fetcher /fetch/libcxxrt/src /sysroot/usr/include/c++/v1/cxxabi
+COPY --from=build-unwind /stage /stage
+COPY --from=build-libcxxrt /sysroot /stage-cxxrt
+COPY --from=libcxxheaders /headers/usr/include/c++ /sysroot/usr/include/c++
+COPY --from=build-libcxx-bs /sysroot /stage-bootstrap
+
+# skip dummy cxx-headers shim into image
+# COPY shims/cxx-headers.c /work/cxx-headers.c
+
+# Copy custom Generic-Musl.cmake into the image build context before building the image
+COPY Generic-Musl/Platforms/Generic-Musl.cmake /tmp/Generic-Musl.cmake
+COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
+
+# Copy helper scripts and sources into the image
+# (Ensure these files exist next to the Dockerfile when building)
+COPY payloads/bin/run_cmake_build.sh /work/run_cmake_build.sh
+COPY payloads/bin/run_post_build_strip.sh /work/run_post_build_strip.sh
+COPY payloads/tests/test_exception.cpp /work/test_exception.cpp
+
+ARG MUSL_LDLIB
+ENV MUSL_LDLIB="${MUSL_LDLIB}"
+
+ARG LLVM_RTLIB_STUB
+ENV LLVM_RTLIB_STUB="${LLVM_RTLIB_STUB}"
+
+ARG LLVM_RTLIB
+ENV LLVM_RTLIB="${LLVM_RTLIB:-lib${LLVM_RTLIB_STUB}.a}"
+
+ARG TARGET_FOR_LLVM
+ENV TARGET_FOR_LLVM=${TARGET_FOR_LLVM}
+
+ARG TARGET_TRIPLE
+ENV TARGET_TRIPLE=${TARGET_TRIPLE}
+
+ARG HOST_TRIPLE
+ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
+
+ENV CC=clang
+ENV CXX=clang-cpp
+ENV CPP=clang-cpp
+ENV AR=llvm-ar
+ENV AS="clang -integrated-as -c"
+ENV ASM=clang
+ENV RANLIB=llvm-ranlib
+ENV LD=lld
+# will use /sysroot/usr/bin/ld.musl-clang later
+#ENV LD=/sysroot/usr/bin/ld.musl-clang
+
+# musl libc checks TZ
+# format is
+# [SUS/POSIX](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html#tag_08_03)
+# Set TZ to UTC
+ENV TZ='UTC+0'
+
+# epoch is passed through by Docker.
+# shellcheck disable=SC2154
+ARG SOME_DATE_EPOCH
+ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
+
+ENV SYSROOT=/sysroot
+ENV MUSL_PREFIX="/usr"
+ENV SYS_LIB=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib
+ENV SYS_INCLUDE=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/include
+
+
+# overlay the unwinder
+RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/mach-o && \
+    for UNWIND_FILE_ARTIFACT in usr/include/__libunwind_config.h \
+        usr/include/libunwind.h \
+        usr/include/libunwind.modulemap \
+        usr/include/mach-o/compact_unwind_encoding.h \
+        usr/include/unwind_arm_ehabi.h \
+        usr/include/unwind_itanium.h \
+        usr/include/unwind.h \
+        usr/lib/libunwind.a \
+        usr/lib/libunwind.so.1.0 ; do \
+          cp -vf /stage/${UNWIND_FILE_ARTIFACT} ${SYSROOT:-/sysroot}/${UNWIND_FILE_ARTIFACT} || true ; \
+          touch -d "${SOME_DATE_EPOCH}" ${SYSROOT:-/sysroot}/${UNWIND_FILE_ARTIFACT} || true ; \
+    done ;
+
+# Ensure unwind has canonical name (example: /usr/lib/libunwind.so -> /usr/lib/libunwind.so.1.0)
+RUN set -eux \
+    && ln -fns libunwind.so.1.0 ${SYS_LIB}/libunwind.so.1 && \
+    ln -fns libunwind.so.1 ${SYS_LIB}/libunwind.so
+
+# overlay the libcxxrt
+RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi && \
+    for CXXRT_FILE_ARTIFACT in usr/include/c++/v1/cxxabi/cxxabi.h \
+        usr/include/c++/v1/cxxabi/unwind-llvm.h \
+        usr/include/c++/v1/cxxabi/unwind-cxxabi.h \
+        usr/include/c++/v1/cxxabi/unwind.h \
+        usr/lib/libcxxrt.so ; do \
+          cp -vf /stage-cxxrt/${CXXRT_FILE_ARTIFACT} ${SYSROOT:-/sysroot}/${CXXRT_FILE_ARTIFACT} || true ; \
+          touch -d "${SOME_DATE_EPOCH}" ${SYSROOT:-/sysroot}/${CXXRT_FILE_ARTIFACT} || true ; \
+    done ;
+
+# overlay the bootstrapped libcxx and abi
+# skipping libssp_nonshared.a as unneeded now (hopefully)
+RUN  touch -d "${SOME_DATE_EPOCH}" ${SYSROOT:-/sysroot}/usr/lib && \
+    for CXXSTD_FILE_ARTIFACT in usr/lib/libc++.a \
+        usr/lib/libc++.so \
+        usr/lib/libc++abi.so \
+        usr/lib/libc++experimental.a ; do \
+          if [ -f /stage-bootstrap/${CXXSTD_FILE_ARTIFACT} ] ; then
+            cp -vf /stage-bootstrap/${CXXSTD_FILE_ARTIFACT} ${SYSROOT:-/sysroot}/${CXXSTD_FILE_ARTIFACT} || true ; \
+            touch -d "${SOME_DATE_EPOCH}" ${SYSROOT:-/sysroot}/${CXXSTD_FILE_ARTIFACT} || true ; \
+          fi ;\
+    done ;
+
+# install minimal build tooling (musl-based; no libstdc++/glibc packages used)
+RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
+  apk update && \
+  apk add --no-cache \
+    cmd:bash \
+    cmd:dash \
+    cmd:clang \
+    llvm-libs \
+    cmake \
+    python3 \
+    samurai \
+    cmd:grep \
+    cmd:clang-cpp \
+    cmd:lld \
+    cmd:llvm-ar \
+    cmd:llvm-ranlib \
+    cmd:llvm-strip \
+    cmd:llvm-readelf \
+    cmd:llvm-objdump \
+    file \
+    cmd:find
+
+# Install into Alpine cmake's Platform dir as PlatformGeneric-Musl.cmake
+RUN mkdir -p /usr/share/cmake/Modules/Platform \
+ && install -m 0644 /tmp/Generic-Musl.cmake /usr/share/cmake/Modules/Platform/Generic-Musl.cmake \
+ && rm /tmp/Generic-Musl.cmake \
+ && chmod -R a+rX /usr/share/cmake/Modules/Platform \
+ && mkdir -p /usr/share/cmake/Modules/Platform/Linker \
+ && install -m 0644 /tmp/Generic-Musl-Linker.cmake /usr/share/cmake/Modules/Platform/Linker/Generic-Musl-Linker.cmake \
+ && rm /tmp/Generic-Musl-Linker.cmake \
+ && chmod -R a+rX /usr/share/cmake/Modules/Platform/Linker
+
+# WORKAROUND: cmake still thinks that clang++ requires g++
+RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
+  apk update && \
+  apk add --no-cache \
+    cmd:clang++
+# but we remove it anyway afterwards
+
+RUN chmod +x /work/run_cmake_build.sh
+
+# Create helper dirs
+RUN mkdir -p /work/builds/opt/libcxx-final /work/builds && \
+    cp -pfr ${SYSROOT:-/sysroot} /work/builds/opt/libcxx-bootstrap1 && \
+    cp -pfr ${SYSROOT:-/sysroot} /work/builds/opt/libcxxabi-final ;
+
+ENV HOST_CC=${CC}
+ENV HOST_CXX=clang++
+ENV HOST_LD=lld
+
+# DEBUG Mark 2
+RUN printf "%s\n" "Stage 3 rebuild libc++" && \
+    printf "%s\n" "CMake Version: $(cmake --version)" && \
+    printf "%s\n" "Clang-cpp Version: $(clang-cpp --version)" && \
+    printf "%s\n" "Clang++ Version: $(clang++ --version)" && \
+    printf "%s\n" "Installed Libraries:" && \
+    ls -1 ${SYSROOT:-/sysroot}/usr/lib/ && ls -1 ${SYSROOT:-/sysroot}/usr/lib/generic/ && \
+    printf "\n"
+
+# may need -Xlinker --sysroot=/sysroot
+# may want linker flag -Xlinker --nostdlib to prevent linking to any std c++
+# may want to link -Xlinker -l${LLVM_RTLIB_STUB}
+ENV LDFLAGS="-fuse-ld=lld -v -Xlinker --trace-symbol=_Unwind_Resume -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/lib -Xlinker -L -Xlinker ${SYS_LIB}/generic -Xlinker -l${LLVM_RTLIB_STUB} -Xlinker --exclude-libs=libgcc_s.so.1 -Xlinker --exclude-libs=libgcc_s.so -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB}"
+# Does NOT require -D__ELF__
+ENV CFLAGS="--no-default-config --target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -Xlinker --pic-veneer -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT:-/sysroot}/usr/include"
+# might need -nostdinc++
+ENV CXXFLAGS="-ffunction-sections -fdata-sections --unwindlib=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib/libunwind.so.1.0"
+
+# force the correct libunwinder
+ENV CXX_UNWINDER_FLAGS="--unwindlib=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib/libunwind.so.1.0"
 
 # stage 3 changes from stage 1
 # use new staging path
@@ -1592,14 +1785,14 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DLIBCXX_HARDENING_MODE=extensive \
       -DLIBCXX_ABI_VERSION=1 \
       -DLIBCXX_CXX_ABI=libcxxabi \
-      -DLIBCXX_CXX_ABI_LIBRARY_PATH=/work/builds/opt/libcxxabi-bootstrap0/lib \
-      -DLIBCXX_CXX_ABI_INCLUDE_PATHS="/work/builds/opt/libcxxabi-bootstrap0/include/c++/v1" \
+      -DLIBCXX_CXX_ABI_LIBRARY_PATH=${SYS_LIB} \
+      -DLIBCXX_CXX_ABI_INCLUDE_PATHS="${SYS_INCLUDE}/c++/v1" \
       -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=ON \
       -DLIBCXX_ENABLE_NEW_DELETE_DEFINITIONS=OFF \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_CXX_FLAGS="${CXXFLAGS} -I/work/builds/opt/libcxxabi-bootstrap0/include/c++/v1 ${CFLAGS} -Qunused-arguments" \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
       -DLIBCXX_LINK_FLAGS="${CXX_UNWINDER_FLAGS} -v ${LDFLAGS} -Xlinker --verbose" \
-      -DCMAKE_EXE_LINKER_FLAGS="${CXX_UNWINDER_FLAGS} -Xlinker -Bdynamic -Xlinker -L -Xlinker /work/builds/opt/libcxxabi-bootstrap0/lib -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap1/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap1/lib -Xlinker --rpath-link=/work/builds/opt/libcxxabi-bootstrap0/lib -Xlinker --rpath-link=${SYS_LIB}" \
+      -DCMAKE_EXE_LINKER_FLAGS="${CXX_UNWINDER_FLAGS} -Xlinker -Bdynamic -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap1/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap1/lib -Xlinker --rpath-link=${SYS_LIB}" \
       -DCMAKE_INSTALL_RPATH=/work/builds/opt/libcxx-bootstrap1/lib \
       -DLLVM_ENABLE_RUNTIMES= \
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
@@ -1607,8 +1800,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
       -DLIBCXXABI_INCLUDE_TESTS=OFF && \
     python3 ../llvm-project/libcxx/utils/generate_iwyu_mapping.py -o include/c++/v1/libcxx.imp || true ;\
-    cmake --install /work/build-libcxx-bootstrap1 && \
-    find /work/builds/opt/libcxx-bootstrap1 -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true ;
+    cmake --install /work/build-libcxx-bootstrap1
 
 # --- Stage 4: Build final libcxxabi using round-tripped libc++ (libcxxabi-final) ---
 RUN mkdir -p /work/build-libcxxabi-final && cd /work/build-libcxxabi-final && \
@@ -1718,7 +1910,7 @@ COPY --from=sysroot /sysroot /sysroot
 COPY --from=build-unwind /stage /stage
 COPY --from=build-libcxxrt /sysroot /stage-libcxxrt
 COPY --from=libcxxheaders /headers /stage-cxx
-COPY --from=build-libcxx /work/builds/opt/libcxx-final /stage-cxx-root
+COPY --from=build-libcxx-stage0 /work/builds/opt/libcxx-final /stage-cxx-root
 
 # Copy custom Generic-Musl.cmake into the image build context before building the image
 COPY Generic-Musl/Platforms/Generic-Musl.cmake /tmp/Generic-Musl.cmake
