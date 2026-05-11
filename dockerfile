@@ -1818,7 +1818,7 @@ RUN mkdir -m 755 -p /stage0-modules/usr/share/libc++/v1 /stage0-modules/usr/lib 
     cp -pfr /work/builds/opt/libcxx-bootstrap1/share/libc++/v1 /stage0-modules/usr/share/libc++/v1 && \
     { find /stage0-modules/usr/share/ -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true ;} && \
     { find /stage0-cxx/usr/include/ -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true ;} && \
-    mv -vf /stage0-cxx/usr/lib/libc++.modules.json /stage0-modules/usr/lib/libc++.modules.json
+    mv -vf /stage0-cxx/usr/lib/libc++.modules.json /stage0-modules/usr/lib/libc++.modules.json ;\
     for SOME_LIB_NAME in "libc++" "libc++experimental" "libc++abi" ; do \
       for SOME_SUFFIX in ".so" ".so.1" ".so.1.0" ; do \
         if [ -f "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" ] ; then \
