@@ -1766,6 +1766,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DCMAKE_CXX_COMPILER=${HOST_CXX} \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
+      -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi" \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
@@ -1781,7 +1782,6 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DLIBCXX_HAS_MUSL_LIBC=ON \
       -DLIBCXX_ENABLE_THREADS=ON \
       -DLIBCXX_HAS_PTHREAD_API=ON \
-      -DLIBCXXABI_USE_LLVM_UNWINDER=NO \
       -DLIBCXX_INCLUDE_BENCHMARKS=OFF \
       -DLIBCXX_HARDENING_MODE=extensive \
       -DLIBCXX_ABI_VERSION=1 \
@@ -1790,15 +1790,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DLIBCXX_CXX_ABI_INCLUDE_PATHS="${SYS_INCLUDE}/c++/v1" \
       -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=ON \
       -DLIBCXX_ENABLE_NEW_DELETE_DEFINITIONS=OFF \
-      -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
-      -DLIBCXX_LINK_FLAGS="${CXX_UNWINDER_FLAGS} -v ${LDFLAGS} -Xlinker --verbose" \
-      -DCMAKE_EXE_LINKER_FLAGS="${CXX_UNWINDER_FLAGS} -Xlinker -Bdynamic -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap1/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap1/lib -Xlinker --rpath-link=${SYS_LIB}" \
-      -DCMAKE_INSTALL_RPATH=/work/builds/opt/libcxx-bootstrap1/lib \
-      -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
-      -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
-      -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
-      -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi" \
+      -DLIBCXXABI_USE_LLVM_UNWINDER=NO \
       -DLIBCXXABI_USE_COMPILER_RT=ON \
       -DLIBCXXABI_ENABLE_SHARED=ON \
       -DLIBCXXABI_ENABLE_STATIC=OFF \
@@ -1808,10 +1800,19 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DLIBCXXABI_LIBUNWIND_INCLUDES=/stage/usr/include \
       -DLIBCXXABI_ENABLE_THREADS=ON \
       -DLIBCXXABI_HAS_PTHREAD_LIB=ON \
-      -DLIBCXXABI_HAS_C_LIB=ON && \
+      -DLIBCXXABI_HAS_C_LIB=ON \
+      -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
+      -DLIBCXX_LINK_FLAGS="${CXX_UNWINDER_FLAGS} -v ${LDFLAGS} -Xlinker --verbose" \
+      -DCMAKE_EXE_LINKER_FLAGS="${CXX_UNWINDER_FLAGS} -Xlinker -Bdynamic -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap1/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap1/lib -Xlinker --rpath-link=${SYS_LIB}" \
+      -DCMAKE_SKIP_RPATH=ON \
+      -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+      -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+      -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER && \
+      { find /work/build-libcxx-bootstrap1 -type f -iname "*.so" -exec file {} + || true ;} && \
     cmake --install /work/build-libcxx-bootstrap1
 
-# python3 ../llvm-project/libcxx/utils/generate_iwyu_mapping.py -o include/c++/v1/libcxx.imp || true ;
+# should not need -DCMAKE_INSTALL_RPATH=/work/builds/opt/libcxx-bootstrap1/lib  now
 
 
 # --- Stage 4: Build final libcxxabi using round-tripped libc++ (libcxxabi-final) ---
