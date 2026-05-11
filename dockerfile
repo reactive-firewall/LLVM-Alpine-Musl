@@ -1520,9 +1520,9 @@ WORKDIR /work
 
 # cleanup and reset the llvm project source for next stage
 RUN mkdir -p -m 755 /bootstrap-stage && \
-    { rm -vfrd /work/llvm-project/ || true ;} && \
-    rm -vfrd /work/build-libcxxabi-bootstrap0/ && \
-    rm -vfrd /work/build-libcxx-bootstrap0/ && \
+    { rm -vfr /work/llvm-project || true ;} && \
+    rm -vfr /work/build-libcxxabi-bootstrap0 && \
+    rm -vfr /work/build-libcxx-bootstrap0 && \
     { rm -vf /work/libbootstrap_cxa.{a,o,c,cpp} || true ;} && \
     { rm -vf /work/libssp_nonshared.{a,o,c} || true ;} && \
     chmod +x /work/run_post_build_strip.sh && \
