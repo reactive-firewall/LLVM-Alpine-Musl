@@ -1516,6 +1516,15 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DLIBCXXABI_INCLUDE_TESTS=OFF && \
     cmake --install /work/build-libcxxabi-bootstrap0
 
+WORKDIR /work
+
+# reset the llvm project source for next stage
+RUN mkdir -p -m 755 /work/bootstrap-stage && \
+    mv -vf /work/llvm-project /work/bootstrap-stage/llvm-project && \
+    ls -lp /work/ && \
+    mv -vf /work/llvm-project-stage1 /work/llvm-project && \
+    ls -lp /work/ && touch -d "${SOME_DATE_EPOCH}" /work/llvm-project ;
+
 # DEBUG missing stuff
 RUN ls -lap /work/builds/opt/libcxx-bootstrap0/lib && \
     for SOME_LIB_NAME in "libc++" "libc++experimental" "libc++abi" ; do \
@@ -1538,24 +1547,17 @@ RUN ls -lap /work/builds/opt/libcxx-bootstrap0/lib && \
       for SOME_SUFFIX_R2 in ".a" ".so" ".so.1" ".so.1.0" ; do \
         if [ -f "/work/builds/opt/libcxx-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ] ; then \
           file "/work/builds/opt/libcxx-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" || true; \
+          llvm-objdump -hap "/work/builds/opt/libcxx-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}"
         fi ; \
         if [ -f "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ] ; then \
           file "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" || true; \
+          llvm-objdump -hap "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}"
         fi ; \
       done ;\
     done ;\
     ld.lld --verbose --nostdlib -L /work/builds/opt/libcxx-bootstrap0/lib/ --library=c++ | grep -iFe "unable to find library" || true ;\
-    ld.lld --verbose --nostdlib -L /work/builds/opt/libcxxabi-bootstrap0/lib/ --library=c++abi | grep -iFe "unable to find library" || true ;
-
-
-WORKDIR /work
-
-# reset the llvm project source for next stage
-RUN mkdir -p -m 755 /work/bootstrap-stage && \
-    mv -vf /work/llvm-project /work/bootstrap-stage/llvm-project && \
-    ls -lp /work/ && \
-    mv -vf /work/llvm-project-stage1 /work/llvm-project && \
-    ls -lp /work/ && touch -d "${SOME_DATE_EPOCH}" /work/llvm-project ;
+    ld.lld --verbose --nostdlib -L /work/builds/opt/libcxxabi-bootstrap0/lib/ --library=c++abi | grep -iFe "unable to find library" || true ;\
+    rm -vf ./a.out || true ;
 
 # stage 3 changes from stage 1
 # use new staging path
@@ -1574,7 +1576,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
-      -DLLVM_DEFAULT_TARGET_TRIPLE=${HOST_TRIPLE} \
+      -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
       -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
       -DCMAKE_INSTALL_PREFIX=/work/builds/opt/libcxx-bootstrap1 \
@@ -1592,16 +1594,18 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DLIBCXX_CXX_ABI=libcxxabi \
       -DLIBCXX_CXX_ABI_LIBRARY_PATH=/work/builds/opt/libcxxabi-bootstrap0/lib \
       -DLIBCXX_CXX_ABI_INCLUDE_PATHS="/work/builds/opt/libcxxabi-bootstrap0/include/c++/v1" \
-      -DLIBCXX_INCLUDE_TESTS=OFF \
+      -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=ON \
+      -DLIBCXX_ENABLE_NEW_DELETE_DEFINITIONS=OFF \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} -I/work/builds/opt/libcxxabi-bootstrap0/include/c++/v1 ${CFLAGS} -Qunused-arguments" \
       -DLIBCXX_LINK_FLAGS="${CXX_UNWINDER_FLAGS} -v ${LDFLAGS} -Xlinker --verbose" \
       -DCMAKE_EXE_LINKER_FLAGS="${CXX_UNWINDER_FLAGS} -Xlinker -Bdynamic -Xlinker -L -Xlinker /work/builds/opt/libcxxabi-bootstrap0/lib -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap1/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap1/lib -Xlinker --rpath-link=/work/builds/opt/libcxxabi-bootstrap0/lib -Xlinker --rpath-link=${SYS_LIB}" \
       -DCMAKE_INSTALL_RPATH=/work/builds/opt/libcxx-bootstrap1/lib \
       -DLLVM_ENABLE_RUNTIMES= \
-      -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
-      -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY && \
+      -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+      -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+      -DLIBCXXABI_INCLUDE_TESTS=OFF && \
     python3 ../llvm-project/libcxx/utils/generate_iwyu_mapping.py -o include/c++/v1/libcxx.imp || true ;\
     cmake --install /work/build-libcxx-bootstrap1 && \
     find /work/builds/opt/libcxx-bootstrap1 -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true ;
