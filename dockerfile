@@ -1252,6 +1252,7 @@ COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cma
 # (Ensure these files exist next to the Dockerfile when building)
 COPY payloads/bin/run_cmake_build.sh /work/run_cmake_build.sh
 COPY payloads/bin/run_post_build_strip.sh /work/run_post_build_strip.sh
+COPY payloads/bin/run_dir_check.sh /work/run_dir_check.sh
 COPY shims/bootstrap_cxa_stubs.cpp /work/bootstrap_cxa_stubs.cpp
 COPY shims/__stack_chk_fail_local.c /work/__stack_chk_fail_local.c
 COPY payloads/tests/test_exception.cpp /work/test_exception.cpp
@@ -1375,12 +1376,14 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:g++
 # but we remove it anyway afterwards
 
-RUN chmod +x /work/run_cmake_build.sh
+RUN chmod +x /work/run_cmake_build.sh && chmod +x /work/run_dir_check.sh
 
 # Create helper dirs
 RUN mkdir -p /work/builds/opt/libcxx-bootstrap1 /work/builds/opt/libcxxabi-final /work/builds/opt/libcxx-final /work/builds && \
-    cp -pfr ${SYSROOT:-/sysroot} /work/builds/opt/libcxx-bootstrap0 && \
-    cp -pfr ${SYSROOT:-/sysroot} /work/builds/opt/libcxxabi-bootstrap0 ;
+    cp -pfr ${SYSROOT:-/sysroot}/ /work/builds/opt/libcxx-bootstrap0 && \
+    cp -pfr ${SYSROOT:-/sysroot}/ /work/builds/opt/libcxxabi-bootstrap0 && \
+    /work/run_dir_check.sh /work/builds/opt/libcxx-bootstrap0/usr 5 && \
+    /work/run_dir_check.sh /work/builds/opt/libcxxabi-bootstrap0/usr 5 ;
 
 ENV HOST_CC=${CC}
 ENV HOST_CXX=clang++
@@ -1597,6 +1600,7 @@ COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cma
 # (Ensure these files exist next to the Dockerfile when building)
 COPY payloads/bin/run_cmake_build.sh /work/run_cmake_build.sh
 COPY payloads/bin/run_post_build_strip.sh /work/run_post_build_strip.sh
+COPY payloads/bin/run_dir_check.sh /work/run_dir_check.sh
 COPY payloads/tests/test_exception.cpp /work/test_exception.cpp
 
 ARG MUSL_LDLIB
@@ -1729,12 +1733,14 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:g++
 # but we remove it anyway afterwards
 
-RUN chmod +x /work/run_cmake_build.sh
+RUN chmod +x /work/run_cmake_build.sh && chmod +x /work/run_dir_check.sh ;
 
 # Create helper dirs
 RUN mkdir -p /work/builds/opt/libcxx-final /work/builds && \
-    cp -pfr ${SYSROOT:-/sysroot} /work/builds/opt/libcxx-bootstrap1 && \
-    cp -pfr ${SYSROOT:-/sysroot} /work/builds/opt/libcxxabi-final ;
+    cp -pfr ${SYSROOT:-/sysroot}/ /work/builds/opt/libcxx-bootstrap1 && \
+    cp -pfr ${SYSROOT:-/sysroot}/ /work/builds/opt/libcxxabi-final && \
+    /work/run_dir_check.sh /work/builds/opt/libcxx-bootstrap1/usr 5 && \
+    /work/run_dir_check.sh /work/builds/opt/libcxxabi-final/usr 5 ;
 
 ENV HOST_CC=${CC}
 ENV HOST_CXX=clang++
@@ -1770,6 +1776,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DLLVM_RUNTIMES_TARGET=${TARGET_TRIPLE} \
       -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
       -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
@@ -1812,12 +1819,16 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
 
 # see https://libcxx.llvm.org/Modules.html for /stage0-modules/share/libc++/v1/
 RUN mkdir -m 755 -p /stage0-modules/usr/share/libc++/v1 /stage0-modules/usr/lib /stage0-cxx/usr/lib /stage0-cxx/usr/include/c++/v1/ && \
-    cp -pfr /work/builds/opt/libcxx-bootstrap1/include/c++/v1 /stage0-cxx/usr/include/c++/v1 && \
-    cp -vpfr /work/builds/opt/libcxx-bootstrap1/lib /stage0-cxx/usr/lib && \
-    cp -pfr /work/builds/opt/libcxx-bootstrap1/share/libc++/v1 /stage0-modules/usr/share/libc++/v1 && \
+    cp -pfr /work/builds/opt/libcxx-bootstrap1/include/c++/v1/ /stage0-cxx/usr/include/c++/v1/ && \
+    cp -vpfr /work/builds/opt/libcxx-bootstrap1/lib/ /stage0-cxx/usr/lib/ && \
+    cp -pfr /work/builds/opt/libcxx-bootstrap1/share/libc++/v1/ /stage0-modules/usr/share/libc++/v1/ && \
+    /work/run_dir_check.sh /stage0-cxx/usr/lib 4 && \
+    /work/run_dir_check.sh /stage0-modules/usr/share/libc++/v1 3 && \
+    /work/run_dir_check.sh /stage0-cxx/usr/include/c++/v1 10 && \
     { find /stage0-modules/usr/share/ -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true ;} && \
     { find /stage0-cxx/usr/include/ -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true ;} && \
-    { mv -vf /stage0-cxx/usr/lib/libc++.modules.json /stage0-modules/usr/lib/libc++.modules.json || true ;} ;\
+    mv -vf /stage0-cxx/usr/lib/libc++.modules.json /stage0-modules/usr/lib/libc++.modules.json && \
+    /work/run_dir_check.sh /stage0-modules/usr/lib 3 ;\
     for SOME_LIB_NAME in "libc++" "libc++experimental" "libc++abi" ; do \
       for SOME_SUFFIX in ".so" ".so.1" ".so.1.0" ; do \
         if [ -f "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" ] ; then \
@@ -1831,7 +1842,6 @@ RUN mkdir -m 755 -p /stage0-modules/usr/share/libc++/v1 /stage0-modules/usr/lib 
       done ;\
       for SOME_SUFFIX_R2 in ".a" ".so" ".so.1" ".so.1.0" ; do \
         if [ -f "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ] ; then \
-          /work/run_post_build_strip.sh "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ;\
           file "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" || true; \
         fi ; \
       done ;\
@@ -1866,6 +1876,7 @@ COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cma
 # (Ensure these files exist next to the Dockerfile when building)
 COPY payloads/bin/run_cmake_build.sh /work/run_cmake_build.sh
 COPY payloads/bin/run_post_build_strip.sh /work/run_post_build_strip.sh
+COPY payloads/bin/run_dir_check.sh /work/run_dir_check.sh
 COPY payloads/tests/test_exception.cpp /work/test_exception.cpp
 
 ARG MUSL_LDLIB
@@ -1999,11 +2010,13 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:g++
 # but we remove it anyway afterwards
 
-RUN chmod +x /work/run_cmake_build.sh
+RUN chmod +x /work/run_cmake_build.sh && chmod +x /work/run_dir_check.sh ;
 
 # Create helper dirs
 RUN mkdir -p /work/builds/opt/ && \
-    cp -pfr ${SYSROOT:-/sysroot} /work/builds/opt/libcxx-final ;
+    cp -pfr ${SYSROOT:-/sysroot} /work/builds/opt/libcxx-final && \
+    /work/run_dir_check.sh /work/builds/opt/libcxx-final/usr 5 ;
+
 
 ENV HOST_CC=${CC}
 ENV HOST_CXX=clang++
@@ -2032,6 +2045,8 @@ ENV CXX_UNWINDER_FLAGS="--unwindlib=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib
 
 # stage 4 changes from stage 3
 # built against stage 3 (just need reproducibility and tests)
+# removed -DCMAKE_EXE_LINKER_FLAGS="${CXX_UNWINDER_FLAGS} -Xlinker -Bdynamic -Xlinker -L -Xlinker /work/builds/opt/libcxx-final/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-final/lib -Xlinker --rpath-link=${SYS_LIB}"
+#
 
 # --- Stage 4: Build libc++ linking against libcxxabi from stage0-cxx (round-trip libc++ bootstrap1) ---
 RUN mkdir -p /work/build-libcxx-final && cd /work/build-libcxx-final && \
@@ -2041,11 +2056,12 @@ RUN mkdir -p /work/build-libcxx-final && cd /work/build-libcxx-final && \
       -DCMAKE_CXX_COMPILER=${HOST_CXX} \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
-      -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi" \
+      -DLLVM_ENABLE_RUNTIMES="libcxxabi;libcxx" \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DLLVM_RUNTIMES_TARGET=${TARGET_TRIPLE} \
       -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
       -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
@@ -2079,7 +2095,6 @@ RUN mkdir -p /work/build-libcxx-final && cd /work/build-libcxx-final && \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
       -DLIBCXX_LINK_FLAGS="${CXX_UNWINDER_FLAGS} -v ${LDFLAGS} -Xlinker --verbose" \
-      -DCMAKE_EXE_LINKER_FLAGS="${CXX_UNWINDER_FLAGS} -Xlinker -Bdynamic -Xlinker -L -Xlinker /work/builds/opt/libcxx-final/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-final/lib -Xlinker --rpath-link=${SYS_LIB}" \
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER && \
@@ -2090,7 +2105,7 @@ RUN mkdir -p /work/build-libcxx-final && cd /work/build-libcxx-final && \
 # Build test program and link against final libs
 RUN ${HOST_CXX} -std=c++17 ${CXXFLAGS} ${CXX_UNWINDER_FLAGS} /work/test_exception.cpp -o /work/test_exception \
     -fuse-ld=lld -L/work/builds/opt/libcxx-final/lib -lc++ -L/work/builds/opt/libcxxabi-final/lib -lc++abi \
-    -Xlinker --rpath=/work/builds/opt/libcxxabi-final/lib:/work/builds/opt/libcxx-final/lib
+    -Xlinker --rpath="/work/builds/opt/libcxx-final/lib:${SYS_LIB}" ;
 
 CMD ["/work/test_exception"]
 
@@ -2103,10 +2118,12 @@ WORKDIR /bootstrap
 COPY --from=fetcher /fetch/llvmorg /bootstrap/llvmorg
 COPY --from=sysroot /sysroot /sysroot
 COPY --from=build-unwind /stage /stage
-COPY --from=build-libcxx-stage0 /work/builds/opt/libcxx-final /stage-cxx-root
+COPY --from=build-libcxx /work/builds/opt/libcxx-final /stage-cxx-root
 # should not need
 #COPY --from=build-libcxxrt /sysroot /stage-libcxxrt
 #COPY --from=libcxxheaders /headers /stage-cxx
+
+COPY payloads/bin/run_post_build_strip.sh /bootstrap/bin/run_post_build_strip.sh
 
 # Copy custom Generic-Musl.cmake into the image build context before building the image
 COPY Generic-Musl/Platforms/Generic-Musl.cmake /tmp/Generic-Musl.cmake
@@ -2157,7 +2174,7 @@ ENV MUSL_PREFIX="/usr"
 
 ENV LDFLAGS="-v -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic"
 ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -iwithsysroot /usr/include"
-ENV CXXFLAGS="-cxx-isystem /sysroot/usr/include/c++/v1 --unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
+ENV CXXFLAGS="-stdlib=libc++ -cxx-isystem /sysroot/usr/include/c++/v1 --unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/mach-o && \
@@ -2184,6 +2201,18 @@ RUN ls -l ${SYSROOT:-/sysroot}${MUSL_PREFIX}/include || true \
     && file ${SYSROOT:-/sysroot}${MUSL_PREFIX}/include/* || true
 
 # overlay the standard c++ library (from stage-cxx-root)
+# skip usr/lib/libc++.a for now
+RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/c++/v1 && \
+    for CXXSTD_FILE_ARTIFACT in usr/lib/libc++.so \
+        usr/lib/libc++abi.so \
+        usr/lib/libc++experimental.a ; do \
+          if [ -f /stage-bootstrap/${CXXSTD_FILE_ARTIFACT} ] ; then \
+            install -m 755 /stage-bootstrap/${CXXSTD_FILE_ARTIFACT} ${SYSROOT:-/sysroot}/${CXXSTD_FILE_ARTIFACT} || true ; \
+            touch -d "${SOME_DATE_EPOCH}" ${SYSROOT:-/sysroot}/${CXXSTD_FILE_ARTIFACT} || true ; \
+          fi ;\
+    done ;\
+    cp -f /stage0-cxx/usr/include/c++/v1/ ${SYSROOT:-/sysroot}/usr/include/c++/v1/ && \
+    /bootstrap/bin/run_dir_check.sh ${SYSROOT:-/sysroot}/usr/include/c++/v1 10 ;
 
 #check the lib directories too
 # check on the lib
