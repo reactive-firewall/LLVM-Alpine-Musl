@@ -1804,7 +1804,6 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
       -DLIBCXX_LINK_FLAGS="${CXX_UNWINDER_FLAGS} -v ${LDFLAGS} -Xlinker --verbose" \
       -DCMAKE_EXE_LINKER_FLAGS="${CXX_UNWINDER_FLAGS} -Xlinker -Bdynamic -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap1/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap1/lib -Xlinker --rpath-link=${SYS_LIB}" \
-      -DCMAKE_SKIP_RPATH=ON \
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER && \
@@ -1814,11 +1813,11 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
 # see https://libcxx.llvm.org/Modules.html for /stage0-modules/share/libc++/v1/
 RUN mkdir -m 755 -p /stage0-modules/usr/share/libc++/v1 /stage0-modules/usr/lib /stage0-cxx/usr/lib /stage0-cxx/usr/include/c++/v1/ && \
     cp -pfr /work/builds/opt/libcxx-bootstrap1/include/c++/v1 /stage0-cxx/usr/include/c++/v1 && \
-    cp -pfr /work/builds/opt/libcxx-bootstrap1/lib /stage0-cxx/usr/lib && \
+    cp -vpfr /work/builds/opt/libcxx-bootstrap1/lib /stage0-cxx/usr/lib && \
     cp -pfr /work/builds/opt/libcxx-bootstrap1/share/libc++/v1 /stage0-modules/usr/share/libc++/v1 && \
     { find /stage0-modules/usr/share/ -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true ;} && \
     { find /stage0-cxx/usr/include/ -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true ;} && \
-    mv -vf /stage0-cxx/usr/lib/libc++.modules.json /stage0-modules/usr/lib/libc++.modules.json ;\
+    { mv -vf /stage0-cxx/usr/lib/libc++.modules.json /stage0-modules/usr/lib/libc++.modules.json || true ;} ;\
     for SOME_LIB_NAME in "libc++" "libc++experimental" "libc++abi" ; do \
       for SOME_SUFFIX in ".so" ".so.1" ".so.1.0" ; do \
         if [ -f "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" ] ; then \
@@ -2081,7 +2080,6 @@ RUN mkdir -p /work/build-libcxx-final && cd /work/build-libcxx-final && \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
       -DLIBCXX_LINK_FLAGS="${CXX_UNWINDER_FLAGS} -v ${LDFLAGS} -Xlinker --verbose" \
       -DCMAKE_EXE_LINKER_FLAGS="${CXX_UNWINDER_FLAGS} -Xlinker -Bdynamic -Xlinker -L -Xlinker /work/builds/opt/libcxx-final/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-final/lib -Xlinker --rpath-link=${SYS_LIB}" \
-      -DCMAKE_SKIP_RPATH=ON \
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER && \
