@@ -1760,6 +1760,7 @@ ENV CXX_UNWINDER_FLAGS="--unwindlib=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib
 
 # stage 3 changes from stage 1
 # use new staging path
+# leave the linker script logic as auto-discover rather than OFF
 # swap to abi NEW/DELETE DEFINITIONS and thus disable LIBCXX_ENABLE_NEW_DELETE_DEFINITIONS
 # use ABI=libcxxabi (from stage 2)
 
@@ -1794,7 +1795,6 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DLIBCXX_CXX_ABI=libcxxabi \
       -DLIBCXX_CXX_ABI_LIBRARY_PATH=${SYS_LIB} \
       -DLIBCXX_CXX_ABI_INCLUDE_PATHS="${SYS_INCLUDE}/c++/v1" \
-      -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=ON \
       -DLIBCXX_ENABLE_NEW_DELETE_DEFINITIONS=OFF \
       -DLIBCXXABI_USE_LLVM_UNWINDER=NO \
       -DLIBCXXABI_USE_COMPILER_RT=ON \
@@ -2045,6 +2045,7 @@ ENV CXX_UNWINDER_FLAGS="--unwindlib=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib
 
 # stage 4 changes from stage 3
 # built against stage 3 (just need reproducibility and tests)
+# force problematic abi-linker script to be "OFF"
 # removed -DCMAKE_EXE_LINKER_FLAGS="${CXX_UNWINDER_FLAGS} -Xlinker -Bdynamic -Xlinker -L -Xlinker /work/builds/opt/libcxx-final/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-final/lib -Xlinker --rpath-link=${SYS_LIB}"
 #
 
@@ -2079,7 +2080,7 @@ RUN mkdir -p /work/build-libcxx-final && cd /work/build-libcxx-final && \
       -DLIBCXX_CXX_ABI=libcxxabi \
       -DLIBCXX_CXX_ABI_LIBRARY_PATH=${SYS_LIB} \
       -DLIBCXX_CXX_ABI_INCLUDE_PATHS="${SYS_INCLUDE}/c++/v1" \
-      -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=ON \
+      -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=OFF \
       -DLIBCXX_ENABLE_NEW_DELETE_DEFINITIONS=OFF \
       -DLIBCXXABI_USE_LLVM_UNWINDER=NO \
       -DLIBCXXABI_USE_COMPILER_RT=ON \
@@ -2098,12 +2099,13 @@ RUN mkdir -p /work/build-libcxx-final && cd /work/build-libcxx-final && \
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER && \
-      { find /work/build-libcxx-final -type f -iname "*.so" -exec file {} + || true ;} && \
-    cmake --install /work/build-libcxx-final
+    { find /work/build-libcxx-final -type f -iname "*.so" -exec file {} + || true ;} && \
+    cmake --install /work/build-libcxx-final && \
+    { find /work/builds/opt/libcxx-final -type f -iname "*.so" -exec file {} + || true ;} ;
 
 # --- Stage 5: smoke test ---
 # Build test program and link against final libs
-RUN ${HOST_CXX} -std=c++17 ${CXXFLAGS} ${CXX_UNWINDER_FLAGS} /work/test_exception.cpp -o /work/test_exception \
+RUN ${HOST_CXX} -std=c++17 ${CXXFLAGS} ${CXX_UNWINDER_FLAGS} ${CFLAGS} -x c++ /work/test_exception.cpp -o /work/test_exception \
     -fuse-ld=lld -L/work/builds/opt/libcxx-final/lib -lc++ -L/work/builds/opt/libcxxabi-final/lib -lc++abi \
     -Xlinker --rpath="/work/builds/opt/libcxx-final/lib:${SYS_LIB}" ;
 
