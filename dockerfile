@@ -1972,7 +1972,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER && \
-      { find /work/build-libcxx-bootstrap1 -type f -iname "*.so" -exec file {} + || true ;} && \
+    { find /work/build-libcxx-bootstrap1 -type f -iname "*.so" -exec file {} + || true ;} && \
     cmake --install /work/build-libcxx-bootstrap1 && \
     { find /work/build-libcxx-bootstrap1 -type f -iname "*.so" -exec file {} + || true ;} ;
 
@@ -1982,9 +1982,9 @@ RUN ls -lap /work/builds/opt/libcxx-bootstrap1/lib ;\
     mkdir -m 755 -p /stage0-modules/usr/lib/ && \
     mkdir -m 755 -p /stage0-cxx/usr/lib/ && \
     mkdir -m 755 -p /stage0-cxx/usr/include/c++/ && \
-    cp -vpfr /work/builds/opt/libcxx-bootstrap1/include/c++/v1 /stage0-cxx/usr/include/c++/v1 && \
-    cp -vpfr /work/builds/opt/libcxx-bootstrap1/lib /stage0-cxx/usr/lib && \
-    cp -vpfr /work/builds/opt/libcxx-bootstrap1/share/libc++/v1 /stage0-modules/usr/share/libc++/v1 && \
+    cp -pfr /work/builds/opt/libcxx-bootstrap1/include/c++/v1 /stage0-cxx/usr/include/c++/v1 && \
+    cp -vpfr /work/builds/opt/libcxx-bootstrap1/usr/lib /stage0-cxx/usr/lib && \
+    cp -pfr /work/builds/opt/libcxx-bootstrap1/share/libc++/v1 /stage0-modules/usr/share/libc++/v1 && \
     /work/run_dir_check.sh /stage0-cxx/usr/lib 4 && \
     /work/run_dir_check.sh /stage0-modules/usr/share/libc++/v1 3 && \
     /work/run_dir_check.sh /stage0-cxx/usr/include/c++/v1 10 && \
