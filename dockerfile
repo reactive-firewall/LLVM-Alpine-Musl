@@ -1976,10 +1976,10 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
     cmake --install /work/build-libcxx-bootstrap1
 
 # see https://libcxx.llvm.org/Modules.html for /stage0-modules/share/libc++/v1/
-RUN mkdir -m 755 -p /stage0-modules/usr/share/libc++/v1 /stage0-modules/usr/lib /stage0-cxx/usr/lib /stage0-cxx/usr/include/c++/v1/ && \
-    cp -pfr /work/builds/opt/libcxx-bootstrap1/include/c++/v1/ /stage0-cxx/usr/include/c++/v1/ && \
-    cp -vpfr /work/builds/opt/libcxx-bootstrap1/lib/ /stage0-cxx/usr/lib/ && \
-    cp -pfr /work/builds/opt/libcxx-bootstrap1/share/libc++/v1/ /stage0-modules/usr/share/libc++/v1/ && \
+RUN mkdir -m 755 -p /stage0-modules/usr/share/libc++/ /stage0-modules/usr/lib/ /stage0-cxx/usr /stage0-cxx/usr/include/c++/ && \
+    cp -pfr /work/builds/opt/libcxx-bootstrap1/include/c++/v1 /stage0-cxx/usr/include/c++/v1 && \
+    cp -vpfr /work/builds/opt/libcxx-bootstrap1/lib /stage0-cxx/usr/lib && \
+    cp -pfr /work/builds/opt/libcxx-bootstrap1/share/libc++/v1 /stage0-modules/usr/share/libc++/v1 && \
     /work/run_dir_check.sh /stage0-cxx/usr/lib 4 && \
     /work/run_dir_check.sh /stage0-modules/usr/share/libc++/v1 3 && \
     /work/run_dir_check.sh /stage0-cxx/usr/include/c++/v1 10 && \
@@ -2013,8 +2013,8 @@ RUN ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
     -isystem /usr/include \
     -cxx-isystem /usr/include/c++/v1 -unwindlib=libunwind ${CFLAGS} \
     -x c++ /work/test_exception.cpp -o /work/test_exception \
-    -fuse-ld=lld -L/work/builds/opt/libcxx-final/lib -lunwind -lc++ -lc++abi \
-    -Xlinker --sysroot=${SYSROOT --rpath="/work/builds/opt/libcxx-final/lib:${SYS_LIB}" ;
+    -fuse-ld=lld -L/work/builds/opt/libcxx-bootstrap1/lib -lunwind -lc++ -lc++abi \
+    -Xlinker --sysroot=${SYSROOT --rpath="/work/builds/opt/libcxx-bootstrap1/lib:${SYS_LIB}" ;
 
 # Cleanup build packages and intermediate files to keep this stage small
 RUN apk del --no-cache \
