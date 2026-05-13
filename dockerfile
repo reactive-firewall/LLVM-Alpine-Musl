@@ -438,7 +438,7 @@ RUN ./configure --prefix=${MUSL_PREFIX} --target=${TARGET_TRIPLE} \
       AR=llvm-ar RANLIB=llvm-ranlib \
       LDFLAGS="${LDFLAGS}" \
       LIBCC="-l${SYSROOT}${MUSL_PREFIX}/lib/Generic/${LLVM_RTLIB}" \
-      CFLAGS="${CFLAGS} -sysroot=$SYSROOT -rtlib=compiler-rt -fno-math-errno -fPIC -fno-common -fuse-ld=lld" && \
+      CFLAGS="${CFLAGS} --sysroot=$SYSROOT -rtlib=compiler-rt -fno-math-errno -fPIC -fno-common -fuse-ld=lld" && \
     make -j"$(nproc)" && \
     DESTDIR=${SYSROOT} make install
 
@@ -2016,9 +2016,10 @@ RUN ls -lap /work/builds/opt/libcxx-bootstrap1/lib ;\
 
 # Build test program and link against final libs
 RUN ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
-    -sysroot=${SYSROOT:-/sysroot} \
-    -isystem /usr/include \
-    -cxx-isystem /usr/include/c++/v1 -unwindlib=libunwind ${CFLAGS} \
+    --sysroot=${SYSROOT:-/sysroot} \
+    -cxx-isystem /usr/include/c++/v1
+    -isystem /usr/include -I${SYSROOT:-/sysroot}/usr/include/c++/v1 -I${SYSROOT:-/sysroot}/usr/include \
+    -unwindlib=libunwind ${CFLAGS} \
     -x c++ /work/test_exception.cpp -o /work/test_exception \
     -fuse-ld=lld -L/work/builds/opt/libcxx-bootstrap1/lib -lunwind -lc++ -lc++abi \
     -Xlinker --sysroot=${SYSROOT} -Xlinker --rpath="/work/builds/opt/libcxx-bootstrap1/lib:${SYS_LIB}" ;
@@ -2283,7 +2284,7 @@ RUN mkdir -p /work/build-libcxx-final && cd /work/build-libcxx-final && \
 # Build test program and link against final libs
 RUN ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
     -resource-dir /empty-resource-dir \
-    -sysroot=${SYSROOT:-/sysroot} \
+    --sysroot=${SYSROOT:-/sysroot} \
     -isystem /usr/include \
     -cxx-isystem /usr/include/c++/v1 -unwindlib=libunwind ${CFLAGS} \
     -x c++ /work/test_exception.cpp -o /work/test_exception \
