@@ -2019,7 +2019,7 @@ RUN ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
     -cxx-isystem /usr/include/c++/v1 -unwindlib=libunwind ${CFLAGS} \
     -x c++ /work/test_exception.cpp -o /work/test_exception \
     -fuse-ld=lld -L/work/builds/opt/libcxx-bootstrap1/lib -lunwind -lc++ -lc++abi \
-    -Xlinker --sysroot=${SYSROOT --rpath="/work/builds/opt/libcxx-bootstrap1/lib:${SYS_LIB}" ;
+    -Xlinker --sysroot=${SYSROOT} --rpath="/work/builds/opt/libcxx-bootstrap1/lib:${SYS_LIB}" ;
 
 # Cleanup build packages and intermediate files to keep this stage small
 RUN apk del --no-cache \
