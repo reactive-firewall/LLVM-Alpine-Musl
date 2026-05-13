@@ -2285,8 +2285,9 @@ RUN mkdir -p /work/build-libcxx-final && cd /work/build-libcxx-final && \
 RUN ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
     -resource-dir /empty-resource-dir \
     --sysroot=${SYSROOT:-/sysroot} \
-    -isystem /usr/include \
-    -cxx-isystem /usr/include/c++/v1 -unwindlib=libunwind ${CFLAGS} \
+    -cxx-isystem /usr/include/c++/v1
+    -isystem /usr/include -I${SYSROOT:-/sysroot}/usr/include/c++/v1 -I${SYSROOT:-/sysroot}/usr/include \
+    -unwindlib=libunwind ${CFLAGS} \
     -x c++ /work/test_exception.cpp -o /work/test_exception \
     -fuse-ld=lld -L/work/builds/opt/libcxx-final/lib -lunwind -lc++ -lc++abi \
     -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker --rpath="/work/builds/opt/libcxx-final/lib:${SYS_LIB}" ;
