@@ -485,8 +485,6 @@ RUN set -eux \
     && apk del --no-cache \
         binutils \
         build-base \
-        clang \
-        clang++ \
         cmd:clang \
         cmd:clang++ \
         cmd:llvm-ar \
@@ -499,7 +497,7 @@ RUN set -eux \
         llvm-runtimes \
         make \
         cmd:find \
-        zlib-dev 2>/dev/null ;
+        zlib-dev || true;
 
 # --- Prepare Stage: Bootstrap sysroot with musl ---
 # shellcheck disable=SC2154
