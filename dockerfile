@@ -2017,7 +2017,7 @@ RUN ls -lap /work/builds/opt/libcxx-bootstrap1/lib ;\
 # Build test program and link against final libs
 RUN ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
     --sysroot=${SYSROOT:-/sysroot} \
-    -cxx-isystem /usr/include/c++/v1
+    -cxx-isystem /usr/include/c++/v1 \
     -isystem /usr/include -I${SYSROOT:-/sysroot}/usr/include/c++/v1 -I${SYSROOT:-/sysroot}/usr/include \
     -unwindlib=libunwind ${CFLAGS} \
     -x c++ /work/test_exception.cpp -o /work/test_exception \
@@ -2285,7 +2285,7 @@ RUN mkdir -p /work/build-libcxx-final && cd /work/build-libcxx-final && \
 RUN ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
     -resource-dir /empty-resource-dir \
     --sysroot=${SYSROOT:-/sysroot} \
-    -cxx-isystem /usr/include/c++/v1
+    -cxx-isystem /usr/include/c++/v1 \
     -isystem /usr/include -I${SYSROOT:-/sysroot}/usr/include/c++/v1 -I${SYSROOT:-/sysroot}/usr/include \
     -unwindlib=libunwind ${CFLAGS} \
     -x c++ /work/test_exception.cpp -o /work/test_exception \
