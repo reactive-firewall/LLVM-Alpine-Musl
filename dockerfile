@@ -1983,7 +1983,7 @@ RUN ls -lap /work/builds/opt/libcxx-bootstrap1/lib ;\
     mkdir -m 755 -p /stage0-cxx/usr/lib/ && \
     mkdir -m 755 -p /stage0-cxx/usr/include/c++/ && \
     cp -pfr /work/builds/opt/libcxx-bootstrap1/include/c++/v1 /stage0-cxx/usr/include/c++/v1 && \
-    cp -vpfr /work/builds/opt/libcxx-bootstrap1/usr/lib /stage0-cxx/usr/lib && \
+    cp -vpfr /work/builds/opt/libcxx-bootstrap1/usr/lib/ /stage0-cxx/usr/lib/ && \
     cp -pfr /work/builds/opt/libcxx-bootstrap1/share/libc++/v1 /stage0-modules/usr/share/libc++/v1 && \
     /work/run_dir_check.sh /stage0-cxx/usr/lib 4 && \
     /work/run_dir_check.sh /stage0-modules/usr/share/libc++/v1 3 && \
@@ -2019,7 +2019,7 @@ RUN ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
     -cxx-isystem /usr/include/c++/v1 -unwindlib=libunwind ${CFLAGS} \
     -x c++ /work/test_exception.cpp -o /work/test_exception \
     -fuse-ld=lld -L/work/builds/opt/libcxx-bootstrap1/lib -lunwind -lc++ -lc++abi \
-    -Xlinker --sysroot=${SYSROOT} --rpath="/work/builds/opt/libcxx-bootstrap1/lib:${SYS_LIB}" ;
+    -Xlinker --sysroot=${SYSROOT} -Xlinker --rpath="/work/builds/opt/libcxx-bootstrap1/lib:${SYS_LIB}" ;
 
 # Cleanup build packages and intermediate files to keep this stage small
 RUN apk del --no-cache \
@@ -2286,7 +2286,7 @@ RUN ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
     -cxx-isystem /usr/include/c++/v1 -unwindlib=libunwind ${CFLAGS} \
     -x c++ /work/test_exception.cpp -o /work/test_exception \
     -fuse-ld=lld -L/work/builds/opt/libcxx-final/lib -lunwind -lc++ -lc++abi \
-    -Xlinker --sysroot=${SYSROOT --rpath="/work/builds/opt/libcxx-final/lib:${SYS_LIB}" ;
+    -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker --rpath="/work/builds/opt/libcxx-final/lib:${SYS_LIB}" ;
 
 CMD ["/work/test_exception"]
 
