@@ -2015,7 +2015,8 @@ RUN ls -lap /work/builds/opt/libcxx-bootstrap1/lib ;\
     done ;
 
 # Build test program and link against final libs
-RUN ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
+RUN ${HOST_CXX} --help ;\
+    ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
     --sysroot=${SYSROOT:-/sysroot} \
     -isystem /usr/include \
     -cxx-isystem /usr/include/c++/v1 -unwindlib=libunwind ${CFLAGS} \
