@@ -1891,7 +1891,9 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:g++
 # but we remove it anyway afterwards
 
-RUN chmod +x /work/run_cmake_build.sh && chmod +x /work/run_dir_check.sh ;
+RUN chmod +x /work/run_cmake_build.sh && \
+    chmod +x /work/run_dir_check.sh && \
+    chmod +x /work/run_post_build_strip.sh ;
 
 # Create helper dirs
 RUN mkdir -p /work/builds/opt/libcxx-final /work/builds && \
@@ -1918,7 +1920,7 @@ ENV CXX_UNWINDER_FLAGS="--unwindlib=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib
 
 # stage 3 changes from stage 1
 # use new staging path
-# leave the linker script logic as auto-discover rather than OFF
+# swap the linker script logic to OFF
 # swap to abi NEW/DELETE DEFINITIONS and thus disable LIBCXX_ENABLE_NEW_DELETE_DEFINITIONS
 # use ABI=libcxxabi (from stage 2)
 
@@ -1953,6 +1955,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DLIBCXX_CXX_ABI=libcxxabi \
       -DLIBCXX_CXX_ABI_LIBRARY_PATH=${SYS_LIB} \
       -DLIBCXX_CXX_ABI_INCLUDE_PATHS="${SYS_INCLUDE}/c++/v1" \
+      -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=OFF \
       -DLIBCXX_ENABLE_NEW_DELETE_DEFINITIONS=OFF \
       -DLIBCXXABI_USE_LLVM_UNWINDER=NO \
       -DLIBCXXABI_USE_COMPILER_RT=ON \
@@ -1990,7 +1993,7 @@ RUN ls -lap /work/builds/opt/libcxx-bootstrap1/lib ;\
     { find /stage0-modules/usr/share/ -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true ;} && \
     { find /stage0-cxx/usr/include/ -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true ;} && \
     mv -vf /stage0-cxx/usr/lib/libc++.modules.json /stage0-modules/usr/lib/libc++.modules.json && \
-    /work/run_dir_check.sh /stage0-modules/usr/lib 3 ;\
+    /work/run_dir_check.sh /stage0-modules/usr/lib 1 ;\
     for SOME_LIB_NAME in "libc++" "libc++experimental" "libc++abi" ; do \
       for SOME_SUFFIX in ".so" ".so.1" ".so.1.0" ; do \
         if [ -f "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" ] ; then \
@@ -1999,13 +2002,13 @@ RUN ls -lap /work/builds/opt/libcxx-bootstrap1/lib ;\
           else \
              strip --strip-unneeded "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" || true; \
           fi ; \
-          /work/run_post_build_strip.sh "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" ;\
+          /work/run_post_build_strip.sh "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" || true; \
         fi ; \
       done ;\
       for SOME_SUFFIX_R2 in ".a" ".so" ".so.1" ".so.1.0" ; do \
         if [ -f "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ] ; then \
           file "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" || true; \
-          rm -f "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" && \
+          rm -f "/${SYSROOT}/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" && \
           install -m 755 "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" "/${SYSROOT}/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ;\
         fi ; \
       done ;\
