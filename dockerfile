@@ -6,19 +6,31 @@
 # shellcheck disable=SC2154
 FROM --platform="linux/${TARGETARCH}" alpine:latest AS fetcher
 
-# Set environment variables
+# - Use pinned versions -
+# Versions are passed through by Docker.
+# shellcheck disable=SC2154
+ARG LIBEXECINFO_VERSION=${LIBEXECINFO_VERSION:-1.3}
+# shellcheck disable=SC2154
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+# shellcheck disable=SC2154
+ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
+
+# OTHER VARS - BUILD HOST ONLY (NOT USED ATM)
+# shellcheck disable=SC2154
+#ARG HOST_HEADERS_VERSION=${HOST_HEADERS_VERSION:-"17.2"}
+
+# Set Source URL environment variables
 ARG LIBEXECINFO_VERSION=${LIBEXECINFO_VERSION:-"1.3"}
 ENV LIBEXECINFO_VERSION=${LIBEXECINFO_VERSION}
 ENV LIBEXECINFO_URL="https://github.com/reactive-firewall/libexecinfo/raw/refs/tags/v${LIBEXECINFO_VERSION}/libexecinfo-${LIBEXECINFO_VERSION}r.tar.bz2"
 ENV LIBCXXRT_URL="https://github.com/reactive-firewall/libcxxrt/archive/refs/heads/master.tar.gz"
-ARG LLVM_VERSION=${LLVM_VERSION:-"22.1.5"}
-ENV LLVM_VERSION=${LLVM_VERSION}
 ENV LLVM_URL="https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-${LLVM_VERSION}.tar.gz"
-ARG MUSL_VERSION=${MUSL_VERSION:-"1.2.6"}
-ENV MUSL_VERSION=${MUSL_VERSION}
 ENV MUSL_URL="https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz"
 
-WORKDIR /fetch
+# OTHER VARS - BUNDLE ONLY (NOT USED ATM)
+#ENV HOST_HEADERS_URL="https://www.kernel.org/pub/linux/kernel/v6.x/linux-6.${HOST_HEADERS_VERSION}.tar.gz"
+
+# Set Source URL environment variables
 ENV CC=clang
 ENV CXX=clang-cpp
 ENV CPP=clang-cpp
@@ -28,19 +40,15 @@ ENV ASM=clang
 ENV RANLIB=llvm-ranlib
 ENV LDFLAGS="-fuse-ld=lld"
 
-# OTHER VARS - BUNDLE ONLY (NOT USED ATM)
-#ARG HOST_HEADERS_VERSION=${HOST_HEADERS_VERSION:-"17.2"}
-#ENV HOST_HEADERS_VERSION=${HOST_HEADERS_VERSION}
-#ENV HOST_HEADERS_URL="https://www.kernel.org/pub/linux/kernel/v6.x/linux-6.${HOST_HEADERS_VERSION}.tar.gz"
+# label the fetcher
+LABEL org.opencontainers.image.vendor="individual"
+LABEL org.opencontainers.image.licenses="cURL License"
 
-
-# Install necessary packages
+# Install necessary packages (for fetcher)
 # ca-certificates - MPL AND MIT - do not bundle - just to verify certificates (weak)
 # alpine - MIT - do not bundle - just need an OS (weak)
 # curl - curl License / MIT (direct)
 # bsdtar - BSD-2 - used to unarchive during bootstrap (transient)
-LABEL org.opencontainers.image.vendor="individual"
-LABEL org.opencontainers.image.licenses="cURL License"
 
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
   apk update && \
@@ -50,6 +58,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:bsdtar && \
   update-ca-certificates
 
+# Stage fetched sources for an otherwise hermetic build
 # just need a place to fetch
 RUN mkdir -p /fetch
 WORKDIR /fetch
@@ -96,7 +105,8 @@ RUN curl -fSLo llvmorg-${LLVM_VERSION}.tar.gz \
     bsdtar -xzf llvmorg-${LLVM_VERSION}.tar.gz && \
     rm llvmorg-${LLVM_VERSION}.tar.gz && \
     mv /fetch/llvm-project-llvmorg-${LLVM_VERSION} /fetch/llvmorg
-# OPTIONAL
+
+# OPTIONAL - UNUSED by default (DO NOT BUNDLE)
 # get HOST linux Headers
 #RUN curl -fsSLo linux-6.${HOST_HEADERS_VERSION}.tar.gz \
 #    --url "https://www.kernel.org/pub/linux/kernel/v6.x/linux-6.${HOST_HEADERS_VERSION}.tar.gz" && \
@@ -110,7 +120,6 @@ RUN curl -fSLo llvmorg-${LLVM_VERSION}.tar.gz \
 #FROM --platform="linux/${TARGETARCH}" alpine:latest AS linux-trampoline
 
 #ARG HOST_HEADERS_VERSION=${HOST_HEADERS_VERSION:-"17.2"}
-#ENV HOST_HEADERS_VERSION=${HOST_HEADERS_VERSION}
 #ENV HOST_HEADERS_URL="https://www.kernel.org/pub/linux/kernel/v6.x/linux-6.${HOST_HEADERS_VERSION}.tar.gz"
 
 #RUN set -eux \
@@ -148,36 +157,90 @@ RUN curl -fSLo llvmorg-${LLVM_VERSION}.tar.gz \
 #RUN make headers -j$(nproc) && \
 #    find usr/include -type f ! -name '*.h' -delete
 
+# clean up tools for smaller image
+#RUN set -eux \
+#    && apk del --no-cache \
+#        cmd:bsdtar \
+#        clang \
+#        cmd:clang++ \
+#        llvm \
+#        libc++ \
+#        libc++-dev \
+#        compiler-rt \
+#        llvm-runtimes \
+#        cmd:llvm-ar \
+#        lld \
+#        make \
+#       binutils \
+#        curl \
+#        ca-certificates \
+#        build-base \
+#        gzip \
+#        perl \
+#        paxctl
 
 # --- Prepare Stage: prepare sysroot for musl headers ---
 # shellcheck disable=SC2154
-FROM --platform="linux/${TARGETARCH}" alpine:latest AS sysroot
+FROM --platform="linux/${TARGETARCH}" alpine:latest AS sysroot-bootstrap
 
+# Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG MUSL_VERSION=${MUSL_VERSION:-"1.2.6"}
-ENV MUSL_VERSION=${MUSL_VERSION}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+# shellcheck disable=SC2154
+ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
+
+# Configure or apply override for musl related environment variables
 ENV MUSL_URL="https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz"
+ENV MUSL_PREFIX="/usr"
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
+
+# Configure or apply override for LLVM related environment variables
+# Compiler runtime library
 ARG LLVM_RTLIB_STUB
 ENV LLVM_RTLIB_STUB="${LLVM_RTLIB_STUB}"
 ARG LLVM_RTLIB
 ENV LLVM_RTLIB="${LLVM_RTLIB:-lib${LLVM_RTLIB_STUB}.a}"
+# Targets & triples
 ARG TARGET_FOR_LLVM
 ENV TARGET_FOR_LLVM=${TARGET_FOR_LLVM}
 ARG TARGET_TRIPLE
 ENV TARGET_TRIPLE=${TARGET_TRIPLE}
 ARG HOST_TRIPLE
 ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
+# Sysroot path
 ENV SYSROOT="/sysroot"
-ENV MUSL_PREFIX="/usr"
 
+# Just Need a bootstrap host to build our bootstrap host.
+# WORKAROUND: Install necessary packages (for bootstrapping a musl sysroot)
+# alpine - MIT - do not bundle - just need an OS (weak)
+# cmd:file - BSD-2-Clause - optional for tests (weak)
+# binutils - GPL-2.0-or-later AND LGPL-2.1-or-later AND BSD-3-Clause
+#            - do not bundle
+#            - just to bootstrap compiler builtins (transient)
+#            - and just to provide a c++ implementation for LLVM (transient) - see llvm-runtime
+#            - and optionally just to provide a zlib implementation (transient)
+#            - and installed by build-base (weak)
+# build-base - MIT - used to bootstrap - (transient)
+# cmd:make - GPL-3.0-or-later - do not bundle - just need make to bootstrap musl (weak)
+# compiler-rt - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a compiler runtime (transient)
+# cmd:clang - Apache-2.0 WITH LLVM-exception / Apache-2.0 - used to compile musl - (direct)
+# libc++ / libc++-dev - Apache-2.0 WITH LLVM-exception / Apache-2.0
+#              - just need a c++ implementation while bootstrapping clang_rt.builtins (transient)
+#              - and just to provide a c++ implementation for LLVM (transient)
+# llvm - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a working toolchain (weak)
+# lld - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a working linker (transient)
+# llvm - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a working toolchain (weak)
+# llvm-runtimes - Apache-2.0 WITH LLVM-exception / Apache-2.0
+#                 - just need a compiler runtime (transient)
+#                 - and just to provide a c++ implementation for LLVM (transient)
+#                 - and just need a unwinder implementation for compiler runtime (transient)
 # does not use cmd:bsdtar nor gzip
 
 RUN set -eux \
     && apk add --no-cache \
-        clang \
+        cmd:clang \
         llvm \
         libc++ \
         libc++-dev \
@@ -185,12 +248,16 @@ RUN set -eux \
         llvm-runtimes \
         cmd:llvm-ar \
         lld \
-        make \
+        cmd:make \
         binutils \
-        curl \
-        ca-certificates \
         build-base \
     && mkdir -pv /build && mkdir -pv "${SYSROOT}"
+
+# Label the sysroot-bootstrap
+# DO NOT VENDOR
+#LABEL org.opencontainers.image.vendor="NULL"
+# note as Apache-2.0 albeit GPL poisoned (transient)
+LABEL org.opencontainers.image.licenses="Apache-2.0 WITH LLVM-exception OR GPL-3.0"
 
 WORKDIR /staging
 
@@ -222,8 +289,8 @@ RUN mkdir -pv ${MUSL_PREFIX} && \
 # Some systems expect /lib64 -> /lib for x86_64. Create symlink if appropriate (unsupported by musl).
 RUN set -eux; \
     if [ "$(uname -m)" = "x86_64" ]; then \
-      [ -d "${SYSROOT}"/lib64 ] || ln -svf usr/lib "${SYSROOT}"/lib64; \
-      [ -d "${SYSROOT}"/usr/lib64 ] || ln -svf lib "${SYSROOT}"/usr/lib64; \
+      [ -d "${SYSROOT}"/lib64 ] || [ -L "${SYSROOT}"/lib64 ] || ln -svf usr/lib "${SYSROOT}"/lib64; \
+      [ -d "${SYSROOT}"/usr/lib64 ] || [ -L "${SYSROOT}"/usr/lib64 ] || ln -svf lib "${SYSROOT}"/usr/lib64; \
     fi
 
 WORKDIR /build
@@ -254,6 +321,7 @@ COPY --from=fetcher /fetch/musl /build/musl
 
 # OPTIONAL - copy headers to $SYSROOT
 
+# musl looks for the following (TODO: add shims if relevant or clean-room replacements if possible)
 # linux/kd.h
 # linux/soundcard.h
 # linux/vt.h
@@ -268,7 +336,7 @@ COPY --from=fetcher /fetch/llvmorg /build/llvm
 # musl should be given these values too
 ENV CFLAGS="-D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700"
 
-# --- Prepare Stage: prepare musl sysroot with headers ---
+# --- Prepare Stage 1 of 3: prepare musl sysroot with headers ---
 WORKDIR /build/musl
 
 # Configure, build, and install musl with shared enabled (default) using LLVM tools
@@ -282,31 +350,37 @@ RUN ./configure --prefix=${MUSL_PREFIX} --target=${TARGET_TRIPLE} \
       CFLAGS="${CFLAGS} -stdlib=libc++ -rtlib=compiler-rt -fno-math-errno -fPIC -fno-common" && \
     make -j"$(nproc)" && \
     DESTDIR="${SYSROOT}" make install-headers && \
-    rm -rfv ./build
+    rm -rf ./build
 
-# Ensure we have the dynamic loader and libs present (sysroot paths)
+# Ensure we have the musl headers present (sysroot paths)
 RUN ls -l ${SYSROOT}${MUSL_PREFIX}/include || true \
     && file ${SYSROOT}${MUSL_PREFIX}/include/* || true
 
 
-# --- Prepare Stage: prepare musl sysroot for TARGET_TRIPLE ---
+# --- Prepare Stage 2 of 3: prepare musl sysroot for TARGET_TRIPLE ---
 WORKDIR /build/llvm
 
 ENV CXXFLAGS="-stdlib=libc++ -fPIC -target ${TARGET_TRIPLE}"
 
 # additional tools for building llvm
-# python3 license: PSF-2.0
+# cmake - BSD-3-Clause - used as a pre-build tool while bootstrapping - (weak)
+# cmd:clang++ - Apache-2.0 WITH LLVM-exception / Apache-2.0 - used to compile parts of clang_rt - (weak)
+# cmd:find - GPL-3.0-or-later - do not bundle - just need a tool to iterate over files and filter results - (weak)
+# cmd:perl - Artistic-1.0-Perl OR GPL-1.0 - do not bundle - used by llvm build automation (weak)
+# cmd:paxctl - GPL-2.0-only - might be used for testing hardened ELF stuff
+# python3 - PSF-2.0 / Python Software Foundation license 2.0 - do not bundle (transient)
+# samurai - Apache-2.0 - do not bundle - just need a build-tool implementation (weak)
+# zlib-dev - Zlib / - see https://zlib.net/zlib_license.html - used by LLVM toolchain (transient)
 RUN set -eux \
     && apk add --no-cache \
-        samurai \
-        cmd:clang++ \
         cmake \
-        python3 \
+        cmd:clang++ \
+        cmd:find \
+        cmd:perl \
         pkgconfig \
-        zlib-dev \
-        perl \
-        paxctl \
-        cmd:find
+        python3 \
+        samurai \
+        zlib-dev
 
 
 # --- Precompile CC Stage0: prepare musl sysroot with clang builtins for TARGET_TRIPLE ---
@@ -338,16 +412,19 @@ RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
       cmake --install build-compiler-rt && \
       rm -rfv build-compiler-rt
 
+# purge transitive stuff once not needed
 RUN set -eux \
     && apk del --no-cache \
         samurai \
         cmake \
         python3 \
         pkgconfig \
-        zlib-dev 2>/dev/null
+        perl \
+        paxctl 2>/dev/null  || true ;
 
 # Ensure we have the clang builtins lib
 RUN ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true;
+# TODO: test for expected lib
 
 
 # --- runtime Trampoline Stage: compile musl sysroot with compiler_rt ---
@@ -365,6 +442,8 @@ RUN ./configure --prefix=${MUSL_PREFIX} --target=${TARGET_TRIPLE} \
     make -j"$(nproc)" && \
     DESTDIR=${SYSROOT} make install
 
+# TODO: implement bootstraping tool to walk dirs and find files with glob names and
+#       then update those matches filesystem dates (and decouple from overkill find tool here)
 # Strip unneeded symbols from shared objects to save space (optional)
 RUN set -eux \
     && if command -v llvm-strip >/dev/null 2>&1; then \
@@ -380,6 +459,8 @@ RUN set -eux \
     && ln -fns libc.so "${SYSROOT}${MUSL_PREFIX}/lib/${MUSL_LDLIB}" \
     && ln -fns "${MUSL_LDLIB}" "${SYSROOT}${MUSL_PREFIX}/lib/ld-musl.so.1"
 
+# TODO: implement bootstraping tool to walk dirs and find files with glob names and
+#       then update those matches filesystem dates (and decouple from overkill find tool here)
 # touch artifacts to make more reproducible (optional)
 RUN find ${SYSROOT}${MUSL_PREFIX}/lib -type f -name "*.so" -exec touch -d "${SOME_DATE_EPOCH}" {} + || true; \
     find ${SYSROOT}${MUSL_PREFIX}/lib -type f -name "*.o" -exec touch -d "${SOME_DATE_EPOCH}" {} + || true; \
@@ -399,13 +480,92 @@ RUN ls -l ${SYSROOT}${MUSL_PREFIX}/include || true && \
 RUN ls -l ${SYSROOT}${MUSL_PREFIX}/bin || true && \
     file ${SYSROOT}${MUSL_PREFIX}/bin/* || true
 
-# purge transient packages
+# Cleanup and purge transient packages (no-longer needed)
 RUN set -eux \
     && apk del --no-cache \
+        binutils \
+        build-base \
+        clang \
+        clang++ \
+        cmd:clang \
         cmd:clang++ \
-        perl \
-        paxctl \
-        cmd:find
+        cmd:llvm-ar \
+        cmd:make \
+        compiler-rt \
+        libc++ \
+        libc++-dev \
+        lld \
+        llvm \
+        llvm-runtimes \
+        make \
+        cmd:find \
+        zlib-dev 2>/dev/null ;
+
+# --- Prepare Stage: Bootstrap sysroot with musl ---
+# shellcheck disable=SC2154
+FROM --platform="linux/${TARGETARCH}" alpine:latest AS sysroot
+
+# Use pinned versions
+# version is passed through by Docker.
+# shellcheck disable=SC2154
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+# shellcheck disable=SC2154
+ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
+
+# Configure or apply override for musl related environment variables
+ENV MUSL_URL="https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz"
+ENV MUSL_PREFIX="/usr"
+ARG MUSL_LDLIB
+ENV MUSL_LDLIB="${MUSL_LDLIB}"
+
+# Configure or apply override for LLVM related environment variables
+# Compiler runtime library
+ARG LLVM_RTLIB_STUB
+ENV LLVM_RTLIB_STUB="${LLVM_RTLIB_STUB}"
+ARG LLVM_RTLIB
+ENV LLVM_RTLIB="${LLVM_RTLIB:-lib${LLVM_RTLIB_STUB}.a}"
+# Targets & triples
+ARG TARGET_FOR_LLVM
+ENV TARGET_FOR_LLVM=${TARGET_FOR_LLVM}
+ARG TARGET_TRIPLE
+ENV TARGET_TRIPLE=${TARGET_TRIPLE}
+ARG HOST_TRIPLE
+ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
+# Sysroot path
+ENV SYSROOT="/sysroot"
+
+# Label the sysroot-trampoline
+# Do not need to vendor
+LABEL org.opencontainers.image.vendor="individual"
+# note as Apache-2.0 WITH LLVM-exception (transient)
+LABEL org.opencontainers.image.licenses="Apache-2.0 WITH LLVM-exception"
+
+ENV CC=clang
+ENV CPP=clang-cpp
+ENV AR=llvm-ar
+ENV AS="clang -integrated-as -c"
+ENV ASM=clang
+ENV RANLIB=llvm-ranlib
+ENV LD=ld.lld
+ENV LDFLAGS="-fuse-ld=lld -Wl,--sysroot=/sysroot -fPIC -Wl,--pic-veneer -Wl,-z,relro -Wl,-z,now"
+
+# musl libc checks TZ
+# format is
+# [SUS/POSIX](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html#tag_08_03)
+# Set TZ to UTC
+ENV TZ='UTC+0'
+
+# epoch is passed through by Docker.
+# shellcheck disable=SC2154
+ARG SOME_DATE_EPOCH
+ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
+
+# MAY want -D_POSIX_C_SOURCE=202405L for v1.2.6 (TODO: review)
+# musl should be given these values too
+ENV CFLAGS="-D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700"
+ENV CXXFLAGS="-stdlib=libc++ -fPIC -target ${TARGET_TRIPLE}"
+
+COPY --from=sysroot-bootstrap /sysroot /sysroot
 
 # Ensure the dynamic loader is configured to search paths correctly
 COPY payloads/etc/ld-musl-x86_64.path /etc/ld-musl-x86_64.path
@@ -430,7 +590,7 @@ RUN set -eux; \
     [ -L "${SYSROOT}"/etc/ld-musl-armv8.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-armv8.path;
 
 RUN printf '#! /bin/sh --norc\n%s\n' "no_op_cmd() { return 0; } ; no_op_cmd ;" >"${SYSROOT}/bin/:" && \
-    chmod -v 755 "${SYSROOT}/bin/:"
+    chmod 755 "${SYSROOT}/bin/:"
 
 # --- unwind-base: bootstrap unwind using distro clang/llvm to compile a minimal unwind library ---
 FROM --platform="linux/${TARGETARCH}" alpine:latest AS build-unwind-base
@@ -1843,9 +2003,20 @@ RUN mkdir -m 755 -p /stage0-modules/usr/share/libc++/v1 /stage0-modules/usr/lib 
       for SOME_SUFFIX_R2 in ".a" ".so" ".so.1" ".so.1.0" ; do \
         if [ -f "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ] ; then \
           file "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" || true; \
+          rm -f "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" && \
+          install -m 755 "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" "/${SYSROOT}/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ;\
         fi ; \
       done ;\
     done ;
+
+# Build test program and link against final libs
+RUN ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
+    --sysroot=${SYSROOT:-/sysroot} \
+    -isystem /usr/include \
+    -cxx-isystem /usr/include/c++/v1 -unwindlib=libunwind ${CFLAGS} \
+    -x c++ /work/test_exception.cpp -o /work/test_exception \
+    -fuse-ld=lld -L/work/builds/opt/libcxx-final/lib -lunwind -lc++ -lc++abi \
+    -Xlinker --sysroot=${SYSROOT --rpath="/work/builds/opt/libcxx-final/lib:${SYS_LIB}" ;
 
 # Cleanup build packages and intermediate files to keep this stage small
 RUN apk del --no-cache \
@@ -2105,9 +2276,14 @@ RUN mkdir -p /work/build-libcxx-final && cd /work/build-libcxx-final && \
 
 # --- Stage 5: smoke test ---
 # Build test program and link against final libs
-RUN ${HOST_CXX} -std=c++17 ${CXXFLAGS} ${CXX_UNWINDER_FLAGS} ${CFLAGS} -x c++ /work/test_exception.cpp -o /work/test_exception \
-    -fuse-ld=lld -L/work/builds/opt/libcxx-final/lib -lc++ -L/work/builds/opt/libcxxabi-final/lib -lc++abi \
-    -Xlinker --rpath="/work/builds/opt/libcxx-final/lib:${SYS_LIB}" ;
+RUN ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
+    -resource-dir /empty-resource-dir \
+    --sysroot=${SYSROOT:-/sysroot} \
+    -isystem /usr/include \
+    -cxx-isystem /usr/include/c++/v1 -unwindlib=libunwind ${CFLAGS} \
+    -x c++ /work/test_exception.cpp -o /work/test_exception \
+    -fuse-ld=lld -L/work/builds/opt/libcxx-final/lib -lunwind -lc++ -lc++abi \
+    -Xlinker --sysroot=${SYSROOT --rpath="/work/builds/opt/libcxx-final/lib:${SYS_LIB}" ;
 
 CMD ["/work/test_exception"]
 
