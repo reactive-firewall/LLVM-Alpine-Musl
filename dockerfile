@@ -43,6 +43,7 @@ ENV LDFLAGS="-fuse-ld=lld"
 # label the fetcher
 LABEL org.opencontainers.image.vendor="individual"
 LABEL org.opencontainers.image.licenses="cURL License"
+LABEL org.opencontainers.image.description="Transient source fetching container. Do not bundle."
 
 # Install necessary packages (for fetcher)
 # ca-certificates - MPL AND MIT - do not bundle - just to verify certificates (weak)
@@ -122,6 +123,12 @@ RUN curl -fSLo llvmorg-${LLVM_VERSION}.tar.gz \
 #ARG HOST_HEADERS_VERSION=${HOST_HEADERS_VERSION:-"17.2"}
 #ENV HOST_HEADERS_URL="https://www.kernel.org/pub/linux/kernel/v6.x/linux-6.${HOST_HEADERS_VERSION}.tar.gz"
 
+# DO NOT VENDOR
+#LABEL org.opencontainers.image.vendor="NULL"
+# note as GPL poisoned (transient)
+#LABEL org.opencontainers.image.licenses="GPL-2.0"
+#LABEL org.opencontainers.image.description="OPTIONAL, transient public headers extraction trampoline. Do not bundle."
+
 #RUN set -eux \
 #    && apk add --no-cache \
 #        cmd:bsdtar \
@@ -135,7 +142,7 @@ RUN curl -fSLo llvmorg-${LLVM_VERSION}.tar.gz \
 #        cmd:llvm-ar \
 #        lld \
 #        make \
-#       binutils \
+#        binutils \
 #        curl \
 #        ca-certificates \
 #        build-base \
@@ -143,7 +150,7 @@ RUN curl -fSLo llvmorg-${LLVM_VERSION}.tar.gz \
 #        perl \
 #        paxctl
 
-# copy optional linux sources (for musl headers)
+# copy optional linux sources (for musl to use headers)
 #COPY --from=fetcher /fetch/linux /build/linux
 #ENV CC=clang
 #ENV CXX=clang++
@@ -171,7 +178,7 @@ RUN curl -fSLo llvmorg-${LLVM_VERSION}.tar.gz \
 #        cmd:llvm-ar \
 #        lld \
 #        make \
-#       binutils \
+#        binutils \
 #        curl \
 #        ca-certificates \
 #        build-base \
@@ -179,7 +186,7 @@ RUN curl -fSLo llvmorg-${LLVM_VERSION}.tar.gz \
 #        perl \
 #        paxctl
 
-# --- Prepare Stage: prepare sysroot for musl headers ---
+# --- Prepare Stage: prepare a sysroot for bootstrapping with musl ---
 # shellcheck disable=SC2154
 FROM --platform="linux/${TARGETARCH}" alpine:latest AS sysroot-bootstrap
 
@@ -258,14 +265,18 @@ RUN set -eux \
 #LABEL org.opencontainers.image.vendor="NULL"
 # note as Apache-2.0 albeit GPL poisoned (transient)
 LABEL org.opencontainers.image.licenses="Apache-2.0 WITH LLVM-exception OR GPL-3.0"
+LABEL org.opencontainers.image.description="Transient container for bootstrapping a sysroot with musl. Do not bundle."
 
-WORKDIR /staging
+# Initialize container working directory to better ensure overall reproducibility
+WORKDIR /tmp
+
+# --- Prepare sysroot skeleton ---
 
 # IMPORTANT:
 # carefully craft symlinks to only look deeper, build tools like ninja don't resolve symlinks well
 # see https://github.com/ninja-build/ninja/issues/1330
 
-RUN mkdir -pv ${MUSL_PREFIX} && \
+RUN set -eux && \
     mkdir -pv "${SYSROOT}"/dev && \
     mkdir -pv "${SYSROOT}"/proc && \
     mkdir -pv "${SYSROOT}"/run && \
@@ -295,15 +306,41 @@ RUN set -eux; \
 
 WORKDIR /build
 
+# Configure bootstrapping toolchain related environment variables
+# prefer LLVM's toolchain (clang, lld, llvm-ar, llvm-ranlib, etc.)
 ENV CC=clang
-ENV CPP=clang-cpp
+ENV CPP="${CC:-clang} -E"
+ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="clang -integrated-as -c"
-ENV ASM=clang
-ENV RANLIB=llvm-ranlib
+ENV AS="${CC:-clang} -integrated-as -c"
+ENV ASM="${CC:-clang} -integrated-as -S"
 ENV LD=ld.lld
-# can't use -Wl,--dynamic-linker=/lib/ld-musl-x86_64.so.1 yet
-ENV LDFLAGS="-fuse-ld=lld -Wl,--sysroot=/sysroot -fPIC -Wl,--pic-veneer -Wl,-z,relro -Wl,-z,now"
+ENV RANLIB=llvm-ranlib
+
+# Configure bootstrapping tool flags via more environment variables
+#
+# Key Bootstrapping compiler Flags (for musl-based builds)
+# Use -fPIC everywhere for position independent code
+# Musl Libc understands -D_ALL_SOURCE (but defaults to -D_DEFAULT_SOURCE / -D_BSD_SOURCE)
+# Musl can expose some POSIX interfaces, so use -D_POSIX_C_SOURCE=200809L to expose those.
+# MAY want try -D_POSIX_C_SOURCE=202405L instead for v1.2.6+ (TODO: review)
+# Musl can expose some XOPEN interfaces too, so use -D_XOPEN_SOURCE=700 to configure those.
+# musl should be given these values too
+ENV CFLAGS="-D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -fPIC"
+# musl provides a C aware dynamic loader/linker implementation, once built
+# but can't use -Wl,--dynamic-linker=/lib/ld-musl-{x86_64,aarch64,armv7}.so.1 just yet
+# Key Linker Flags (for musl bootstraping)
+# Use -fPIC everywhere for position independent code (yes when linking too)
+# Also pass --pic-veneer to the linker whenever supported (e.g. lld)
+# Use -fuse-ld=lld to prefer linking with LLVM's lld (simplifies cross-target linking)
+# Also pass -z relro to the linker whenever supported (helps prevent runtime GOT/PLT overwrites)
+# Also pass -z now to the linker whenever supported (helps prevent lazy-binding attacks)
+ENV LDFLAGS="-fPIC -fuse-ld=lld -Wl,--sysroot=/sysroot -Wl,--pic-veneer -Wl,-z,relro -Wl,-z,now"
+# musl is C but some of the clang_rt builtins are C++
+# Use -stdlib=libc++ to specify using LLVM's libc++ implementation (mostly just to be consistent)
+# Use -fPIC everywhere for position independent code
+# Use -target ${TARGET_TRIPLE} to avoid auto-detection while bootstrapping
+ENV CXXFLAGS="-stdlib=libc++ -fPIC -target ${TARGET_TRIPLE}"
 
 # musl libc checks TZ
 # format is
@@ -311,35 +348,34 @@ ENV LDFLAGS="-fuse-ld=lld -Wl,--sysroot=/sysroot -fPIC -Wl,--pic-veneer -Wl,-z,r
 # Set TZ to UTC
 ENV TZ='UTC+0'
 
-# epoch is passed through by Docker.
+# An 'epoch' based date-string is passed through by Docker.
 # shellcheck disable=SC2154
 ARG SOME_DATE_EPOCH
 ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
 
-# copy sources (for musl headers)
+# Copy sources (for musl headers)
 COPY --from=fetcher /fetch/musl /build/musl
 
-# OPTIONAL - copy headers to $SYSROOT
+# OPTIONAL - Copy OS headers to $SYSROOT - UNUSED by default (for a more OS agnostic bootstrap)
 
-# musl looks for the following (TODO: add shims if relevant or clean-room replacements if possible)
+# musl's source looks for at-least the following headers to pull-in ...
+# TODO: add shims if relevant or clean-room replacements if possible
 # linux/kd.h
 # linux/soundcard.h
 # linux/vt.h
 
-# DEBUG: works without linux headers
+# OPTIONAL - musl build works without linux headers (unused for improved build isolation)
 #COPY --from=linux-trampoline /build/linux/usr/include /sysroot/usr/include
 
-# copy llvm sources (for compiler_rt)
+# Copy LLVM toolchain sources (for compiler_rt, or rather the clang_rt builtins for now)
 COPY --from=fetcher /fetch/llvmorg /build/llvm
 
-# MAY want -D_POSIX_C_SOURCE=202405L for v1.2.6 (TODO: review)
-# musl should be given these values too
-ENV CFLAGS="-D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700"
 
-# --- Prepare Stage 1 of 3: prepare musl sysroot with headers ---
+# --- Prepare Stage 1 of 3: prepare sysroot with musl headers ---
 WORKDIR /build/musl
 
-# Configure, build, and install musl with shared enabled (default) using LLVM tools
+# Configure, build, and install musl headers using LLVM tools
+# IMPORTANT: cleanup the headers build after installing headers (see stage 3 of bootstrapping sysroot)
 RUN ./configure --prefix=${MUSL_PREFIX} --target=${TARGET_TRIPLE} \
       --enable-wrapper=clang \
       --disable-gcc-wrapper \
@@ -347,27 +383,26 @@ RUN ./configure --prefix=${MUSL_PREFIX} --target=${TARGET_TRIPLE} \
       CXX=clang++ \
       AR=llvm-ar RANLIB=llvm-ranlib \
       LDFLAGS="${LDFLAGS}" \
-      CFLAGS="${CFLAGS} -stdlib=libc++ -rtlib=compiler-rt -fno-math-errno -fPIC -fno-common" && \
+      CXXFLAGS="${CXXFLAGS}" \
+      CFLAGS="${CFLAGS} -rtlib=compiler-rt -fno-math-errno -fPIC -fno-common" && \
     make -j"$(nproc)" && \
     DESTDIR="${SYSROOT}" make install-headers && \
     rm -rf ./build
 
-# Ensure we have the musl headers present (sysroot paths)
-RUN ls -l ${SYSROOT}${MUSL_PREFIX}/include || true \
-    && file ${SYSROOT}${MUSL_PREFIX}/include/* || true
+# OPTIONAL - Ensure we have the musl headers present (sysroot paths)
+RUN ls -l ${SYSROOT}${MUSL_PREFIX}/include && \
+    file ${SYSROOT}${MUSL_PREFIX}/include/* || true ;
 
 
-# --- Prepare Stage 2 of 3: prepare musl sysroot for TARGET_TRIPLE ---
+# --- Prepare Stage 2 of 3: prepare sysroot with builtins for TARGET_TRIPLE ---
 WORKDIR /build/llvm
 
-ENV CXXFLAGS="-stdlib=libc++ -fPIC -target ${TARGET_TRIPLE}"
-
-# additional tools for building llvm
+# install additional tools for building llvm clang_rt builtins
 # cmake - BSD-3-Clause - used as a pre-build tool while bootstrapping - (weak)
 # cmd:clang++ - Apache-2.0 WITH LLVM-exception / Apache-2.0 - used to compile parts of clang_rt - (weak)
 # cmd:find - GPL-3.0-or-later - do not bundle - just need a tool to iterate over files and filter results - (weak)
 # cmd:perl - Artistic-1.0-Perl OR GPL-1.0 - do not bundle - used by llvm build automation (weak)
-# cmd:paxctl - GPL-2.0-only - might be used for testing hardened ELF stuff
+# cmd:paxctl - GPL-2.0-only - might be used for testing hardened ELF stuff (UNUSED)
 # python3 - PSF-2.0 / Python Software Foundation license 2.0 - do not bundle (transient)
 # samurai - Apache-2.0 - do not bundle - just need a build-tool implementation (weak)
 # zlib-dev - Zlib / - see https://zlib.net/zlib_license.html - used by LLVM toolchain (transient)
@@ -383,7 +418,7 @@ RUN set -eux \
         zlib-dev
 
 
-# --- Precompile CC Stage0: prepare musl sysroot with clang builtins for TARGET_TRIPLE ---
+# --- Precompile CC builtins: prepare sysroot with clang builtins for TARGET_TRIPLE ---
 RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
       -DCMAKE_INSTALL_PREFIX="${SYSROOT}${MUSL_PREFIX}" \
       -DLLVM_CMAKE_DIR=/build/llvm/cmake/modules \
@@ -397,13 +432,15 @@ RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
       -DCOMPILER_RT_BUILD_CTX_PROFILE=OFF \
       -DCOMPILER_RT_BUILD_ORC=OFF \
       -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON \
+      -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
       -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_C_FLAGS="-fPIC -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700" \
       -DCMAKE_C_COMPILER=clang \
       -DCMAKE_CXX_COMPILER=clang++ \
-      -DCMAKE_ASM_COMPILER=clang \
+      -DCMAKE_ASM_COMPILER=${ASM} \
       -DCMAKE_SYSTEM_NAME=Generic \
       -DLIBC_TARGET_TRIPLE=${TARGET_TRIPLE} \
       -DCMAKE_LINKER=lld \
@@ -412,7 +449,7 @@ RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
       cmake --install build-compiler-rt && \
       rm -rfv build-compiler-rt
 
-# purge transitive stuff once not needed
+# Cleanup and purge transitive stuff once not needed
 RUN set -eux \
     && apk del --no-cache \
         samurai \
@@ -420,14 +457,14 @@ RUN set -eux \
         python3 \
         pkgconfig \
         perl \
-        paxctl 2>/dev/null  || true ;
+        paxctl 2>/dev/null || true ;
 
 # Ensure we have the clang builtins lib
 RUN ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true;
-# TODO: test for expected lib
+# TODO: test for expected clang_rt.* lib
 
 
-# --- runtime Trampoline Stage: compile musl sysroot with compiler_rt ---
+# --- Prepare Stage 3 of 3: compile musl with compiler_rt ---
 WORKDIR /build/musl
 
 # Configure, build, and install musl with shared enabled (default) using LLVM tools
@@ -437,7 +474,8 @@ RUN ./configure --prefix=${MUSL_PREFIX} --target=${TARGET_TRIPLE} \
       CC=clang \
       AR=llvm-ar RANLIB=llvm-ranlib \
       LDFLAGS="${LDFLAGS}" \
-      LIBCC="-l${SYSROOT}${MUSL_PREFIX}/lib/Generic/${LLVM_RTLIB}" \
+      LIBCC="-l${SYSROOT}${MUSL_PREFIX}/lib/generic/${LLVM_RTLIB}" \
+      CXXFLAGS="${CXXFLAGS}" \
       CFLAGS="${CFLAGS} --sysroot=$SYSROOT -rtlib=compiler-rt -fno-math-errno -fPIC -fno-common -fuse-ld=lld" && \
     make -j"$(nproc)" && \
     DESTDIR=${SYSROOT} make install
@@ -499,7 +537,7 @@ RUN set -eux \
         cmd:find \
         zlib-dev || true;
 
-# --- Prepare Stage: Bootstrap sysroot with musl ---
+# --- Prepare Stage: Bootstrap sysroot with musl and builtins ---
 # shellcheck disable=SC2154
 FROM --platform="linux/${TARGETARCH}" alpine:latest AS sysroot
 
@@ -537,32 +575,54 @@ ENV SYSROOT="/sysroot"
 LABEL org.opencontainers.image.vendor="individual"
 # note as Apache-2.0 WITH LLVM-exception (transient)
 LABEL org.opencontainers.image.licenses="Apache-2.0 WITH LLVM-exception"
+LABEL org.opencontainers.image.description="Transient container for a sysroot with musl."
 
+
+# Configure bootstrapping toolchain related environment variables (for providence)
+# prefer LLVM's toolchain (clang, lld, llvm-ar, llvm-ranlib, etc.)
 ENV CC=clang
-ENV CPP=clang-cpp
+ENV CPP="${CC:-clang} -E"
+ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="clang -integrated-as -c"
-ENV ASM=clang
-ENV RANLIB=llvm-ranlib
+ENV AS="${CC:-clang} -integrated-as -c"
+ENV ASM="${CC:-clang} -integrated-as -S"
 ENV LD=ld.lld
-ENV LDFLAGS="-fuse-ld=lld -Wl,--sysroot=/sysroot -fPIC -Wl,--pic-veneer -Wl,-z,relro -Wl,-z,now"
+ENV RANLIB=llvm-ranlib
 
-# musl libc checks TZ
-# format is
-# [SUS/POSIX](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html#tag_08_03)
-# Set TZ to UTC
+# Configure bootstrapping tool flags via more environment variables (for providence)
+#
+# Key Bootstrapping compiler Flags (for musl-based builds)
+# Use -fPIC everywhere for position independent code
+# Musl Libc understands -D_ALL_SOURCE (but defaults to -D_DEFAULT_SOURCE / -D_BSD_SOURCE)
+# Musl can expose some POSIX interfaces, so use -D_POSIX_C_SOURCE=200809L to expose those.
+# MAY want try -D_POSIX_C_SOURCE=202405L instead for v1.2.6+ (TODO: review)
+# Musl can expose some XOPEN interfaces too, so use -D_XOPEN_SOURCE=700 to configure those.
+# musl should be given these values too
+ENV CFLAGS="-D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -fPIC"
+# musl provides a C aware dynamic loader/linker implementation, now built
+# can use -Wl,--dynamic-linker=/lib/ld-musl-{x86_64,aarch64,armv7}.so.1 (but match bootstrap)
+# Key Linker Flags (for musl bootstraping)
+# Use -fPIC everywhere for position independent code (yes when linking too)
+# Also pass --pic-veneer to the linker whenever supported (e.g. lld)
+# Use -fuse-ld=lld to prefer linking with LLVM's lld (simplifies cross-target linking)
+# Also pass -z relro to the linker whenever supported (helps prevent runtime GOT/PLT overwrites)
+# Also pass -z now to the linker whenever supported (helps prevent lazy-binding attacks)
+ENV LDFLAGS="-fPIC -fuse-ld=lld -Wl,--sysroot=/sysroot -Wl,--pic-veneer -Wl,-z,relro -Wl,-z,now"
+# musl is C but some of the clang_rt builtins are C++
+# Use -stdlib=libc++ to specify using LLVM's libc++ implementation (mostly just to be consistent)
+# Use -fPIC everywhere for position independent code
+# Use -target ${TARGET_TRIPLE} to avoid auto-detection while bootstrapping
+ENV CXXFLAGS="-stdlib=libc++ -fPIC -target ${TARGET_TRIPLE}"
+
+# Set TZ to UTC (for consistency)
 ENV TZ='UTC+0'
 
-# epoch is passed through by Docker.
+# An 'epoch' based date-string is passed through by Docker.
 # shellcheck disable=SC2154
 ARG SOME_DATE_EPOCH
 ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
 
-# MAY want -D_POSIX_C_SOURCE=202405L for v1.2.6 (TODO: review)
-# musl should be given these values too
-ENV CFLAGS="-D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700"
-ENV CXXFLAGS="-stdlib=libc++ -fPIC -target ${TARGET_TRIPLE}"
-
+# --- runtime Trampoline Stage: Copy just the bootstrapped sysroot ---
 COPY --from=sysroot-bootstrap /sysroot /sysroot
 
 # Ensure the dynamic loader is configured to search paths correctly
@@ -580,15 +640,17 @@ COPY payloads/etc/ld-musl-aarch64.path /etc/ld-musl-aarch64.path
 RUN set -eux; \
     if [ "$(uname -m)" = "aarch64" ]; then \
       [ -L "${SYSROOT}"/etc/ld-musl-generic.path ] || ln -svf ld-musl-aarch64.path "${SYSROOT}"/etc/ld-musl-generic.path; \
+      [ -L "${SYSROOT}"/etc/ld-musl-armv8.path ] || ln -svf ld-musl-aarch64.path "${SYSROOT}"/etc/ld-musl-armv8.path;
     fi;
 
 COPY payloads/etc/ld-musl-arm.path /etc/ld-musl-arm.path
 RUN set -eux; \
     [ -L "${SYSROOT}"/etc/ld-musl-armv7.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-armv7.path; \
-    [ -L "${SYSROOT}"/etc/ld-musl-armv8.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-armv8.path;
+    [ -L "${SYSROOT}"/etc/ld-musl-armhf.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-armhf.path;
 
 RUN printf '#! /bin/sh --norc\n%s\n' "no_op_cmd() { return 0; } ; no_op_cmd ;" >"${SYSROOT}/bin/:" && \
     chmod 755 "${SYSROOT}/bin/:"
+
 
 # --- unwind-base: bootstrap unwind using distro clang/llvm to compile a minimal unwind library ---
 FROM --platform="linux/${TARGETARCH}" alpine:latest AS build-unwind-base
@@ -1445,9 +1507,7 @@ ENV LD=lld
 #ENV LD=/sysroot/usr/bin/ld.musl-clang
 
 # musl libc checks TZ
-# format is
-# [SUS/POSIX](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html#tag_08_03)
-# Set TZ to UTC
+# shellcheck disable=SC2154
 ENV TZ='UTC+0'
 
 # epoch is passed through by Docker.
@@ -1791,9 +1851,7 @@ ENV LD=lld
 #ENV LD=/sysroot/usr/bin/ld.musl-clang
 
 # musl libc checks TZ
-# format is
-# [SUS/POSIX](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html#tag_08_03)
-# Set TZ to UTC
+# shellcheck disable=SC2154
 ENV TZ='UTC+0'
 
 # epoch is passed through by Docker.
@@ -2086,9 +2144,7 @@ ENV LD=lld
 #ENV LD=/sysroot/usr/bin/ld.musl-clang
 
 # musl libc checks TZ
-# format is
-# [SUS/POSIX](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html#tag_08_03)
-# Set TZ to UTC
+# shellcheck disable=SC2154
 ENV TZ='UTC+0'
 
 # epoch is passed through by Docker.
@@ -2120,9 +2176,9 @@ RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/mach-o && \
 # Ensure unwind has canonical name (example: /usr/lib/libunwind.so -> /usr/lib/libunwind.so.1.0)
 RUN set -eux \
     && ln -fns libunwind.so.1.0 ${SYS_LIB}/libunwind.so.1 && \
-    ln -fns libunwind.so.1 ${SYS_LIB}/libunwind.so
+    ln -fns libunwind.so.1.0 ${SYS_LIB}/libunwind.so
 
-# overlay the libcxxrt (should no-longer be needed)
+# overlay the libcxxrt (should no-longer be needed in step 4)
 #RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi && \
 #    for CXXRT_FILE_ARTIFACT in usr/include/c++/v1/cxxabi/cxxabi.h \
 #        usr/include/c++/v1/cxxabi/unwind-llvm.h \
@@ -2134,18 +2190,19 @@ RUN set -eux \
 #    done ;
 
 # overlay the bootstrapped libcxx and abi
-# no longer needs libssp_nonshared.a (hopefully)
+# (no longer needs libssp_nonshared.a in step 4)
 RUN  touch -d "${SOME_DATE_EPOCH}" ${SYSROOT:-/sysroot}/usr/lib && \
     for CXXSTD_FILE_ARTIFACT in usr/lib/libc++.a \
         usr/lib/libc++.so \
         usr/lib/libc++abi.so \
         usr/lib/libc++experimental.a ; do \
           if [ -f /stage-bootstrap/${CXXSTD_FILE_ARTIFACT} ] ; then \
-            cp -vf /stage-bootstrap/${CXXSTD_FILE_ARTIFACT} ${SYSROOT:-/sysroot}/${CXXSTD_FILE_ARTIFACT} || true ; \
+            install -m 755 /stage-bootstrap/${CXXSTD_FILE_ARTIFACT} ${SYSROOT:-/sysroot}/${CXXSTD_FILE_ARTIFACT} || true ; \
             touch -d "${SOME_DATE_EPOCH}" ${SYSROOT:-/sysroot}/${CXXSTD_FILE_ARTIFACT} || true ; \
           fi ;\
     done ;\
-    mv -f /stage0-cxx/usr/include/c++/v1 ${SYSROOT:-/sysroot}/usr/include/c++/v1
+    rm -fr ${SYSROOT:-/sysroot}/usr/include/c++/v1/ || true ;\
+    cp -rf /stage0-cxx/usr/include/c++/v1 ${SYSROOT:-/sysroot}/usr/include/c++/v1
 
 # install minimal build tooling (musl-based; no libstdc++/glibc packages used)
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
@@ -2220,11 +2277,12 @@ ENV CXXFLAGS="-ffunction-sections -fdata-sections --unwindlib=${SYSROOT:-/sysroo
 # force the correct libunwinder
 ENV CXX_UNWINDER_FLAGS="--unwindlib=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib/libunwind.so.1.0"
 
-# stage 4 changes from stage 3
-# built against stage 3 (just need reproducibility and tests)
-# force problematic abi-linker script to be "OFF"
-# removed -DCMAKE_EXE_LINKER_FLAGS="${CXX_UNWINDER_FLAGS} -Xlinker -Bdynamic -Xlinker -L -Xlinker /work/builds/opt/libcxx-final/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-final/lib -Xlinker --rpath-link=${SYS_LIB}"
+# Stage 4 of 4: Reproduce build against stage 3 build
 #
+# Changes from stage 3 ...
+# built against stage 3 (just need reproducibility and tests)
+# Removed -DCMAKE_EXE_LINKER_FLAGS=... stuff
+# swap enable order of runtimes (trivial config test)
 
 # --- Stage 4: Build libc++ linking against libcxxabi from stage0-cxx (round-trip libc++ bootstrap1) ---
 RUN mkdir -p /work/build-libcxx-final && cd /work/build-libcxx-final && \
@@ -2282,6 +2340,7 @@ RUN mkdir -p /work/build-libcxx-final && cd /work/build-libcxx-final && \
 
 # --- Stage 5: smoke test ---
 # Build test program and link against final libs
+# should work in c++17 mode now
 RUN ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
     -resource-dir /empty-resource-dir \
     --sysroot=${SYSROOT:-/sysroot} \
@@ -2291,6 +2350,12 @@ RUN ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
     -x c++ /work/test_exception.cpp -o /work/test_exception \
     -fuse-ld=lld -L/work/builds/opt/libcxx-final/lib -lunwind -lc++ -lc++abi \
     -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker --rpath="/work/builds/opt/libcxx-final/lib:${SYS_LIB}" ;
+
+# TODO: cleanup and remove no-longer needed packages
+
+# Run the built smoke test
+RUN file /work/test_exception && \
+    /work/test_exception
 
 CMD ["/work/test_exception"]
 
