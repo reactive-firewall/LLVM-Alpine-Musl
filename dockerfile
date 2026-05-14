@@ -440,7 +440,6 @@ RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
       -DCMAKE_C_FLAGS="-fPIC -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700" \
       -DCMAKE_C_COMPILER=clang \
       -DCMAKE_CXX_COMPILER=clang++ \
-      -DCMAKE_ASM_COMPILER=${ASM} \
       -DCMAKE_SYSTEM_NAME=Generic \
       -DLIBC_TARGET_TRIPLE=${TARGET_TRIPLE} \
       -DCMAKE_LINKER=lld \
