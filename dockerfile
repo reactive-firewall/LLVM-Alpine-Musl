@@ -640,7 +640,7 @@ COPY payloads/etc/ld-musl-aarch64.path /etc/ld-musl-aarch64.path
 RUN set -eux; \
     if [ "$(uname -m)" = "aarch64" ]; then \
       [ -L "${SYSROOT}"/etc/ld-musl-generic.path ] || ln -svf ld-musl-aarch64.path "${SYSROOT}"/etc/ld-musl-generic.path; \
-      [ -L "${SYSROOT}"/etc/ld-musl-armv8.path ] || ln -svf ld-musl-aarch64.path "${SYSROOT}"/etc/ld-musl-armv8.path;
+      [ -L "${SYSROOT}"/etc/ld-musl-armv8.path ] || ln -svf ld-musl-aarch64.path "${SYSROOT}"/etc/ld-musl-armv8.path; \
     fi;
 
 COPY payloads/etc/ld-musl-arm.path /etc/ld-musl-arm.path
