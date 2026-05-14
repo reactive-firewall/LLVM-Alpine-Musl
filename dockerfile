@@ -2354,6 +2354,7 @@ RUN ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
 
 # Run the built smoke test
 RUN file /work/test_exception && \
+    chmod +x /work/test_exception && \
     /work/test_exception
 
 CMD ["/work/test_exception"]
