@@ -2473,7 +2473,7 @@ RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/c++/v1 && \
         usr/lib/libc++abi.so \
         usr/lib/libc++experimental.a ; do \
           if [ -f /stage-cxx-root/${CXXSTD_FILE_ARTIFACT} ] ; then \
-            install -m 755 /stage-bootstrap/${CXXSTD_FILE_ARTIFACT} ${SYSROOT:-/sysroot}/${CXXSTD_FILE_ARTIFACT} || true ; \
+            install -m 755 /stage-cxx-root/${CXXSTD_FILE_ARTIFACT} ${SYSROOT:-/sysroot}/${CXXSTD_FILE_ARTIFACT} || true ; \
             touch -d "${SOME_DATE_EPOCH}" ${SYSROOT:-/sysroot}/${CXXSTD_FILE_ARTIFACT} || true ; \
           fi ;\
     done ;\
@@ -2599,8 +2599,8 @@ RUN cmake -S llvm -B build-llvm -G "Ninja" \
     -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
-    -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} ${LDFLAGS}" \
-    -DCMAKE_CXX_FLAGS="-stdlib=libc++ -rtlib=compiler-rt -fPIC -Qunused-arguments -Wl,--dynamic-linker=/lib/${MUSL_LDLIB} ${LDFLAGS}" \
+    -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
+    -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
     -DLLVM_ENABLE_LIBCXX=true \
     -DLLVM_ENABLE_ZSTD=false \
     -DLLVM_ENABLE_ZLIB=false \
