@@ -339,8 +339,9 @@ ENV LDFLAGS="-fPIC -fuse-ld=lld -Wl,--sysroot=/sysroot -Wl,--pic-veneer -Wl,-z,r
 # musl is C but some of the clang_rt builtins are C++
 # Use -stdlib=libc++ to specify using LLVM's libc++ implementation (mostly just to be consistent)
 # Use -fPIC everywhere for position independent code
+# Use -ffunction-sections -fdata-sections to separate data and functions (like musl build does)
 # Use -target ${TARGET_TRIPLE} to avoid auto-detection while bootstrapping
-ENV CXXFLAGS="-stdlib=libc++ -fPIC -target ${TARGET_TRIPLE}"
+ENV CXXFLAGS="-stdlib=libc++ -fPIC -ffunction-sections -fdata-sections -target ${TARGET_TRIPLE}"
 
 # musl libc checks TZ
 # format is
@@ -387,6 +388,8 @@ RUN ./configure --prefix=${MUSL_PREFIX} --target=${TARGET_TRIPLE} \
       CFLAGS="${CFLAGS} -rtlib=compiler-rt -fno-math-errno -fPIC -fno-common" && \
     make -j"$(nproc)" && \
     DESTDIR="${SYSROOT}" make install-headers && \
+    rm -rf ./obj && \
+    rm -rf ./lib && \
     rm -rf ./build
 
 # OPTIONAL - Ensure we have the musl headers present (sysroot paths)
@@ -2350,16 +2353,50 @@ RUN ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
     -fuse-ld=lld -L/work/builds/opt/libcxx-final/lib -lunwind -lc++ -lc++abi \
     -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker --rpath="/work/builds/opt/libcxx-final/lib:${SYS_LIB}" ;
 
-# TODO: cleanup and remove no-longer needed packages
+# see https://libcxx.llvm.org/Modules.html for why /share/libc++/v1/
+RUN set -eux && \
+    ls -lap /work/builds/opt/libcxx-final/usr/lib ;\
+    mkdir -m 755 -p /libcxx-final/usr/share/libc++/ && \
+    mkdir -m 755 -p /libcxx-final/usr/lib/ && \
+    mkdir -m 755 -p /libcxx-final/usr/include/c++/ && \
+    cp -pfr /work/builds/opt/libcxx-bootstrap1/include/c++/v1 /libcxx-final/usr/include/c++/v1 && \
+    cp -vpfr /work/builds/opt/libcxx-bootstrap1/usr/lib /libcxx-final/usr/lib && \
+    cp -pfr /work/builds/opt/libcxx-bootstrap1/share/libc++/v1 /libcxx-final/usr/share/libc++/v1 && \
+    /work/run_dir_check.sh /libcxx-final/usr/lib 4 && \
+    /work/run_dir_check.sh /libcxx-final/usr/share/libc++/v1 3 && \
+    /work/run_dir_check.sh /libcxx-final/usr/include/c++/v1 10 && \
+    { find /libcxx-final/usr/share/ -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true ;} && \
+    { find /libcxx-final/include/ -type f -exec touch -d "${SOME_DATE_EPOCH}" {} + || true ;} ;\
+    for SOME_LIB_NAME in "libc++" "libc++experimental" "libc++abi" ; do \
+      for SOME_SUFFIX in ".so" ".so.1" ".so.1.0" ; do \
+        if [ -f "/libcxx-final/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" ] ; then \
+          if command -v llvm-strip >/dev/null 2>&1; then \
+             llvm-strip --strip-unneeded "/libcxx-final/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" || true; \
+          else \
+             strip --strip-unneeded "/libcxx-final/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" || true; \
+          fi ; \
+          /work/run_post_build_strip.sh "/libcxx-final/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" || true; \
+        fi ; \
+      done ;\
+    done ;
 
 # Run the built smoke test
 # IMPORTANT - compiled is enough of a smoke test, and because the C runtime is still the host OS,
 # this will likely just crash (e.g., seg fault), so launch via the musl loader ... (experimental)
 RUN file /work/test_exception && \
     chmod +x /work/test_exception && \
-    ${SYSROOT:-/sysroot}/lib/ld-musl-x86_64.so.1 --library-path ${SYSROOT:-/sysroot}/lib:${SYSROOT:-/sysroot}/usr/lib:/work/builds/opt/libcxx-final/lib /work/test_exception || true ;
+    ${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB} --library-path ${SYSROOT:-/sysroot}/lib:${SYSROOT:-/sysroot}/usr/lib:/work/builds/opt/libcxx-final/lib /work/test_exception || true ;
 
-CMD ["/work/test_exception"]
+# TODO: cleanup and remove no-longer needed packages
+RUN set -eux && \
+  apk del --no-cache \
+    llvm-libs \
+    cmake \
+    python3 \
+    samurai \
+    cmd:find \
+    cmd:clang++ \
+    cmd:g++ 2>/dev/null || true ;
 
 # --- bootstrap: bootstrap environment using distro clang/llvm to compile a minimal clang toolchain ---
 FROM --platform="linux/${TARGETARCH}" alpine:latest AS bootstrap
@@ -2371,7 +2408,7 @@ WORKDIR /bootstrap
 COPY --from=fetcher /fetch/llvmorg /bootstrap/llvmorg
 COPY --from=sysroot /sysroot /sysroot
 COPY --from=build-unwind /stage /stage
-COPY --from=build-libcxx /work/builds/opt/libcxx-final /stage-cxx-root
+COPY --from=build-libcxx /libcxx-final /stage-cxx-root
 # should not need
 #COPY --from=build-libcxxrt /sysroot /stage-libcxxrt
 #COPY --from=libcxxheaders /headers /stage-cxx
@@ -2468,7 +2505,7 @@ RUN printf "%s\n" "Bootstrapped Libs (pre-c++):" && \
 
 # overlay the standard c++ library (from stage-cxx-root)
 # skip usr/lib/libc++.a for now
-RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/c++/v1 && \
+RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/c++/ && \
     for CXXSTD_FILE_ARTIFACT in usr/lib/libc++.so \
         usr/lib/libc++abi.so \
         usr/lib/libc++experimental.a ; do \
@@ -2477,7 +2514,7 @@ RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/c++/v1 && \
             touch -d "${SOME_DATE_EPOCH}" ${SYSROOT:-/sysroot}/${CXXSTD_FILE_ARTIFACT} || true ; \
           fi ;\
     done ;\
-    cp -f /stage-cxx-root/usr/include/c++/v1/ ${SYSROOT:-/sysroot}/usr/include/c++/v1/ && \
+    cp -pfr /stage-cxx-root/usr/include/c++/v1 ${SYSROOT:-/sysroot}/usr/include/c++/v1 && \
     /bootstrap/bin/run_dir_check.sh ${SYSROOT:-/sysroot}/usr/include/c++/v1 10 ;
 
 # check on the libs and headers again
