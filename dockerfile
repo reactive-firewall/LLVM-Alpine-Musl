@@ -2353,18 +2353,21 @@ RUN ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
 # TODO: cleanup and remove no-longer needed packages
 
 # Run the built smoke test
+# IMPORTANT - compiled is enough of a smoke test, and because the C runtime is still the host OS,
+# this will likely just crash (e.g., seg fault), so launch via the musl loader ... (experimental)
 RUN file /work/test_exception && \
     chmod +x /work/test_exception && \
-    /work/test_exception || true ;
+    ${SYSROOT:-/sysroot}/lib/ld-musl-x86_64.so.1 --library-path ${SYSROOT:-/sysroot}/lib:${SYSROOT:-/sysroot}/usr/lib:/work/builds/opt/libcxx-final/lib /work/test_exception || true ;
 
 CMD ["/work/test_exception"]
 
 # --- bootstrap: bootstrap environment using distro clang/llvm to compile a minimal clang toolchain ---
 FROM --platform="linux/${TARGETARCH}" alpine:latest AS bootstrap
 
+# For build consistancy ....
 WORKDIR /bootstrap
 
-# copy sources
+# Copy sources
 COPY --from=fetcher /fetch/llvmorg /bootstrap/llvmorg
 COPY --from=sysroot /sysroot /sysroot
 COPY --from=build-unwind /stage /stage
@@ -2379,27 +2382,35 @@ COPY payloads/bin/run_post_build_strip.sh /bootstrap/bin/run_post_build_strip.sh
 COPY Generic-Musl/Platforms/Generic-Musl.cmake /tmp/Generic-Musl.cmake
 COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
 
+# Configure or apply override for musl related environment variables
+ENV MUSL_PREFIX="/usr"
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
 
+# Configure or apply override for LLVM related environment variables
+# Compiler runtime library
 ARG LLVM_RTLIB_STUB
 ENV LLVM_RTLIB_STUB="${LLVM_RTLIB_STUB}"
-
 ARG LLVM_RTLIB
 ENV LLVM_RTLIB="${LLVM_RTLIB:-lib${LLVM_RTLIB_STUB}.a}"
-
+# Targets & triples
 ARG TARGET_FOR_LLVM
 ENV TARGET_FOR_LLVM=${TARGET_FOR_LLVM}
-
 ARG TARGET_TRIPLE
 ENV TARGET_TRIPLE=${TARGET_TRIPLE}
-
 ARG HOST_TRIPLE
 ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
 
-# musl libc checks TZ
-# format is
-# [SUS/POSIX](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html#tag_08_03)
+# Sysroot path
+ENV SYSROOT="/sysroot"
+
+# Label the bootstrap image
+# DO NOT VENDOR
+LABEL org.opencontainers.image.vendor="individual"
+# note as Apache-2.0 albeit GPL poisoned (transient)
+LABEL org.opencontainers.image.licenses="Apache-2.0 WITH LLVM-exception OR GPL-3.0"
+LABEL org.opencontainers.image.description="Transient bootstrapped sysroot with musl libc and LLVM libc++."
+
 # Set TZ to UTC
 ENV TZ='UTC+0'
 
@@ -2422,9 +2433,11 @@ ENV LD=lld
 ENV SYSROOT="/sysroot"
 ENV MUSL_PREFIX="/usr"
 
-ENV LDFLAGS="-v -Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic"
-ENV CFLAGS="-rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -iwithsysroot /usr/include"
-ENV CXXFLAGS="-stdlib=libc++ -cxx-isystem /sysroot/usr/include/c++/v1 --unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
+# no more binutils in our toolchain
+
+ENV LDFLAGS="-fuse-ld=lld -v -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/usr/lib -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/lib -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/usr/lib/generic -Xlinker -l${LLVM_RTLIB_STUB} -Xlinker --exclude-libs=libgcc_s.so.1 -Xlinker --exclude-libs=libgcc_s.so -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB}"
+ENV CFLAGS="-I${SYSROOT:-/sysroot}/usr/include -rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -iwithsysroot /usr/include"
+ENV CXXFLAGS="-std=c++17 -stdlib=libc++ -nostdinc++ -resource-dir /empty-resource-dir --sysroot=${SYSROOT:-/sysroot} -cxx-isystem /usr/include/c++/v1 -I${SYSROOT:-/sysroot}/usr/include/c++/v1 -I${SYSROOT:-/sysroot}/usr/include -unwindlib=libunwind -fbinutils-version=none"
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/mach-o && \
@@ -2446,9 +2459,12 @@ RUN set -eux \
     && ln -fns libunwind.so.1.0 ${SYSROOT:-/sysroot}/lib/libunwind.so.1 && \
     ln -fns libunwind.so.1 ${SYSROOT:-/sysroot}/lib/libunwind.so
 
-# Ensure we have the unwinder and libc headers present (sysroot paths)
-RUN ls -l ${SYSROOT:-/sysroot}${MUSL_PREFIX}/include || true \
-    && file ${SYSROOT:-/sysroot}${MUSL_PREFIX}/include/* || true
+# Ensure we have the unwinder and libc libs & headers present (sysroot paths)
+RUN printf "%s\n" "Bootstrapped Libs (pre-c++):" && \
+    ls -lap ${SYSROOT:-/sysroot}/lib/ && file ${SYSROOT:-/sysroot}/lib/generic/* || true ;\
+    ls -lap ${SYSROOT:-/sysroot}/lib/generic/ && file ${SYSROOT:-/sysroot}/lib/generic/* || true ;\
+    printf "%s\n" "Bootstrapped Headers:" && \
+    ls -lapr ${SYSROOT:-/sysroot}/usr/include/ || true
 
 # overlay the standard c++ library (from stage-cxx-root)
 # skip usr/lib/libc++.a for now
@@ -2456,47 +2472,73 @@ RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/c++/v1 && \
     for CXXSTD_FILE_ARTIFACT in usr/lib/libc++.so \
         usr/lib/libc++abi.so \
         usr/lib/libc++experimental.a ; do \
-          if [ -f /stage-bootstrap/${CXXSTD_FILE_ARTIFACT} ] ; then \
+          if [ -f /stage-cxx-root/${CXXSTD_FILE_ARTIFACT} ] ; then \
             install -m 755 /stage-bootstrap/${CXXSTD_FILE_ARTIFACT} ${SYSROOT:-/sysroot}/${CXXSTD_FILE_ARTIFACT} || true ; \
             touch -d "${SOME_DATE_EPOCH}" ${SYSROOT:-/sysroot}/${CXXSTD_FILE_ARTIFACT} || true ; \
           fi ;\
     done ;\
-    cp -f /stage0-cxx/usr/include/c++/v1/ ${SYSROOT:-/sysroot}/usr/include/c++/v1/ && \
+    cp -f /stage-cxx-root/usr/include/c++/v1/ ${SYSROOT:-/sysroot}/usr/include/c++/v1/ && \
     /bootstrap/bin/run_dir_check.sh ${SYSROOT:-/sysroot}/usr/include/c++/v1 10 ;
 
-#check the lib directories too
-# check on the lib
-RUN printf "%s\n" "Bootstrapped Libs (pre-c++):" && \
-    ls -lap ${SYSROOT:-/sysroot}/lib/ && file ${SYSROOT:-/sysroot}/lib/generic/* || true ;\
-    ls -lap ${SYSROOT:-/sysroot}/lib/generic/ && file ${SYSROOT:-/sysroot}/lib/generic/* || true ;\
-    printf "%s\n" "Bootstrapped Headers:" && \
-    ls -lapr ${SYSROOT:-/sysroot}/usr/include/ || true
+# check on the libs and headers again
+RUN printf "%s\n" "Additional bootstrapped Libs (with c++ overlay):" && \
+    { ls -lap ${SYSROOT:-/sysroot}/lib/ | grep -iFe 'libc++' ;} && \
+    printf "%s\n" "Bootstrapped C++ Headers:" && \
+    ls -lapr ${SYSROOT:-/sysroot}/usr/include/c++/v1 ;
 
-# Install distro packages that provide clang able to cross-emit --target. Adjust names for Alpine tag.
+# Just Need a bootstrap host toolchain to cross-compile our stage0.
+# WORKAROUND: Install necessary packages (for bootstrapping a stage0 toolchain)
+# alpine - MIT - do not bundle - just need an OS (weak)
+# file - BSD-2-Clause - optional for tests (weak)
+# compiler-rt - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a compiler runtime (transient)
+# cmake - BSD-3-Clause - used as a pre-build tool while bootstrapping - (weak)
+# oils-for-unix / oils-for-unix-bash - Apache-2.0 - used to trampoline away from GNU bash (transient)
+# cmd:dash - BSD-3-Clause AND GPL-2.0-or-later - just need a host shell more like ash - (weak)
+# cmd:clang - Apache-2.0 WITH LLVM-exception / Apache-2.0 - used to compile musl - (direct)
+# cmd:clang++ - Apache-2.0 WITH LLVM-exception / Apache-2.0 - used to compile parts of clang_rt - (weak)
+# cmd:find - GPL-3.0-or-later - do not bundle - just need a tool to iterate over files and filter results - (weak)
+# cmd:grep - GPL-3.0-or-later - do not bundle - just need a tool to perform string/regex searches - (weak)
+# python3 - PSF-2.0 / Python Software Foundation license 2.0 - do not bundle (transient)
+# samurai - Apache-2.0 - do not bundle - just need a build-tool implementation (weak)
+# zlib-dev - Zlib / - see https://zlib.net/zlib_license.html - used by LLVM toolchain (transient)
+# libc++ / libc++-dev - Apache-2.0 WITH LLVM-exception / Apache-2.0
+#              - just need a c++ implementation while bootstrapping clang_rt.builtins (transient)
+#              - and just to provide a c++ implementation for LLVM (transient)
+# lld - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a working linker (transient)
+# llvm - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a working toolchain (weak)
+# llvm-ar - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a working archive tool (weak)
+# llvm-nm - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a working symbol table inspection tool (transient)
+# llvm-objdump - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need an object file dumper tool (transient)
+# llvm-otool - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need an object file inspection tool (transient)
+# llvm-ranlib - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a working archive tool (weak)
+# llvm-strip - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a working object stripping tool (transient)
+# does not use cmd:bsdtar nor gzip nor packaged libc++ nor packaged libunwind
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
   apk update && \
   apk add --no-cache \
-    cmd:bash \
-    cmd:dash \
-    cmd:clang \
-    llvm \
-    lld \
-    compiler-rt \
-    cmd:llvm-ar \
     cmake \
-    python3 \
-    samurai \
-    cmd:grep \
-    pkgconfig \
-    file \
+    cmd:bash \
+    cmd:clang \
     cmd:clang-cpp \
     cmd:clang++ \
+    cmd:dash \
     cmd:find \
-    cmd:llvm-otool \
-    cmd:llvm-objdump \
-    cmd:llvm-ranlib \
+    cmd:grep \
+    cmd:llvm-ar \
     cmd:llvm-nm \
-    cmd:llvm-strip
+    cmd:llvm-objdump \
+    cmd:llvm-otool \
+    cmd:llvm-ranlib \
+    cmd:llvm-strip \
+    compiler-rt \
+    file \
+    lld \
+    llvm \
+    oils-for-unix \
+    oils-for-unix-bash \
+    pkgconfig \
+    python3 \
+    samurai
 
 # Install into Alpine cmake's Platform dir as PlatformGeneric-Musl.cmake
 RUN mkdir -p /usr/share/cmake/Modules/Platform \
