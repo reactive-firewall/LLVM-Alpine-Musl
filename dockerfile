@@ -461,9 +461,14 @@ RUN set -eux \
         perl \
         paxctl 2>/dev/null || true ;
 
-# Ensure we have the clang builtins lib
-RUN ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ || true;
-# TODO: test for expected clang_rt.* lib
+# Ensure we have the clang builtins lib, and verify the archive:
+RUN ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ && \
+    file ${SYSROOT}${MUSL_PREFIX}/lib/generic/${LLVM_RTLIB} && \
+    { llvm-ar t ${SYSROOT}${MUSL_PREFIX}/lib/generic/${LLVM_RTLIB} | head -5 ;} && \
+    mkdir -p /tmp/rtlib-test && cd /tmp/rtlib-test && \
+    llvm-ar x ${SYSROOT}${MUSL_PREFIX}/lib/generic/${LLVM_RTLIB} && \
+    { for obj in *.o; do file "$obj" || exit 1; done ;} && \
+    rm -rf /tmp/rtlib-test
 
 
 # --- Prepare Stage 3 of 3: compile musl with compiler_rt ---
