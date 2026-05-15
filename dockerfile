@@ -476,7 +476,7 @@ RUN ./configure --prefix=${MUSL_PREFIX} --target=${TARGET_TRIPLE} \
       CC=clang \
       AR=llvm-ar RANLIB=llvm-ranlib \
       LDFLAGS="${LDFLAGS}" \
-      LIBCC="-l${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib/generic/${LLVM_RTLIB}" \
+      LIBCC="-Wl,--whole-archive ${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib/generic/${LLVM_RTLIB} -Wl,--no-whole-archive" \
       CXXFLAGS="${CXXFLAGS}" \
       CFLAGS="${CFLAGS} --sysroot=$SYSROOT -rtlib=compiler-rt -fno-math-errno -fPIC -fno-common -fuse-ld=lld" && \
     make -j"$(nproc)" && \
