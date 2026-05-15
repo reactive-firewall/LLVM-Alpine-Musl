@@ -426,6 +426,8 @@ RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
       -DCMAKE_INSTALL_PREFIX="${SYSROOT}${MUSL_PREFIX}" \
       -DLLVM_CMAKE_DIR=/build/llvm/cmake/modules \
       -DLLVM_MAIN_SRC_DIR=/build/llvm/llvm \
+      -DCOMPILER_RT_HAS_GCC_LIB=NO \
+      -DCOMPILER_RT_HAS_GCC_S_LIB=NO \
       -DCOMPILER_RT_BUILD_BUILTINS=ON \
       -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
       -DCOMPILER_RT_BUILD_MEMPROF=OFF \
@@ -486,6 +488,9 @@ RUN ./configure --prefix=${MUSL_PREFIX} --target=${TARGET_TRIPLE} \
       CFLAGS="${CFLAGS} --sysroot=$SYSROOT -rtlib=compiler-rt -fno-math-errno -fPIC -fno-common -fuse-ld=lld" && \
     make -j"$(nproc)" && \
     DESTDIR=${SYSROOT} make install
+
+# TODO: check If musl + dynamic loader include dl_iterate_phdr, malloc, mmap, atomics
+#       may need to ensure isolation
 
 # TODO: implement bootstraping tool to walk dirs and find files with glob names and
 #       then update those matches filesystem dates (and decouple from overkill find tool here)
