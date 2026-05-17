@@ -400,7 +400,7 @@ RUN set -eux && \
         bin/${TARGET_TRIPLE}-cpp \
         bin/${TARGET_TRIPLE}-ar \
         bin/${TARGET_TRIPLE}-ranlib ; do \
-          [ -L "${SYSROOT:/sysroot}${MUSL_PREFIX:-/usr}/${CROSS_PATH}" ] || ln -svf template-generic-none-musl-tool "${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/${CROSS_PATH}" ;\
+          [ -L "${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/${CROSS_PATH}" ] || ln -svf template-generic-none-musl-tool "${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/${CROSS_PATH}" ;\
     done ;
 
 # --- Prepare Stage 1 of 3: prepare sysroot with musl headers ---
