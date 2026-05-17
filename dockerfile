@@ -313,7 +313,7 @@ ENV CPP="${CC:-clang} -E"
 ENV CXX=clang++
 ENV AR=llvm-ar
 ENV AS="${CC:-clang} -integrated-as -c"
-ENV ASM="${CC:-clang} -integrated-as -S"
+ENV ASM="${CC:-clang} -integrated-as -c"
 ENV LD=ld.lld
 ENV RANLIB=llvm-ranlib
 
@@ -371,9 +371,36 @@ COPY --from=fetcher /fetch/musl /build/musl
 # Copy LLVM toolchain sources (for compiler_rt, or rather the clang_rt builtins for now)
 COPY --from=fetcher /fetch/llvmorg /build/llvm
 
+# Copy wrappers for cross-compiling toolchain mocking
+COPY payloads/bin/run_build_tool.sh ${SYSROOT}/usr/bin/mock-build-tool
+COPY payloads/bin/template-generic-none-musl-tool.sh ${SYSROOT}/usr/bin/template-generic-none-musl-tool
+
+
+# Symlink typical, canonical assembler/linker/archiver/compiler names:
+RUN set -eux && \
+    chmod +x "${SYSROOT:/sysroot}${MUSL_PREFIX:-/usr}/bin/mock-build-tool" && \
+    chmod +x "${SYSROOT:/sysroot}${MUSL_PREFIX:-/usr}/bin/template-generic-none-musl-tool" && \
+    for TYPICAL_PATH in bin/as bin/gas bin/asm bin/cc bin/c++ bin/cpp \
+      bin/clang-wrapper bin/ar bin/ranlib \
+      bin/any-generic-none-musl-as \
+      bin/any-generic-none-musl-ar \
+      bin/any-generic-none-musl-cc \
+      bin/any-generic-none-musl-cpp \
+      bin/any-generic-none-musl-ranlib ; do \
+        [ -x "${SYSROOT:/sysroot}${MUSL_PREFIX:-/usr}/${TYPICAL_PATH}" ] || [ -L "${SYSROOT:/sysroot}${MUSL_PREFIX:-/usr}/${TYPICAL_PATH}" ] || ln -svf mock-build-tool "${SYSROOT:/sysroot}${MUSL_PREFIX:-/usr}/${TYPICAL_PATH}"; \
+    done ;\
+    for CROSS_PATH in bin/${TARGET_TRIPLE}-as bin/${TARGET_TRIPLE}-gas \
+      bin/${TARGET_TRIPLE}-asm bin/${TARGET_TRIPLE}-cc \
+      bin/${TARGET_TRIPLE}-c++ bin/${TARGET_TRIPLE}-cpp \
+      bin/${TARGET_TRIPLE}-ar bin/${TARGET_TRIPLE}-ranlib ; do \
+        [ -x "${SYSROOT:/sysroot}${MUSL_PREFIX:-/usr}/${CROSS_PATH}" ] || [ -L "${SYSROOT:/sysroot}${MUSL_PREFIX:-/usr}/${CROSS_PATH}" ] || ln -svf template-generic-none-musl-tool "${SYSROOT:/sysroot}${MUSL_PREFIX:-/usr}/${CROSS_PATH}"; \
+    done ;
 
 # --- Prepare Stage 1 of 3: prepare sysroot with musl headers ---
 WORKDIR /build/musl
+
+# create trivial wrappers for common tools
+
 
 # Configure, build, and install musl headers using LLVM tools
 # IMPORTANT: cleanup the headers build after installing headers (see stage 3 of bootstrapping sysroot)
@@ -442,7 +469,8 @@ RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_C_FLAGS="-fPIC -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700" \
+      -DCMAKE_C_FLAGS="${CFLAGS} -D_ALL_SOURCE -Qunused-arguments" \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
       -DCMAKE_C_COMPILER=clang \
       -DCMAKE_CXX_COMPILER=clang++ \
       -DCMAKE_SYSTEM_NAME=Generic \
