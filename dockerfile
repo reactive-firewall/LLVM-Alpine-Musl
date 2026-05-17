@@ -2701,7 +2701,7 @@ RUN ls -l ${SYSROOT:-/sysroot}${MUSL_PREFIX}/include/c++/v1 || true \
 RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
       -DCMAKE_INSTALL_PREFIX="${SYSROOT}${MUSL_PREFIX}" \
       -DLLVM_CMAKE_DIR=/build/llvm/cmake/modules \
-      -DLLVM_MAIN_SRC_DIR=/build/llvm/llvm \
+      -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
       -DCOMPILER_RT_HAS_GCC_LIB=NO \
       -DCOMPILER_RT_HAS_GCC_S_LIB=NO \
       -DCOMPILER_RT_BUILD_BUILTINS=ON \
