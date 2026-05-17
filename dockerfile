@@ -2550,8 +2550,8 @@ ENV MUSL_PREFIX="/usr"
 # no more binutils in our toolchain
 
 ENV LDFLAGS="-fuse-ld=lld -v -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/usr/lib -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/lib -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/usr/lib/generic -Xlinker -l${LLVM_RTLIB_STUB} -Xlinker --exclude-libs=libgcc_s.so.1 -Xlinker --exclude-libs=libgcc_s.so --exclude-libs=libssp_nonshared.so -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB}"
-ENV CFLAGS="-I${SYSROOT:-/sysroot}/usr/include -rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -iwithsysroot /usr/include"
-ENV CXXFLAGS="-std=c++17 -stdlib=libc++ -nostdinc++ -resource-dir /esysroot/usr --sysroot=${SYSROOT:-/sysroot} -cxx-isystem /usr/include/c++/v1 -I${SYSROOT:-/sysroot}/usr/include/c++/v1 -I${SYSROOT:-/sysroot}/usr/include -unwindlib=libunwind -fbinutils-version=none"
+ENV CFLAGS="-I${SYSROOT:-/sysroot}/usr/include -rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -iwithsysroot /usr/include"
+ENV CXXFLAGS="-std=c++17 -stdlib=libc++ -nostdinc++ -resource-dir ${SYSROOT:-/sysroot}/usr --sysroot=${SYSROOT:-/sysroot} -cxx-isystem /usr/include/c++/v1 -I${SYSROOT:-/sysroot}/usr/include/c++/v1 -I${SYSROOT:-/sysroot}/usr/include -unwindlib=libunwind -fbinutils-version=none"
 
 RUN chmod +x /bootstrap/bin/run_dir_check.sh && chmod +x /bootstrap/bin/run_post_build_strip.sh
 
@@ -2693,6 +2693,49 @@ RUN ls -l ${SYSROOT:-/sysroot}${MUSL_PREFIX}/lib || true \
 # Ensure we have the libc++ headers present (sysroot paths)
 RUN ls -l ${SYSROOT:-/sysroot}${MUSL_PREFIX}/include/c++/v1 || true \
     && file ${SYSROOT:-/sysroot}${MUSL_PREFIX}/include/c++/v1/* || true
+
+# may want -DCOMPILER_RT_STANDALONE_BUILD=ON
+# may want -DCOMPILER_RT_USE_LLVM_UNWINDER=ON
+
+# --- recompile CC builtins: round-trip with clang builtins for TARGET_TRIPLE ---
+RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
+      -DCMAKE_INSTALL_PREFIX="${SYSROOT}${MUSL_PREFIX}" \
+      -DLLVM_CMAKE_DIR=/build/llvm/cmake/modules \
+      -DLLVM_MAIN_SRC_DIR=/build/llvm/llvm \
+      -DCOMPILER_RT_HAS_GCC_LIB=NO \
+      -DCOMPILER_RT_HAS_GCC_S_LIB=NO \
+      -DCOMPILER_RT_BUILD_BUILTINS=ON \
+      -DCOMPILER_RT_USE_BUILTINS_LIBRARY=ON \
+      -DCOMPILER_RT_BUILD_INTRINSICS=ON \
+      -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
+      -DCOMPILER_RT_BUILD_MEMPROF=OFF \
+      -DCOMPILER_RT_BUILD_PROFILE=OFF \
+      -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
+      -DCOMPILER_RT_BUILD_XRAY=OFF \
+      -DCOMPILER_RT_BUILD_CTX_PROFILE=OFF \
+      -DCOMPILER_RT_BUILD_ORC=OFF \
+      -DCOMPILER_RT_CXX_LIBRARY=libcxx \
+      -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON \
+      -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
+      -DCOMPILER_RT_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
+      -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
+      -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
+      -DCMAKE_C_COMPILER=clang \
+      -DCMAKE_CXX_COMPILER=clang++ \
+      -DCMAKE_SYSTEM_NAME=Generic-Musl \
+      -DCMAKE_LINKER=lld \
+      -DCMAKE_SYSROOT="${SYSROOT}" && \
+      cmake --build build-compiler-rt && \
+      cmake --install build-compiler-rt && \
+      rm -rfv build-compiler-rt
+
+# --- MARK for starting stage0 ---
+
+
 
 # Build minimal clang (install to sysroot)
 RUN cmake -S llvm -B build-llvm -G "Ninja" \
