@@ -2608,7 +2608,6 @@ RUN printf "%s\n" "Additional bootstrapped Libs (with c++ overlay):" && \
 # file - BSD-2-Clause - optional for tests (weak)
 # compiler-rt - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a compiler runtime (transient)
 # cmake - BSD-3-Clause - used as a pre-build tool while bootstrapping - (weak)
-# oils-for-unix / oils-for-unix-bash - Apache-2.0 - used to trampoline away from GNU bash (transient)
 # cmd:dash - BSD-3-Clause AND GPL-2.0-or-later - just need a host shell more like ash - (weak)
 # cmd:clang - Apache-2.0 WITH LLVM-exception / Apache-2.0 - used to compile musl - (direct)
 # cmd:clang++ - Apache-2.0 WITH LLVM-exception / Apache-2.0 - used to compile parts of clang_rt - (weak)
@@ -2650,8 +2649,6 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     file \
     lld \
     llvm \
-    oils-for-unix \
-    oils-for-unix-bash \
     pkgconfig \
     python3 \
     samurai
