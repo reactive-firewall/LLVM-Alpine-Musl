@@ -238,7 +238,8 @@ ENV SYSROOT="/sysroot"
 #              - and just to provide a c++ implementation for LLVM (transient)
 # llvm - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a working toolchain (weak)
 # lld - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a working linker (transient)
-# llvm - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a working toolchain (weak)
+# llvm-ar - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a working archive tool (transient)
+# llvm-ranlib - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a working ranlib tool (transient)
 # llvm-runtimes - Apache-2.0 WITH LLVM-exception / Apache-2.0
 #                 - just need a compiler runtime (transient)
 #                 - and just to provide a c++ implementation for LLVM (transient)
@@ -254,6 +255,7 @@ RUN set -eux \
         compiler-rt \
         llvm-runtimes \
         cmd:llvm-ar \
+        cmd:llvm-ranlib \
         lld \
         cmd:make \
         binutils \
@@ -487,6 +489,35 @@ RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
       cmake --build build-compiler-rt && \
       cmake --install build-compiler-rt && \
       rm -rfv build-compiler-rt
+
+
+# WORKAROUND - arm build has duplicate primitives between libc and builtins (keep musl libc version)
+# llvm-objcopy - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a working object copy tool (weak)
+RUN set -eux && \
+  if [[ -f "/sysroot/usr/lib/generic/libclang_rt.builtins-arm.a" ]] ; then \
+    TMP=/tmp/rt && \
+    mkdir -p "$TMP" && cd "$TMP" && \
+    apk add --no-cache cmd:llvm-objcopy && \
+    llvm-ar x "/sysroot/usr/lib/generic/libclang_rt.builtins-arm.a" aeabi_memcpy.S.obj aeabi_memmove.S.obj aeabi_memset.S.obj && \
+    llvm-objcopy --strip-symbol=__aeabi_memcpy \
+      --strip-symbol=__aeabi_memcpy4 \
+      --strip-symbol=__aeabi_memcpy8 \
+      aeabi_memcpy.S.obj && \
+    llvm-objcopy --strip-symbol=__aeabi_memmove \
+      --strip-symbol=__aeabi_memmove4 \
+      --strip-symbol=__aeabi_memmove8 \
+      aeabi_memmove.S.obj && \
+    llvm-objcopy --strip-symbol=__aeabi_memset \
+      --strip-symbol=__aeabi_memset4 \
+      --strip-symbol=__aeabi_memset8 \
+      --strip-symbol=__aeabi_memclr \
+      --strip-symbol=__aeabi_memclr4 \
+      --strip-symbol=__aeabi_memclr8 \
+      aeabi_memset.S.obj && \
+    llvm-ar --format=bsd r "$ARCHIVE" aeabi_memcpy.S.obj aeabi_memmove.S.obj aeabi_memset.S.obj && \
+    llvm-ranlib "/sysroot/usr/lib/generic/libclang_rt.builtins-arm.a" && \
+    apk del --no-cache cmd:llvm-objcopy ; \
+  fi;
 
 # Cleanup and purge transitive stuff once not needed
 RUN set -eux \
