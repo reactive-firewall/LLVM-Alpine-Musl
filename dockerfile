@@ -2433,7 +2433,7 @@ RUN ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
 RUN set -eux && \
     ls -lap /work/builds/opt/libcxx-final/usr/lib ;\
     mkdir -m 755 -p /libcxx-final/usr/share/libc++/ && \
-    mkdir -m 755 -p /libcxx-final/usr/lib/ && \
+    mkdir -m 755 -p /libcxx-final/usr/ && \
     mkdir -m 755 -p /libcxx-final/usr/include/c++/ && \
     cp -pfr /work/builds/opt/libcxx-final/include/c++/v1 /libcxx-final/usr/include/c++/v1 && \
     cp -vpfr /work/builds/opt/libcxx-final/usr/lib /libcxx-final/usr/lib && \
