@@ -375,25 +375,32 @@ COPY --from=fetcher /fetch/llvmorg /build/llvm
 COPY payloads/bin/run_build_tool.sh ${SYSROOT}/usr/bin/mock-build-tool
 COPY payloads/bin/template-generic-none-musl-tool.sh ${SYSROOT}/usr/bin/template-generic-none-musl-tool
 
-
 # Symlink typical, canonical assembler/linker/archiver/compiler names:
 RUN set -eux && \
     chmod +x "${SYSROOT:/sysroot}${MUSL_PREFIX:-/usr}/bin/mock-build-tool" && \
     chmod +x "${SYSROOT:/sysroot}${MUSL_PREFIX:-/usr}/bin/template-generic-none-musl-tool" && \
-    for TYPICAL_PATH in bin/as bin/gas bin/asm bin/cc bin/c++ bin/cpp \
-      bin/clang-wrapper bin/ar bin/ranlib \
-      bin/any-generic-none-musl-as \
-      bin/any-generic-none-musl-ar \
-      bin/any-generic-none-musl-cc \
-      bin/any-generic-none-musl-cpp \
-      bin/any-generic-none-musl-ranlib ; do \
-        [ -x "${SYSROOT:/sysroot}${MUSL_PREFIX:-/usr}/${TYPICAL_PATH}" ] || [ -L "${SYSROOT:/sysroot}${MUSL_PREFIX:-/usr}/${TYPICAL_PATH}" ] || ln -svf mock-build-tool "${SYSROOT:/sysroot}${MUSL_PREFIX:-/usr}/${TYPICAL_PATH}"; \
+    for TYPICAL_PATH in bin/as bin/gas \
+        bin/asm bin/cc \
+        bin/c++ \
+        bin/cpp \
+        bin/clang-wrapper \
+        bin/ar bin/ranlib \
+        bin/any-generic-none-musl-as \
+        bin/any-generic-none-musl-ar \
+        bin/any-generic-none-musl-cc \
+        bin/any-generic-none-musl-cpp \
+        bin/any-generic-none-musl-ranlib ; do \
+          [ -L "${SYSROOT:/sysroot}${MUSL_PREFIX:-/usr}/${TYPICAL_PATH}" ] || ln -svf mock-build-tool "${SYSROOT:/sysroot}${MUSL_PREFIX:-/usr}/${TYPICAL_PATH}" ;\
     done ;\
-    for CROSS_PATH in bin/${TARGET_TRIPLE}-as bin/${TARGET_TRIPLE}-gas \
-      bin/${TARGET_TRIPLE}-asm bin/${TARGET_TRIPLE}-cc \
-      bin/${TARGET_TRIPLE}-c++ bin/${TARGET_TRIPLE}-cpp \
-      bin/${TARGET_TRIPLE}-ar bin/${TARGET_TRIPLE}-ranlib ; do \
-        [ -x "${SYSROOT:/sysroot}${MUSL_PREFIX:-/usr}/${CROSS_PATH}" ] || [ -L "${SYSROOT:/sysroot}${MUSL_PREFIX:-/usr}/${CROSS_PATH}" ] || ln -svf template-generic-none-musl-tool "${SYSROOT:/sysroot}${MUSL_PREFIX:-/usr}/${CROSS_PATH}"; \
+    for CROSS_PATH in bin/${TARGET_TRIPLE}-as \
+        bin/${TARGET_TRIPLE}-gas \
+        bin/${TARGET_TRIPLE}-asm \
+        bin/${TARGET_TRIPLE}-cc \
+        bin/${TARGET_TRIPLE}-c++ \
+        bin/${TARGET_TRIPLE}-cpp \
+        bin/${TARGET_TRIPLE}-ar \
+        bin/${TARGET_TRIPLE}-ranlib ; do \
+          [ -L "${SYSROOT:/sysroot}${MUSL_PREFIX:-/usr}/${CROSS_PATH}" ] || ln -svf template-generic-none-musl-tool "${SYSROOT:/sysroot}${MUSL_PREFIX:-/usr}/${CROSS_PATH}" ;\
     done ;
 
 # --- Prepare Stage 1 of 3: prepare sysroot with musl headers ---
