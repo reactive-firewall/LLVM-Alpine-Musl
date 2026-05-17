@@ -2696,6 +2696,7 @@ RUN ls -l ${SYSROOT:-/sysroot}${MUSL_PREFIX}/include/c++/v1 || true \
 
 # may want -DCOMPILER_RT_STANDALONE_BUILD=ON
 # may want -DCOMPILER_RT_USE_LLVM_UNWINDER=ON
+# either COMPILER_RT_DEFAULT_TARGET_ONLY or COMPILER_RT_DEFAULT_TARGET_TRIPLE can be set, but not both
 
 # --- recompile CC builtins: round-trip with clang builtins for TARGET_TRIPLE ---
 RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
@@ -2717,7 +2718,6 @@ RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
       -DCOMPILER_RT_CXX_LIBRARY=libcxx \
       -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON \
       -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
-      -DCOMPILER_RT_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE} \
       -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
