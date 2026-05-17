@@ -2435,9 +2435,9 @@ RUN set -eux && \
     mkdir -m 755 -p /libcxx-final/usr/share/libc++/ && \
     mkdir -m 755 -p /libcxx-final/usr/lib/ && \
     mkdir -m 755 -p /libcxx-final/usr/include/c++/ && \
-    cp -pfr /work/builds/opt/libcxx-bootstrap1/include/c++/v1 /libcxx-final/usr/include/c++/v1 && \
-    cp -vpfr /work/builds/opt/libcxx-bootstrap1/usr/lib /libcxx-final/usr/lib && \
-    cp -pfr /work/builds/opt/libcxx-bootstrap1/share/libc++/v1 /libcxx-final/usr/share/libc++/v1 && \
+    cp -pfr /work/builds/opt/libcxx-final/include/c++/v1 /libcxx-final/usr/include/c++/v1 && \
+    cp -vpfr /work/builds/opt/libcxx-final/usr/lib /libcxx-final/usr/lib && \
+    cp -pfr /work/builds/opt/libcxx-final/share/libc++/v1 /libcxx-final/usr/share/libc++/v1 && \
     /work/run_dir_check.sh /libcxx-final/usr/lib 4 && \
     /work/run_dir_check.sh /libcxx-final/usr/share/libc++/v1 3 && \
     /work/run_dir_check.sh /libcxx-final/usr/include/c++/v1 10 && \
