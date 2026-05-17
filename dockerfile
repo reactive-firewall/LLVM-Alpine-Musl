@@ -2489,6 +2489,7 @@ COPY --from=build-libcxx /libcxx-final /stage-cxx-root
 #COPY --from=build-libcxxrt /sysroot /stage-libcxxrt
 #COPY --from=libcxxheaders /headers /stage-cxx
 
+COPY payloads/bin/run_dir_check.sh /bootstrap/bin/run_dir_check.sh
 COPY payloads/bin/run_post_build_strip.sh /bootstrap/bin/run_post_build_strip.sh
 
 # Copy custom Generic-Musl.cmake into the image build context before building the image
@@ -2551,6 +2552,8 @@ ENV MUSL_PREFIX="/usr"
 ENV LDFLAGS="-fuse-ld=lld -v -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/usr/lib -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/lib -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/usr/lib/generic -Xlinker -l${LLVM_RTLIB_STUB} -Xlinker --exclude-libs=libgcc_s.so.1 -Xlinker --exclude-libs=libgcc_s.so -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB}"
 ENV CFLAGS="-I${SYSROOT:-/sysroot}/usr/include -rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -iwithsysroot /usr/include"
 ENV CXXFLAGS="-std=c++17 -stdlib=libc++ -nostdinc++ -resource-dir /empty-resource-dir --sysroot=${SYSROOT:-/sysroot} -cxx-isystem /usr/include/c++/v1 -I${SYSROOT:-/sysroot}/usr/include/c++/v1 -I${SYSROOT:-/sysroot}/usr/include -unwindlib=libunwind -fbinutils-version=none"
+
+RUN chmod +x /bootstrap/bin/run_dir_check.sh && chmod +x /bootstrap/bin/run_post_build_strip.sh
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/mach-o && \
