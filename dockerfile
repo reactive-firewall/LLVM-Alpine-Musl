@@ -514,7 +514,7 @@ RUN set -eux && \
       --strip-symbol=__aeabi_memclr4 \
       --strip-symbol=__aeabi_memclr8 \
       aeabi_memset.S.obj && \
-    llvm-ar --format=bsd r "$ARCHIVE" aeabi_memcpy.S.obj aeabi_memmove.S.obj aeabi_memset.S.obj && \
+    llvm-ar --format=bsd r "/sysroot/usr/lib/generic/libclang_rt.builtins-arm.a" aeabi_memcpy.S.obj aeabi_memmove.S.obj aeabi_memset.S.obj && \
     llvm-ranlib "/sysroot/usr/lib/generic/libclang_rt.builtins-arm.a" && \
     apk del --no-cache cmd:llvm-objcopy ; \
   fi;
