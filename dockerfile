@@ -2534,12 +2534,12 @@ ARG SOME_DATE_EPOCH
 ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
 
 ENV CC=clang
-ENV CXX=clang-cpp
-ENV CPP=clang-cpp
-ENV AR=llvm-ar
-ENV AS="clang -integrated-as -c"
-ENV ASM=clang
-ENV RANLIB=llvm-ranlib
+ENV CXX=clang++
+ENV CPP=${SYSROOT:-/sysroot}/bin/${TARGET_TRIPLE}-cpp
+ENV AR=${SYSROOT:-/sysroot}/bin/${TARGET_TRIPLE}-ar
+ENV AS=${SYSROOT:-/sysroot}/bin/${TARGET_TRIPLE}-as
+ENV ASM=${SYSROOT:-/sysroot}/bin/${TARGET_TRIPLE}-asm
+ENV RANLIB=${SYSROOT:-/sysroot}/bin/${TARGET_TRIPLE}-ranlib
 ENV LD=lld
 # will use /sysroot/usr/bin/ld.musl-clang later
 #ENV LD=/sysroot/usr/bin/ld.musl-clang
@@ -2549,9 +2549,9 @@ ENV MUSL_PREFIX="/usr"
 
 # no more binutils in our toolchain
 
-ENV LDFLAGS="-fuse-ld=lld -v -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/usr/lib -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/lib -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/usr/lib/generic -Xlinker -l${LLVM_RTLIB_STUB} -Xlinker --exclude-libs=libgcc_s.so.1 -Xlinker --exclude-libs=libgcc_s.so -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB}"
+ENV LDFLAGS="-fuse-ld=lld -v -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/usr/lib -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/lib -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/usr/lib/generic -Xlinker -l${LLVM_RTLIB_STUB} -Xlinker --exclude-libs=libgcc_s.so.1 -Xlinker --exclude-libs=libgcc_s.so --exclude-libs=libssp_nonshared.so -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB}"
 ENV CFLAGS="-I${SYSROOT:-/sysroot}/usr/include -rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -iwithsysroot /usr/include"
-ENV CXXFLAGS="-std=c++17 -stdlib=libc++ -nostdinc++ -resource-dir /empty-resource-dir --sysroot=${SYSROOT:-/sysroot} -cxx-isystem /usr/include/c++/v1 -I${SYSROOT:-/sysroot}/usr/include/c++/v1 -I${SYSROOT:-/sysroot}/usr/include -unwindlib=libunwind -fbinutils-version=none"
+ENV CXXFLAGS="-std=c++17 -stdlib=libc++ -nostdinc++ -resource-dir /esysroot/usr --sysroot=${SYSROOT:-/sysroot} -cxx-isystem /usr/include/c++/v1 -I${SYSROOT:-/sysroot}/usr/include/c++/v1 -I${SYSROOT:-/sysroot}/usr/include -unwindlib=libunwind -fbinutils-version=none"
 
 RUN chmod +x /bootstrap/bin/run_dir_check.sh && chmod +x /bootstrap/bin/run_post_build_strip.sh
 
