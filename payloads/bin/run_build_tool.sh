@@ -35,10 +35,10 @@ case "$prog" in
 		fi
 		exec ${CC:-clang} -integrated-as -E "$@"
 		;;
-	c++|g++|any-generic-none-musl-c++)
+	c++|g++|any-generic-none-musl-c++|any-generic-none-musl-clang++)
 		exec ${CXX:-clang++} "$@"
 		;;
-	cc|any-generic-none-musl-cc)
+	cc|any-generic-none-musl-cc|any-generic-none-musl-clang)
 		# Prefer sysroot cc driver if present, falling back to CC
 		if [ -x "${SYSROOT_CC}" ]; then
 			exec "${SYSROOT_CC}" "$@"
