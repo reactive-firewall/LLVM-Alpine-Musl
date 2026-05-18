@@ -106,6 +106,10 @@ case "$prog" in
     inv_arch="${prog%%-generic-none-musl-*}"
     tool="${prog#*-generic-none-musl-}"
     ;;
+  *-generic-none-musleabi-*)
+    inv_arch="${prog%%-generic-none-musleabi-*}"
+    tool="${prog#*-generic-none-musleabi-}"
+    ;;
   *-generic-none-musleabihf-*)
     inv_arch="${prog%%-generic-none-musleabihf-*}"
     tool="${prog#*-generic-none-musleabihf-}"
