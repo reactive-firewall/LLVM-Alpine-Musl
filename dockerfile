@@ -858,7 +858,6 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:grep \
     pkgconfig \
     cmd:llvm-strip \
-    cmd:llvm-config \
     cmd:find
 
 #    cmd:llvm-otool \
@@ -913,7 +912,7 @@ ENV CPP="${CC:-clang} -E"
 ENV CXX=clang++
 ENV AR=llvm-ar
 ENV AS="${CC:-clang} -integrated-as -c"
-ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
+ENV ASM="$${CC:-clang} -integrated-as -c"
 ENV LD=lld
 ENV RANLIB=llvm-ranlib
 
