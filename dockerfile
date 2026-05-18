@@ -848,7 +848,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     llvm-runtimes \
     cmd:llvm-ar \
     cmd:llvm-ranlib \
-    lld
+    lld \
     cmd:bash \
     cmd:dash \
     cmake \
