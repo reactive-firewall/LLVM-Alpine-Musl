@@ -408,7 +408,8 @@ RUN set -eux && \
         bin/${TARGET_TRIPLE}-ar \
         bin/${TARGET_TRIPLE}-ranlib ; do \
           [ -L "${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/${CROSS_PATH}" ] || ln -svf template-generic-none-musl-tool "${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/${CROSS_PATH}" ;\
-    done ;
+    done ;\
+    ls -lap ${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/ ;
 
 # --- Prepare Stage 1 of 3: prepare sysroot with musl headers ---
 WORKDIR /build/musl
