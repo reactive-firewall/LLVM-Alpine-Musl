@@ -486,8 +486,8 @@ RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_C_FLAGS="${CFLAGS} -D_ALL_SOURCE -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_C_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang \
-      -DCMAKE_CXX_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++ \
+      -DCMAKE_C_COMPILER=clang \
+      -DCMAKE_CXX_COMPILER=clang++ \
       -DCMAKE_SYSTEM_NAME=Generic \
       -DLIBC_TARGET_TRIPLE=${TARGET_TRIPLE} \
       -DCMAKE_LINKER=lld \
@@ -959,8 +959,8 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DLIBUNWIND_ENABLE_SHARED=OFF \
     -DLIBUNWIND_ENABLE_STATIC=ON \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang \
-    -DCMAKE_CXX_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++ \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_LINKER=lld && \
     apk del --no-cache \
         g++ \
@@ -1085,8 +1085,8 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DLIBUNWIND_HAS_DL_LIB=OFF \
     -DLIBUNWIND_IS_BAREMETAL=ON \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang \
-    -DCMAKE_CXX_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++ \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_LINKER=lld && \
     apk del --no-cache \
         g++ \
@@ -1266,8 +1266,8 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
   cmake -S . -B ../libcxxrt -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_SYSTEM_NAME=Generic-Musl \
-    -DCMAKE_C_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang \
-    -DCMAKE_CXX_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++ \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
@@ -1533,8 +1533,8 @@ RUN mkdir -p build-libcxx-config && \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CFLAGS} ${CXXFLAGS} -Qunused-arguments" \
-      -DCMAKE_C_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang \
-      -DCMAKE_CXX_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++ \
+      -DCMAKE_C_COMPILER=clang \
+      -DCMAKE_CXX_COMPILER=clang++ \
       -DCMAKE_LINKER=lld \
       -DLLVM_ENABLE_RUNTIMES= \
       -DLIBCXX_INCLUDE_TESTS=OFF \
@@ -1576,8 +1576,8 @@ RUN mkdir -p build-libcxxabi-config && \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_C_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang \
-      -DCMAKE_CXX_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++ \
+      -DCMAKE_C_COMPILER=clang \
+      -DCMAKE_CXX_COMPILER=clang++ \
       -DCMAKE_LINKER=lld \
       -DLLVM_ENABLE_RUNTIMES= \
       -DLIBCXXABI_INCLUDE_TESTS=OFF \
@@ -1797,8 +1797,8 @@ RUN mkdir -p /work/builds/opt/libcxx-bootstrap1 /work/builds/opt/libcxxabi-final
     /work/run_dir_check.sh /work/builds/opt/libcxx-bootstrap0/usr 5 && \
     /work/run_dir_check.sh /work/builds/opt/libcxxabi-bootstrap0/usr 5 ;
 
-ENV HOST_CC=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang
-ENV HOST_CXX=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++
+ENV HOST_CC=clang
+ENV HOST_CXX=clang++
 ENV HOST_LD=lld
 
 # may need -Xlinker --sysroot=/sysroot
@@ -2162,8 +2162,8 @@ RUN mkdir -p /work/builds/opt/libcxx-final /work/builds && \
     /work/run_dir_check.sh /work/builds/opt/libcxx-bootstrap1/usr 5 && \
     /work/run_dir_check.sh /work/builds/opt/libcxxabi-final/usr 5 ;
 
-ENV HOST_CC=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang
-ENV HOST_CXX=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++
+ENV HOST_CC=clang
+ENV HOST_CXX=clang++
 ENV HOST_LD=lld
 
 # may need -Xlinker --sysroot=/sysroot
@@ -2462,8 +2462,8 @@ RUN mkdir -p /work/builds/opt/ && \
     /work/run_dir_check.sh /work/builds/opt/libcxx-final/usr 5 ;
 
 
-ENV HOST_CC=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang
-ENV HOST_CXX=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++
+ENV HOST_CC=clang
+ENV HOST_CXX=clang++
 ENV HOST_LD=lld
 
 # DEBUG Mark 1
@@ -2864,8 +2864,8 @@ RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_C_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang \
-      -DCMAKE_CXX_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++ \
+      -DCMAKE_C_COMPILER=clang \
+      -DCMAKE_CXX_COMPILER=clang++ \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
       -DCMAKE_LINKER=lld \
       -DCMAKE_SYSROOT="${SYSROOT}" && \
@@ -2884,8 +2884,8 @@ RUN cmake -S llvm -B build-llvm -G "Ninja" \
     -DLLVM_CMAKE_DIR=/bootstrap/llvmorg \
     -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
     -DClang_DIR=/bootstrap/llvmorg/clang \
-    -DCMAKE_C_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang \
-    -DCMAKE_CXX_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++ \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_SYSTEM_NAME=Generic-Musl \
     -DCMAKE_SYSROOT="${SYSROOT:-/sysroot}" \
     -DLLVM_ENABLE_PROJECTS="clang;lld" \
