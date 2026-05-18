@@ -385,11 +385,14 @@ RUN set -eux && \
         bin/asm bin/cc \
         bin/c++ \
         bin/cpp \
-        bin/clang-wrapper \
+        bin/as \
         bin/ar bin/ranlib \
         bin/any-generic-none-musl-as \
         bin/any-generic-none-musl-ar \
         bin/any-generic-none-musl-cc \
+        bin/any-generic-none-musl-c++ \
+        bin/any-generic-none-musl-clang \
+        bin/any-generic-none-musl-clang++ \
         bin/any-generic-none-musl-cpp \
         bin/any-generic-none-musl-ranlib ; do \
           [ -L "${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/${TYPICAL_PATH}" ] || ln -svf mock-build-tool "${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/${TYPICAL_PATH}" ;\
@@ -399,6 +402,8 @@ RUN set -eux && \
         bin/${TARGET_TRIPLE}-asm \
         bin/${TARGET_TRIPLE}-cc \
         bin/${TARGET_TRIPLE}-c++ \
+        bin/${TARGET_TRIPLE}-clang \
+        bin/${TARGET_TRIPLE}-clang++ \
         bin/${TARGET_TRIPLE}-cpp \
         bin/${TARGET_TRIPLE}-ar \
         bin/${TARGET_TRIPLE}-ranlib ; do \
@@ -480,8 +485,8 @@ RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_C_FLAGS="${CFLAGS} -D_ALL_SOURCE -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_C_COMPILER=clang \
-      -DCMAKE_CXX_COMPILER=clang++ \
+      -DCMAKE_C_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang \
+      -DCMAKE_CXX_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++ \
       -DCMAKE_SYSTEM_NAME=Generic \
       -DLIBC_TARGET_TRIPLE=${TARGET_TRIPLE} \
       -DCMAKE_LINKER=lld \
@@ -663,7 +668,7 @@ ENV CPP="${CC:-clang} -E"
 ENV CXX=clang++
 ENV AR=llvm-ar
 ENV AS="${CC:-clang} -integrated-as -c"
-ENV ASM="${CC:-clang} -integrated-as -S"
+ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
 ENV LD=ld.lld
 ENV RANLIB=llvm-ranlib
 
@@ -742,26 +747,53 @@ COPY --from=sysroot /sysroot /sysroot
 # copy ehframe.ld script
 COPY payloads/ld.libunwind/ehframe.ld /bootstrap/ehframe.ld
 
+# Use pinned versions
+# version is passed through by Docker.
+# shellcheck disable=SC2154
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+# shellcheck disable=SC2154
+ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
+
+# Configure or apply override for musl related environment variables
+ENV MUSL_URL="https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz"
+ENV MUSL_PREFIX="/usr"
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
 
+# Configure or apply override for LLVM related environment variables
+# Compiler runtime library
+ARG LLVM_RTLIB_STUB
+ENV LLVM_RTLIB_STUB="${LLVM_RTLIB_STUB}"
+ARG LLVM_RTLIB
+ENV LLVM_RTLIB="${LLVM_RTLIB:-lib${LLVM_RTLIB_STUB}.a}"
+# Targets & triples
 ARG TARGET_FOR_LLVM
 ENV TARGET_FOR_LLVM=${TARGET_FOR_LLVM}
-
 ARG TARGET_TRIPLE
 ENV TARGET_TRIPLE=${TARGET_TRIPLE}
-
 ARG HOST_TRIPLE
 ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
+# Sysroot path
+ENV SYSROOT="/sysroot"
 
+# Label the build-unwind-base
+# Do not need to vendor
+# LABEL org.opencontainers.image.vendor="individual"
+# note as Apache-2.0 WITH LLVM-exception (transient)
+LABEL org.opencontainers.image.licenses="Apache-2.0 WITH LLVM-exception"
+LABEL org.opencontainers.image.description="Transient base container for building libunwind built with musl."
+
+
+# Configure bootstrapping toolchain related environment variables (for providence)
+# prefer LLVM's toolchain (clang, lld, llvm-ar, llvm-ranlib, etc.)
 ENV CC=clang
-ENV CXX=clang-cpp
-ENV CPP=clang-cpp
+ENV CPP="${CC:-clang} -E"
+ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="clang -integrated-as -c"
-ENV ASM=clang
-ENV RANLIB=llvm-ranlib
+ENV AS="${CC:-clang} -integrated-as -c"
+ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
 ENV LD=lld
+ENV RANLIB=llvm-ranlib
 
 # musl libc checks TZ
 # format is
@@ -778,25 +810,52 @@ ENV SYSROOT="/sysroot"
 ENV MUSL_PREFIX="/usr"
 
 # Install distro packages that provide clang able to cross-emit --target. Adjust names for Alpine tag.
+# Just Need a bootstrap host to build our bootstrap host.
+# WORKAROUND: Install necessary packages (for bootstrapping a musl sysroot)
+# alpine - MIT - do not bundle - just need an OS (weak)
+# cmd:file - BSD-2-Clause - optional for tests (weak)
+# cmd:make - GPL-3.0-or-later - do not bundle - just need make to bootstrap musl (weak)
+# compiler-rt - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a compiler runtime (transient)
+# cmd:clang - Apache-2.0 WITH LLVM-exception / Apache-2.0 - used to compile libunwind - (direct)
+# cmd:clang++ - Apache-2.0 WITH LLVM-exception / Apache-2.0 - used to compile parts of libunwind - (weak)
+# cmd:clang-cpp - Apache-2.0 WITH LLVM-exception / Apache-2.0 - used to preprocess libunwind - (unused)
+# cmake - BSD-3-Clause - used as a pre-build tool while bootstrapping - (weak)
+# libc++ / libc++-dev - Apache-2.0 WITH LLVM-exception / Apache-2.0
+#              - just need a c++ implementation while bootstrapping clang_rt.builtins (transient)
+#              - and just to provide a c++ implementation for LLVM (transient)
+# llvm - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a working toolchain (weak)
+# lld - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a working linker (transient)
+# llvm-ar - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a working archive tool (transient)
+# llvm-ranlib - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a working ranlib tool (transient)
+# llvm-runtimes - Apache-2.0 WITH LLVM-exception / Apache-2.0
+#                 - just need a compiler runtime (transient)
+#                 - and just to provide a c++ implementation for LLVM (transient)
+#                 - and just need a unwinder implementation for compiler runtime (transient)
+# llvm-strip - Apache-2.0 WITH LLVM-exception / Apache-2.0 - just need a working symbol strip tool (transient)
+# cmd:find - GPL-3.0-or-later - do not bundle - just need a tool to iterate over files and filter results - (weak)
+# python3 - PSF-2.0 / Python Software Foundation license 2.0 - do not bundle (transient)
+# samurai - Apache-2.0 - do not bundle - just need a build-tool implementation (weak)
+# does not use cmd:bsdtar nor gzip nor perl
+
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
   apk update && \
   apk add --no-cache \
-    cmd:bash \
-    cmd:dash \
     cmd:clang \
     llvm \
-    lld \
     libc++ \
     libc++-dev \
     compiler-rt \
-    cmd:llvm-ar \
     llvm-runtimes \
+    cmd:llvm-ar \
+    cmd:llvm-ranlib \
+    lld
+    cmd:bash \
+    cmd:dash \
     cmake \
     python3 \
     samurai \
     cmd:grep \
     pkgconfig \
-    cmd:clang-cpp \
     cmd:llvm-strip \
     cmd:find
 
@@ -816,34 +875,53 @@ FROM --platform="linux/${TARGETARCH}" build-unwind-base AS build-unwind-static
 
 WORKDIR /bootstrap
 
+# Use pinned versions
+# version is passed through by Docker.
+# shellcheck disable=SC2154
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+# shellcheck disable=SC2154
+ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
+
+# Configure or apply override for musl related environment variables
+ENV MUSL_URL="https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz"
+ENV MUSL_PREFIX="/usr"
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
 
+# Configure or apply override for LLVM related environment variables
+# Compiler runtime library
+ARG LLVM_RTLIB_STUB
+ENV LLVM_RTLIB_STUB="${LLVM_RTLIB_STUB}"
+ARG LLVM_RTLIB
+ENV LLVM_RTLIB="${LLVM_RTLIB:-lib${LLVM_RTLIB_STUB}.a}"
+# Targets & triples
 ARG TARGET_FOR_LLVM
 ENV TARGET_FOR_LLVM=${TARGET_FOR_LLVM}
-
 ARG TARGET_TRIPLE
 ENV TARGET_TRIPLE=${TARGET_TRIPLE}
-
 ARG HOST_TRIPLE
 ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
+# Sysroot path
+ENV SYSROOT="/sysroot"
 
+# Configure bootstrapping toolchain related environment variables (for providence)
+# prefer LLVM's toolchain (clang, lld, llvm-ar, llvm-ranlib, etc.)
 ENV CC=clang
-ENV CXX=clang-cpp
-ENV CPP=clang-cpp
+ENV CPP="${CC:-clang} -E"
+ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="clang -integrated-as -c"
-ENV ASM=clang
-ENV RANLIB=llvm-ranlib
+ENV AS="${CC:-clang} -integrated-as -c"
+ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
 ENV LD=lld
+ENV RANLIB=llvm-ranlib
 
 # epoch is passed through by Docker.
 # shellcheck disable=SC2154
 ARG SOME_DATE_EPOCH
 ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
 
-ENV SYSROOT="/sysroot"
-ENV MUSL_PREFIX="/usr"
+# Set TZ to UTC
+ENV TZ='UTC+0'
 
 # may need -Wl,--sysroot=/sysroot
 # may want to play around with -Wl,--allow-shlib-undefined to allow __eh_* undefs (see ehframe.ld)
@@ -880,8 +958,8 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DLIBUNWIND_ENABLE_SHARED=OFF \
     -DLIBUNWIND_ENABLE_STATIC=ON \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang-cpp \
+    -DCMAKE_C_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang \
+    -DCMAKE_CXX_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++ \
     -DCMAKE_LINKER=lld && \
     apk del --no-cache \
         g++ \
@@ -924,34 +1002,53 @@ FROM --platform="linux/${TARGETARCH}" build-unwind-base AS build-unwind
 
 WORKDIR /bootstrap
 
+# Use pinned versions
+# version is passed through by Docker.
+# shellcheck disable=SC2154
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+# shellcheck disable=SC2154
+ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
+
+# Configure or apply override for musl related environment variables
+ENV MUSL_URL="https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz"
+ENV MUSL_PREFIX="/usr"
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
 
+# Configure or apply override for LLVM related environment variables
+# Compiler runtime library
+ARG LLVM_RTLIB_STUB
+ENV LLVM_RTLIB_STUB="${LLVM_RTLIB_STUB}"
+ARG LLVM_RTLIB
+ENV LLVM_RTLIB="${LLVM_RTLIB:-lib${LLVM_RTLIB_STUB}.a}"
+# Targets & triples
 ARG TARGET_FOR_LLVM
 ENV TARGET_FOR_LLVM=${TARGET_FOR_LLVM}
-
 ARG TARGET_TRIPLE
 ENV TARGET_TRIPLE=${TARGET_TRIPLE}
-
 ARG HOST_TRIPLE
 ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
+# Sysroot path
+ENV SYSROOT="/sysroot"
 
+# Configure bootstrapping toolchain related environment variables (for providence)
+# prefer LLVM's toolchain (clang, lld, llvm-ar, llvm-ranlib, etc.)
 ENV CC=clang
-ENV CPP=clang-cpp
+ENV CPP="${CC:-clang} -E"
 ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="clang -integrated-as -c"
-ENV ASM=clang
-ENV RANLIB=llvm-ranlib
+ENV AS="${CC:-clang} -integrated-as -c"
+ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
 ENV LD=lld
+ENV RANLIB=llvm-ranlib
 
 # epoch is passed through by Docker.
 # shellcheck disable=SC2154
 ARG SOME_DATE_EPOCH
 ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
 
-ENV SYSROOT="/sysroot"
-ENV MUSL_PREFIX="/usr"
+# Set TZ to UTC
+ENV TZ='UTC+0'
 
 # may need -Xlinker --sysroot=/sysroot OR -Xlinker --dynamic-linker=/lib/libc.so
 # may need to play around with -Wl,--allow-shlib-undefined to allow __eh_* undefs
@@ -987,8 +1084,8 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DLIBUNWIND_HAS_DL_LIB=OFF \
     -DLIBUNWIND_IS_BAREMETAL=ON \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_C_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang \
+    -DCMAKE_CXX_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++ \
     -DCMAKE_LINKER=lld && \
     apk del --no-cache \
         g++ \
@@ -1049,48 +1146,53 @@ COPY shims/unwind_shim.h /tmp/unwind_shim.h
 COPY Generic-Musl/Platforms/Generic-Musl.cmake /tmp/Generic-Musl.cmake
 COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
 
+# Use pinned versions
+# version is passed through by Docker.
+# shellcheck disable=SC2154
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+# shellcheck disable=SC2154
+ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
+
+# Configure or apply override for musl related environment variables
+ENV MUSL_URL="https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz"
+ENV MUSL_PREFIX="/usr"
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
 
+# Configure or apply override for LLVM related environment variables
+# Compiler runtime library
 ARG LLVM_RTLIB_STUB
 ENV LLVM_RTLIB_STUB="${LLVM_RTLIB_STUB}"
-
 ARG LLVM_RTLIB
 ENV LLVM_RTLIB="${LLVM_RTLIB:-lib${LLVM_RTLIB_STUB}.a}"
-
+# Targets & triples
 ARG TARGET_FOR_LLVM
 ENV TARGET_FOR_LLVM=${TARGET_FOR_LLVM}
-
 ARG TARGET_TRIPLE
 ENV TARGET_TRIPLE=${TARGET_TRIPLE}
-
 ARG HOST_TRIPLE
 ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
+# Sysroot path
+ENV SYSROOT="/sysroot"
 
+# Configure bootstrapping toolchain related environment variables (for providence)
+# prefer LLVM's toolchain (clang, lld, llvm-ar, llvm-ranlib, etc.)
 ENV CC=clang
-ENV CXX=clang-cpp
-ENV CPP=clang-cpp
+ENV CPP="${CC:-clang} -E"
+ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="clang -integrated-as -c"
-ENV ASM=clang
-ENV RANLIB=llvm-ranlib
+ENV AS="${CC:-clang} -integrated-as -c"
+ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
 ENV LD=lld
-# will use /sysroot/usr/bin/ld.musl-clang later
-#ENV LD=/sysroot/usr/bin/ld.musl-clang
-
-# musl libc checks TZ
-# format is
-# [SUS/POSIX](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html#tag_08_03)
-# Set TZ to UTC
-ENV TZ='UTC+0'
+ENV RANLIB=llvm-ranlib
 
 # epoch is passed through by Docker.
 # shellcheck disable=SC2154
 ARG SOME_DATE_EPOCH
 ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
 
-ENV SYSROOT="/sysroot"
-ENV MUSL_PREFIX="/usr"
+# Set TZ to UTC
+ENV TZ='UTC+0'
 
 # may need -Wl,--sysroot=/sysroot
 # may want linker flag -Wl,--nostdlib to prevent linking to any std c++
@@ -1163,8 +1265,8 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
   cmake -S . -B ../libcxxrt -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_SYSTEM_NAME=Generic-Musl \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_C_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang \
+    -DCMAKE_CXX_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++ \
     -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
@@ -1242,48 +1344,53 @@ COPY Generic-Musl/Platforms/Generic-Musl.cmake /tmp/Generic-Musl.cmake
 COPY Generic-Musl/Platforms/Generic-Musl-Libcxxrt.cmake /tmp/Generic-Musl-Libcxxrt.cmake
 COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
 
+# Use pinned versions
+# version is passed through by Docker.
+# shellcheck disable=SC2154
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+# shellcheck disable=SC2154
+ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
+
+# Configure or apply override for musl related environment variables
+ENV MUSL_URL="https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz"
+ENV MUSL_PREFIX="/usr"
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
 
+# Configure or apply override for LLVM related environment variables
+# Compiler runtime library
 ARG LLVM_RTLIB_STUB
 ENV LLVM_RTLIB_STUB="${LLVM_RTLIB_STUB}"
-
 ARG LLVM_RTLIB
 ENV LLVM_RTLIB="${LLVM_RTLIB:-lib${LLVM_RTLIB_STUB}.a}"
-
+# Targets & triples
 ARG TARGET_FOR_LLVM
 ENV TARGET_FOR_LLVM=${TARGET_FOR_LLVM}
-
 ARG TARGET_TRIPLE
 ENV TARGET_TRIPLE=${TARGET_TRIPLE}
-
 ARG HOST_TRIPLE
 ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
+# Sysroot path
+ENV SYSROOT="/sysroot"
 
+# Configure bootstrapping toolchain related environment variables (for providence)
+# prefer LLVM's toolchain (clang, lld, llvm-ar, llvm-ranlib, etc.)
 ENV CC=clang
-ENV CXX=clang-cpp
-ENV CPP=clang-cpp
+ENV CPP="${CC:-clang} -E"
+ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="clang -integrated-as -c"
-ENV ASM=clang
-ENV RANLIB=llvm-ranlib
+ENV AS="${CC:-clang} -integrated-as -c"
+ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
 ENV LD=lld
-# will use /sysroot/usr/bin/ld.musl-clang later
-#ENV LD=/sysroot/usr/bin/ld.musl-clang
-
-# musl libc checks TZ
-# format is
-# [SUS/POSIX](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html#tag_08_03)
-# Set TZ to UTC
-ENV TZ='UTC+0'
+ENV RANLIB=llvm-ranlib
 
 # epoch is passed through by Docker.
 # shellcheck disable=SC2154
 ARG SOME_DATE_EPOCH
 ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
 
-ENV SYSROOT="/sysroot"
-ENV MUSL_PREFIX="/usr"
+# Set TZ to UTC
+ENV TZ='UTC+0'
 
 # may need -Xlinker --sysroot=/sysroot
 # may want linker flag -Xlinker --nostdlib to prevent linking to any std c++
@@ -1425,8 +1532,8 @@ RUN mkdir -p build-libcxx-config && \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CFLAGS} ${CXXFLAGS} -Qunused-arguments" \
-      -DCMAKE_C_COMPILER=clang \
-      -DCMAKE_CXX_COMPILER=clang++ \
+      -DCMAKE_C_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang \
+      -DCMAKE_CXX_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++ \
       -DCMAKE_LINKER=lld \
       -DLLVM_ENABLE_RUNTIMES= \
       -DLIBCXX_INCLUDE_TESTS=OFF \
@@ -1468,8 +1575,8 @@ RUN mkdir -p build-libcxxabi-config && \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_C_COMPILER=clang \
-      -DCMAKE_CXX_COMPILER=clang++ \
+      -DCMAKE_C_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang \
+      -DCMAKE_CXX_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++ \
       -DCMAKE_LINKER=lld \
       -DLLVM_ENABLE_RUNTIMES= \
       -DLIBCXXABI_INCLUDE_TESTS=OFF \
@@ -1487,7 +1594,7 @@ RUN mkdir -p build-libcxxabi-config && \
 RUN set -eux; \
     printf "%s\n" "Test Headers:" && \
     printf '%s\n' '#include <vector>' '#include <string>' 'int main() {' '  std::vector<std::string> v;' '  v.push_back("ok");' '  return (int)v.size();' '}' > /tmp/test.cpp; \
-    clang++ -v -fsyntax-only -std=c++17 -isystem /headers/usr/include /tmp/test.cpp ;
+    ${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++ -v -fsyntax-only -std=c++17 -isystem /headers/usr/include /tmp/test.cpp ;
 
 # Cleanup build packages and intermediate files to keep this stage small
 RUN apk del --no-cache \
@@ -1555,46 +1662,54 @@ COPY shims/bootstrap_cxa_stubs.cpp /work/bootstrap_cxa_stubs.cpp
 COPY shims/__stack_chk_fail_local.c /work/__stack_chk_fail_local.c
 COPY payloads/tests/test_exception.cpp /work/test_exception.cpp
 
+# Use pinned versions
+# version is passed through by Docker.
+# shellcheck disable=SC2154
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+# shellcheck disable=SC2154
+ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
+
+# Configure or apply override for musl related environment variables
+ENV MUSL_URL="https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz"
+ENV MUSL_PREFIX="/usr"
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
 
+# Configure or apply override for LLVM related environment variables
+# Compiler runtime library
 ARG LLVM_RTLIB_STUB
 ENV LLVM_RTLIB_STUB="${LLVM_RTLIB_STUB}"
-
 ARG LLVM_RTLIB
 ENV LLVM_RTLIB="${LLVM_RTLIB:-lib${LLVM_RTLIB_STUB}.a}"
-
+# Targets & triples
 ARG TARGET_FOR_LLVM
 ENV TARGET_FOR_LLVM=${TARGET_FOR_LLVM}
-
 ARG TARGET_TRIPLE
 ENV TARGET_TRIPLE=${TARGET_TRIPLE}
-
 ARG HOST_TRIPLE
 ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
+# Sysroot path
+ENV SYSROOT="/sysroot"
 
+# Configure bootstrapping toolchain related environment variables (for providence)
+# prefer LLVM's toolchain (clang, lld, llvm-ar, llvm-ranlib, etc.)
 ENV CC=clang
-ENV CXX=clang-cpp
-ENV CPP=clang-cpp
+ENV CPP="${CC:-clang} -E"
+ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="clang -integrated-as -c"
-ENV ASM=clang
-ENV RANLIB=llvm-ranlib
+ENV AS="${CC:-clang} -integrated-as -c"
+ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
 ENV LD=lld
-# will use /sysroot/usr/bin/ld.musl-clang later
-#ENV LD=/sysroot/usr/bin/ld.musl-clang
-
-# musl libc checks TZ
-# shellcheck disable=SC2154
-ENV TZ='UTC+0'
+ENV RANLIB=llvm-ranlib
 
 # epoch is passed through by Docker.
 # shellcheck disable=SC2154
 ARG SOME_DATE_EPOCH
 ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
 
-ENV SYSROOT=/sysroot
-ENV MUSL_PREFIX="/usr"
+# Set TZ to UTC
+ENV TZ='UTC+0'
+
 ENV SYS_LIB=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib
 ENV SYS_INCLUDE=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/include
 
@@ -1681,8 +1796,8 @@ RUN mkdir -p /work/builds/opt/libcxx-bootstrap1 /work/builds/opt/libcxxabi-final
     /work/run_dir_check.sh /work/builds/opt/libcxx-bootstrap0/usr 5 && \
     /work/run_dir_check.sh /work/builds/opt/libcxxabi-bootstrap0/usr 5 ;
 
-ENV HOST_CC=${CC}
-ENV HOST_CXX=clang++
+ENV HOST_CC=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang
+ENV HOST_CXX=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++
 ENV HOST_LD=lld
 
 # may need -Xlinker --sysroot=/sysroot
@@ -1899,46 +2014,54 @@ COPY payloads/bin/run_post_build_strip.sh /work/run_post_build_strip.sh
 COPY payloads/bin/run_dir_check.sh /work/run_dir_check.sh
 COPY payloads/tests/test_exception.cpp /work/test_exception.cpp
 
+# Use pinned versions
+# version is passed through by Docker.
+# shellcheck disable=SC2154
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+# shellcheck disable=SC2154
+ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
+
+# Configure or apply override for musl related environment variables
+ENV MUSL_URL="https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz"
+ENV MUSL_PREFIX="/usr"
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
 
+# Configure or apply override for LLVM related environment variables
+# Compiler runtime library
 ARG LLVM_RTLIB_STUB
 ENV LLVM_RTLIB_STUB="${LLVM_RTLIB_STUB}"
-
 ARG LLVM_RTLIB
 ENV LLVM_RTLIB="${LLVM_RTLIB:-lib${LLVM_RTLIB_STUB}.a}"
-
+# Targets & triples
 ARG TARGET_FOR_LLVM
 ENV TARGET_FOR_LLVM=${TARGET_FOR_LLVM}
-
 ARG TARGET_TRIPLE
 ENV TARGET_TRIPLE=${TARGET_TRIPLE}
-
 ARG HOST_TRIPLE
 ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
+# Sysroot path
+ENV SYSROOT="/sysroot"
 
+# Configure bootstrapping toolchain related environment variables (for providence)
+# prefer LLVM's toolchain (clang, lld, llvm-ar, llvm-ranlib, etc.)
 ENV CC=clang
-ENV CXX=clang-cpp
-ENV CPP=clang-cpp
+ENV CPP="${CC:-clang} -E"
+ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="clang -integrated-as -c"
-ENV ASM=clang
-ENV RANLIB=llvm-ranlib
+ENV AS="${CC:-clang} -integrated-as -c"
+ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
 ENV LD=lld
-# will use /sysroot/usr/bin/ld.musl-clang later
-#ENV LD=/sysroot/usr/bin/ld.musl-clang
-
-# musl libc checks TZ
-# shellcheck disable=SC2154
-ENV TZ='UTC+0'
+ENV RANLIB=llvm-ranlib
 
 # epoch is passed through by Docker.
 # shellcheck disable=SC2154
 ARG SOME_DATE_EPOCH
 ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
 
-ENV SYSROOT=/sysroot
-ENV MUSL_PREFIX="/usr"
+# Set TZ to UTC
+ENV TZ='UTC+0'
+
 ENV SYS_LIB=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib
 ENV SYS_INCLUDE=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/include
 
@@ -2038,8 +2161,8 @@ RUN mkdir -p /work/builds/opt/libcxx-final /work/builds && \
     /work/run_dir_check.sh /work/builds/opt/libcxx-bootstrap1/usr 5 && \
     /work/run_dir_check.sh /work/builds/opt/libcxxabi-final/usr 5 ;
 
-ENV HOST_CC=${CC}
-ENV HOST_CXX=clang++
+ENV HOST_CC=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang
+ENV HOST_CXX=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++
 ENV HOST_LD=lld
 
 # may need -Xlinker --sysroot=/sysroot
@@ -2192,46 +2315,54 @@ COPY payloads/bin/run_post_build_strip.sh /work/run_post_build_strip.sh
 COPY payloads/bin/run_dir_check.sh /work/run_dir_check.sh
 COPY payloads/tests/test_exception.cpp /work/test_exception.cpp
 
+# Use pinned versions
+# version is passed through by Docker.
+# shellcheck disable=SC2154
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+# shellcheck disable=SC2154
+ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
+
+# Configure or apply override for musl related environment variables
+ENV MUSL_URL="https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz"
+ENV MUSL_PREFIX="/usr"
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
 
+# Configure or apply override for LLVM related environment variables
+# Compiler runtime library
 ARG LLVM_RTLIB_STUB
 ENV LLVM_RTLIB_STUB="${LLVM_RTLIB_STUB}"
-
 ARG LLVM_RTLIB
 ENV LLVM_RTLIB="${LLVM_RTLIB:-lib${LLVM_RTLIB_STUB}.a}"
-
+# Targets & triples
 ARG TARGET_FOR_LLVM
 ENV TARGET_FOR_LLVM=${TARGET_FOR_LLVM}
-
 ARG TARGET_TRIPLE
 ENV TARGET_TRIPLE=${TARGET_TRIPLE}
-
 ARG HOST_TRIPLE
 ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
+# Sysroot path
+ENV SYSROOT="/sysroot"
 
+# Configure bootstrapping toolchain related environment variables (for providence)
+# prefer LLVM's toolchain (clang, lld, llvm-ar, llvm-ranlib, etc.)
 ENV CC=clang
-ENV CXX=clang-cpp
-ENV CPP=clang-cpp
+ENV CPP="${CC:-clang} -E"
+ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="clang -integrated-as -c"
-ENV ASM=clang
-ENV RANLIB=llvm-ranlib
+ENV AS="${CC:-clang} -integrated-as -c"
+ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
 ENV LD=lld
-# will use /sysroot/usr/bin/ld.musl-clang later
-#ENV LD=/sysroot/usr/bin/ld.musl-clang
-
-# musl libc checks TZ
-# shellcheck disable=SC2154
-ENV TZ='UTC+0'
+ENV RANLIB=llvm-ranlib
 
 # epoch is passed through by Docker.
 # shellcheck disable=SC2154
 ARG SOME_DATE_EPOCH
 ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
 
-ENV SYSROOT=/sysroot
-ENV MUSL_PREFIX="/usr"
+# Set TZ to UTC
+ENV TZ='UTC+0'
+
 ENV SYS_LIB=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib
 ENV SYS_INCLUDE=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/include
 
@@ -2330,8 +2461,8 @@ RUN mkdir -p /work/builds/opt/ && \
     /work/run_dir_check.sh /work/builds/opt/libcxx-final/usr 5 ;
 
 
-ENV HOST_CC=${CC}
-ENV HOST_CXX=clang++
+ENV HOST_CC=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang
+ENV HOST_CXX=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++
 ENV HOST_LD=lld
 
 # DEBUG Mark 1
@@ -2496,7 +2627,15 @@ COPY payloads/bin/run_post_build_strip.sh /bootstrap/bin/run_post_build_strip.sh
 COPY Generic-Musl/Platforms/Generic-Musl.cmake /tmp/Generic-Musl.cmake
 COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
 
+# Use pinned versions
+# version is passed through by Docker.
+# shellcheck disable=SC2154
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+# shellcheck disable=SC2154
+ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
+
 # Configure or apply override for musl related environment variables
+ENV MUSL_URL="https://musl.libc.org/releases/musl-${MUSL_VERSION}.tar.gz"
 ENV MUSL_PREFIX="/usr"
 ARG MUSL_LDLIB
 ENV MUSL_LDLIB="${MUSL_LDLIB}"
@@ -2514,9 +2653,27 @@ ARG TARGET_TRIPLE
 ENV TARGET_TRIPLE=${TARGET_TRIPLE}
 ARG HOST_TRIPLE
 ENV HOST_TRIPLE=${HOST_TRIPLE:-${TARGET_TRIPLE}}
-
 # Sysroot path
 ENV SYSROOT="/sysroot"
+
+# Configure bootstrapping toolchain related environment variables (for providence)
+# prefer LLVM's toolchain (clang, lld, llvm-ar, llvm-ranlib, etc.)
+ENV CC=clang
+ENV CPP="${CC:-clang} -E"
+ENV CXX=clang++
+ENV AR=llvm-ar
+ENV AS="${CC:-clang} -integrated-as -c"
+ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
+ENV LD=lld
+ENV RANLIB=llvm-ranlib
+
+# epoch is passed through by Docker.
+# shellcheck disable=SC2154
+ARG SOME_DATE_EPOCH
+ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
+
+# Set TZ to UTC
+ENV TZ='UTC+0'
 
 # Label the bootstrap image
 # DO NOT VENDOR
@@ -2525,27 +2682,9 @@ LABEL org.opencontainers.image.vendor="individual"
 LABEL org.opencontainers.image.licenses="Apache-2.0 WITH LLVM-exception OR GPL-3.0"
 LABEL org.opencontainers.image.description="Transient bootstrapped sysroot with musl libc and LLVM libc++."
 
-# Set TZ to UTC
-ENV TZ='UTC+0'
-
-# epoch is passed through by Docker.
-# shellcheck disable=SC2154
-ARG SOME_DATE_EPOCH
-ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
-
-ENV CC=clang
-ENV CXX=clang++
-ENV CPP=${SYSROOT:-/sysroot}/bin/${TARGET_TRIPLE}-cpp
-ENV AR=${SYSROOT:-/sysroot}/bin/${TARGET_TRIPLE}-ar
-ENV AS=${SYSROOT:-/sysroot}/bin/${TARGET_TRIPLE}-as
-ENV ASM=${SYSROOT:-/sysroot}/bin/${TARGET_TRIPLE}-asm
-ENV RANLIB=${SYSROOT:-/sysroot}/bin/${TARGET_TRIPLE}-ranlib
-ENV LD=lld
+# note
 # will use /sysroot/usr/bin/ld.musl-clang later
 #ENV LD=/sysroot/usr/bin/ld.musl-clang
-
-ENV SYSROOT="/sysroot"
-ENV MUSL_PREFIX="/usr"
 
 # no more binutils in our toolchain
 
@@ -2724,8 +2863,8 @@ RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
-      -DCMAKE_C_COMPILER=clang \
-      -DCMAKE_CXX_COMPILER=clang++ \
+      -DCMAKE_C_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang \
+      -DCMAKE_CXX_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++ \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
       -DCMAKE_LINKER=lld \
       -DCMAKE_SYSROOT="${SYSROOT}" && \
@@ -2744,8 +2883,8 @@ RUN cmake -S llvm -B build-llvm -G "Ninja" \
     -DLLVM_CMAKE_DIR=/bootstrap/llvmorg \
     -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
     -DClang_DIR=/bootstrap/llvmorg/clang \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_C_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang \
+    -DCMAKE_CXX_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++ \
     -DCMAKE_SYSTEM_NAME=Generic-Musl \
     -DCMAKE_SYSROOT="${SYSROOT:-/sysroot}" \
     -DLLVM_ENABLE_PROJECTS="clang;lld" \

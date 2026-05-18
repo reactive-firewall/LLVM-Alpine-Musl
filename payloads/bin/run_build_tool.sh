@@ -1,4 +1,4 @@
-#!/bin/sh --norc
+#!/bin/sh
 # wrapper: symlinked from various tool names; POSIX shell
 
 prog=$(basename "$0")
@@ -19,20 +19,21 @@ case "$prog" in
 	as|as.exe|gas|asm|any-generic-none-musl-as)
 		exec sh -c "${AS} \"$@\""
 		;;
-	ar|x86_64-generic-none-musl-ar)
+	ar|any-generic-none-musl-ar)
 		exec sh -c "${AR} \"$@\""
 		;;
 	ranlib|any-generic-none-musl-ranlib)
-		exec ${RANLIB:-ranlib} "$@"
+		exec sh -c "${RANLIB:-ranlib} \"$@\""
 		;;
 	cpp|cpp.exe|any-generic-none-musl-cpp)
-		# use CC -E if CPP is not a single token; evaluate carefully
+		allowed="${CC:-clang} -E"
 		if [ -n "${CPP+set}" ]; then
-			# If CPP contains spaces, use eval to expand; safe because wrapper is local/trusted
-			eval exec ${CPP} \"\$@\"
-		else
-			exec ${CC:-clang} -E "$@"
+			if [ "$CPP" != "$allowed" ]; then
+				printf '%s\n' "Refusing to use unsafe CPP value" >&2
+				exit 1
+			fi
 		fi
+		exec ${CC:-clang} -integrated-as -E "$@"
 		;;
 	c++|g++|any-generic-none-musl-c++)
 		exec ${CXX:-clang++} "$@"

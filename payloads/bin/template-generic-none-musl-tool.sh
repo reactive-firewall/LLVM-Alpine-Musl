@@ -1,4 +1,4 @@
-#!/bin/sh --norc
+#!/bin/sh
 # POSIX shell wrapper: data-driven, modular, minimal globals.
 # Usage: invoked via symlink named "<arch>-generic-none-musl-<tool>"
 
