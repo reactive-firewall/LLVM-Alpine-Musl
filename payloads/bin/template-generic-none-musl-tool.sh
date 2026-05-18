@@ -28,7 +28,7 @@ triple_for_arch() {
 march_mcpu_for_arch() {
   case "$1" in
     i486|i*86) printf '%s\n' "-march=i486 -m32 -mtune=generic" ;; # UNUSED ISA32 - just an interesting minimum
-    x86_64) printf '%s\n' "-march=x86-64-v4 -m64 -mtune=generic" ;;  # targets AMD LP64
+    x86_64) printf '%s\n' "-march=x86-64-v4 -mtune=generic" ;;  # targets AMD LP64
     aarch64|armv8) printf '%s\n' "-march=armv8-a -mtune=generic" ;;  # AArch64 target is little-endian
     armhf|armv7) printf '%s\n' "-march=armv7-a -mabi=aapcs -mtune=generic -marm -mfloat-abi=hard -mfpu=neon-vfpv4" ;; # targets armv7 like raspberrypi 2+ thru 3B+ (32-bit) (but those should use -mcpu=cortex-a7 or -mcpu=cortex-a53)
     *) printf '%s\n' "" ;;
