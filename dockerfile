@@ -858,6 +858,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:grep \
     pkgconfig \
     cmd:llvm-strip \
+    cmd:llvm-config \
     cmd:find
 
 #    cmd:llvm-otool \
