@@ -1058,10 +1058,10 @@ ENV TZ='UTC+0'
 # may need to play around with -Wl,--allow-shlib-undefined to allow __eh_* undefs
 # may want --unwindlib=none when building libunwind
 # may want -Xlinker --exclude-libs=libgcc_s.so.1
-ENV LDFLAGS="-Xlinker --sysroot=/sysroot -Xlinker -L -Xlinker /sysroot/usr/lib -Xlinker -L -Xlinker /sysroot/lib -Xlinker -L -Xlinker /sysroot/usr/lib/generic -Xlinker --unique -Xlinker --dynamic-linker=/sysroot/lib/${MUSL_LDLIB} -fPIC -Xlinker --pic-veneer -Xlinker -z -Xlinker relro -Xlinker -z -Xlinker now -fuse-ld=lld -Xlinker --script=/bootstrap/ehframe.ld"
+ENV LDFLAGS="-XLinker --verbose -Xlinker --sysroot=/sysroot -Xlinker -L -Xlinker /sysroot/usr/lib -Xlinker -L -Xlinker /sysroot/lib -Xlinker -L -Xlinker /sysroot/usr/lib/generic -Xlinker --unique -Xlinker --dynamic-linker=/sysroot/lib/${MUSL_LDLIB} -fPIC -Xlinker --pic-veneer -Xlinker -z -Xlinker relro -Xlinker -z -Xlinker now -fuse-ld=lld -Xlinker --eh-frame-hdr -Xlinker --script=/bootstrap/ehframe.ld"
 # may require -D__linux__
-ENV CFLAGS="-rtlib=compiler-rt -fPIC -Xlinker --pic-veneer -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT:-/sysroot}/usr/include -iwithsysroot /usr/include"
-ENV CXXFLAGS="-rtlib=compiler-rt -fPIC -Xlinker --pic-veneer -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
+ENV CFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -Xlinker --pic-veneer -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT:-/sysroot}/usr/include"
+ENV CXXFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -Xlinker --pic-veneer -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
 
 WORKDIR /bootstrap/llvmorg
 
@@ -1084,7 +1084,7 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
     -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
-    -DCMAKE_CXX_FLAGS="${CXXFLAGS} -v -Qunused-arguments -Xlinker --eh-frame-hdr -Xlinker --verbose" \
+    -DCMAKE_CXX_FLAGS="${CXXFLAGS} -v -Qunused-arguments" \
     -DLIBUNWIND_HAS_DL_LIB=OFF \
     -DLIBUNWIND_IS_BAREMETAL=ON \
     -DCMAKE_BUILD_TYPE=Release \
