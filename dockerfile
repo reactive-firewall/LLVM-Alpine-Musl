@@ -915,7 +915,7 @@ ENV CPP="${CC:-clang} -E"
 ENV CXX=clang++
 ENV AR=llvm-ar
 ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
-ENV ASM="${CC:-clang} -integrated-as -c"
+ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
 ENV LD=lld
 ENV RANLIB=llvm-ranlib
 
