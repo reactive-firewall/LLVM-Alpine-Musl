@@ -9,7 +9,10 @@
 arch_map() {
   # maps incoming arch -> canonical arch key
   case "$1" in
+    arm) printf '%s\n' "armhf" ;;
     armv7) printf '%s\n' "armhf" ;;
+    armv8) printf '%s\n' "aarch64" ;;
+    x86-64|x86_64h) printf '%s\n' "x86_64" ;;
     *) printf '%s\n' "$1" ;;
   esac
 }
@@ -38,7 +41,7 @@ march_mcpu_for_arch() {
 # Tools that accept --target (clang style)
 target_accepting() {
   case "$1" in
-    clang|cc|c++|cpp|as|ld) return 0 ;;
+    clang|cc|c++|cpp|as) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -59,6 +62,8 @@ basename_only() {
   p="${1%/}"
   p="${p##*/}"
   printf '%s' "$p"
+  unset p
+  return 0
 }
 
 has_flag_prefix() {
@@ -129,35 +134,34 @@ drv="$(find_driver "$tool")" || {
   exit 127
 }
 
-# Preserve original user args
-orig_args="$*"
-
-# Build final argv: start with driver
-set -- "$drv"
-
 # Inject --target if tool accepts it and triple is known and user didn't provide --target
-if target_accepting "$tool" && [ -n "$triple" ] && ! has_flag_prefix -- "--target" "$@ $orig_args"; then
-  set -- "$@" "--target=$triple"
+if target_accepting "$tool" && [ -n "$triple" ] && ! has_flag_prefix "--target" "$@" ; then
+    set -- "$drv" "--target=$triple" "$@";
+else
+    # Build new argv: start with driver
+    set -- "$drv" "$@";
 fi
 
 # Inject march/mcpu if present and not already supplied
-if [ -n "$marchcpu" ] && ! has_flag_prefix -- "-march" $orig_args && ! has_flag_prefix -- "-mtune" $orig_args && ! has_flag_prefix -- "-mcpu" $orig_args; then
-  for f in $marchcpu; do set -- "$@" "$f"; done
+if [ -n "$marchcpu" ] && ! has_flag_prefix "-march" "$@" && ! has_flag_prefix "-mtune" "$@" && ! has_flag_prefix "-mcpu" "$@"; then
+  for f in $marchcpu; do
+    set -- "$@" "$f";
+  done
 fi
 
 # Tool-specific defaults (ar, etc.)
 defargs="$(default_args_for_tool "$tool")"
 if [ -n "$defargs" ]; then
-  for f in $defargs; do set -- "$@" "$f"; done
+  for f in $defargs; do
+    set -- "$@" "$f";
+  done
 fi
 
-# Append original user args (preserve spacing/words)
-# POSIX: rebuild by iterating over "$@": but we clobbered "$@" earlier, so use saved positional parameters via "$orig_args"
-# Split orig_args safely by resetting IFS then using set --
-old_IFS="$IFS"
-IFS=' '
-set -- "$@" $orig_args
-IFS="$old_IFS"
+# for debugging
+if has_flag_prefix "-v" "$@"; then
+	printf "%s " "Invoking:" "$@";
+	printf "\n";
+fi
 
 # Exec driver with final argv vector
 exec "$@"
