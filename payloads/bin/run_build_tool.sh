@@ -431,7 +431,7 @@ case "$prog" in
 			c++|g++|any-generic-none-musl-c++|any-generic-none-musl-clang++)
 				# C++: add -stdlib if appropriate
 				if [ "$has_nostdincxx" -eq 0 ] && [ "$has_stdlib" -eq 0 ]; then
-					append "-stdlib=c17++"
+					append "-stdlib=libc++"
 				fi
 				# fallthrough to generic compiler handling
 				;;
