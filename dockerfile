@@ -314,7 +314,7 @@ ENV CC=clang
 ENV CPP="${CC:-clang} -E"
 ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="${CC:-clang} -integrated-as -c"
+ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
 ENV ASM="${CC:-clang} -integrated-as -c"
 ENV LD=ld.lld
 ENV RANLIB=llvm-ranlib
@@ -379,14 +379,18 @@ COPY payloads/bin/template-generic-none-musl-tool.sh ${SYSROOT}/usr/bin/template
 
 # Symlink typical, canonical assembler/linker/archiver/compiler names:
 RUN set -eux && \
+    printf '%s\n' '#!/bin/sh' 'exec clang -fintegrated-as -E "$@"' >"${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang" && \
+    printf '%s\n' '#!/bin/sh' 'exec llvm-ar --format=bsd "$@"' >"${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/ar-clang" && \
+    printf '%s\n' '#!/bin/sh' 'exec llvm-ranlib -D "$@"' >"${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/ranlib-clang" && \
+    chmod +x "${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang" && \
+    chmod +x "${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/ar-clang" && \
+    chmod +x "${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/ranlib-clang" && \
     chmod +x "${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/mock-build-tool" && \
     chmod +x "${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/template-generic-none-musl-tool" && \
     for TYPICAL_PATH in bin/as bin/gas \
         bin/asm bin/cc \
         bin/c++ \
         bin/cpp \
-        bin/as \
-        bin/ar bin/ranlib \
         bin/any-generic-none-musl-as \
         bin/any-generic-none-musl-ar \
         bin/any-generic-none-musl-cc \
@@ -398,7 +402,6 @@ RUN set -eux && \
           [ -L "${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/${TYPICAL_PATH}" ] || ln -svf mock-build-tool "${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/${TYPICAL_PATH}" ;\
     done ;\
     for CROSS_PATH in bin/${TARGET_TRIPLE}-as \
-        bin/${TARGET_TRIPLE}-gas \
         bin/${TARGET_TRIPLE}-asm \
         bin/${TARGET_TRIPLE}-cc \
         bin/${TARGET_TRIPLE}-c++ \
@@ -668,7 +671,7 @@ ENV CC=clang
 ENV CPP="${CC:-clang} -E"
 ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="${CC:-clang} -integrated-as -c"
+ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
 ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
 ENV LD=ld.lld
 ENV RANLIB=llvm-ranlib
@@ -791,7 +794,7 @@ ENV CC=clang
 ENV CPP="${CC:-clang} -E"
 ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="${CC:-clang} -integrated-as -c"
+ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
 ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
 ENV LD=lld
 ENV RANLIB=llvm-ranlib
@@ -911,7 +914,7 @@ ENV CC=clang
 ENV CPP="${CC:-clang} -E"
 ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="${CC:-clang} -integrated-as -c"
+ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
 ENV ASM="${CC:-clang} -integrated-as -c"
 ENV LD=lld
 ENV RANLIB=llvm-ranlib
@@ -1038,7 +1041,7 @@ ENV CC=clang
 ENV CPP="${CC:-clang} -E"
 ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="${CC:-clang} -integrated-as -c"
+ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
 ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
 ENV LD=lld
 ENV RANLIB=llvm-ranlib
@@ -1182,7 +1185,7 @@ ENV CC=clang
 ENV CPP="${CC:-clang} -E"
 ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="${CC:-clang} -integrated-as -c"
+ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
 ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
 ENV LD=lld
 ENV RANLIB=llvm-ranlib
@@ -1380,7 +1383,7 @@ ENV CC=clang
 ENV CPP="${CC:-clang} -E"
 ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="${CC:-clang} -integrated-as -c"
+ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
 ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
 ENV LD=lld
 ENV RANLIB=llvm-ranlib
@@ -1698,7 +1701,7 @@ ENV CC=clang
 ENV CPP="${CC:-clang} -E"
 ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="${CC:-clang} -integrated-as -c"
+ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
 ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
 ENV LD=lld
 ENV RANLIB=llvm-ranlib
@@ -2050,7 +2053,7 @@ ENV CC=clang
 ENV CPP="${CC:-clang} -E"
 ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="${CC:-clang} -integrated-as -c"
+ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
 ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
 ENV LD=lld
 ENV RANLIB=llvm-ranlib
@@ -2351,7 +2354,7 @@ ENV CC=clang
 ENV CPP="${CC:-clang} -E"
 ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="${CC:-clang} -integrated-as -c"
+ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
 ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
 ENV LD=lld
 ENV RANLIB=llvm-ranlib
@@ -2663,7 +2666,7 @@ ENV CC=clang
 ENV CPP="${CC:-clang} -E"
 ENV CXX=clang++
 ENV AR=llvm-ar
-ENV AS="${CC:-clang} -integrated-as -c"
+ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
 ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
 ENV LD=lld
 ENV RANLIB=llvm-ranlib
