@@ -315,7 +315,7 @@ ENV CPP="${CC:-clang} -E"
 ENV CXX=clang++
 ENV AR=llvm-ar
 ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
-ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
+ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
 ENV LD=ld.lld
 ENV RANLIB=llvm-ranlib
 
@@ -669,7 +669,7 @@ LABEL org.opencontainers.image.description="Transient container for a sysroot wi
 # Configure bootstrapping toolchain related environment variables (for providence)
 # prefer LLVM's toolchain (clang, lld, llvm-ar, llvm-ranlib, etc.)
 ENV CC=clang
-ENV CPP="${CC:-clang} -E"
+ENV CPP="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/cpp"
 ENV CXX=clang++
 ENV AR=llvm-ar
 ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
@@ -911,7 +911,7 @@ ENV SYSROOT="/sysroot"
 # Configure bootstrapping toolchain related environment variables (for providence)
 # prefer LLVM's toolchain (clang, lld, llvm-ar, llvm-ranlib, etc.)
 ENV CC=clang
-ENV CPP="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/cpp-clang"
+ENV CPP="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/cpp"
 ENV CXX=clang++
 ENV AR=llvm-ar
 ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
@@ -1038,7 +1038,7 @@ ENV SYSROOT="/sysroot"
 # Configure bootstrapping toolchain related environment variables (for providence)
 # prefer LLVM's toolchain (clang, lld, llvm-ar, llvm-ranlib, etc.)
 ENV CC=clang
-ENV CPP="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/cpp-clang"
+ENV CPP="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/cpp"
 ENV CXX=clang++
 ENV AR=llvm-ar
 ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
@@ -1182,7 +1182,7 @@ ENV SYSROOT="/sysroot"
 # Configure bootstrapping toolchain related environment variables (for providence)
 # prefer LLVM's toolchain (clang, lld, llvm-ar, llvm-ranlib, etc.)
 ENV CC=clang
-ENV CPP="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/cpp-clang"
+ENV CPP="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/cpp"
 ENV CXX=clang++
 ENV AR=llvm-ar
 ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
@@ -1269,8 +1269,8 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
   cmake -S . -B ../libcxxrt -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_SYSTEM_NAME=Generic-Musl \
-    -DCMAKE_C_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang \
-    -DCMAKE_CXX_COMPILER=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++ \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
@@ -1698,7 +1698,7 @@ ENV SYSROOT="/sysroot"
 # Configure bootstrapping toolchain related environment variables (for providence)
 # prefer LLVM's toolchain (clang, lld, llvm-ar, llvm-ranlib, etc.)
 ENV CC=clang
-ENV CPP="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/cpp-clang"
+ENV CPP="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/cpp"
 ENV CXX=clang++
 ENV AR=llvm-ar
 ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
@@ -2050,7 +2050,7 @@ ENV SYSROOT="/sysroot"
 # Configure bootstrapping toolchain related environment variables (for providence)
 # prefer LLVM's toolchain (clang, lld, llvm-ar, llvm-ranlib, etc.)
 ENV CC=clang
-ENV CPP="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/cpp-clang"
+ENV CPP="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/cpp"
 ENV CXX=clang++
 ENV AR=llvm-ar
 ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
@@ -2351,7 +2351,7 @@ ENV SYSROOT="/sysroot"
 # Configure bootstrapping toolchain related environment variables (for providence)
 # prefer LLVM's toolchain (clang, lld, llvm-ar, llvm-ranlib, etc.)
 ENV CC=clang
-ENV CPP="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/cpp-clang"
+ENV CPP="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/cpp"
 ENV CXX=clang++
 ENV AR=llvm-ar
 ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
@@ -2663,7 +2663,7 @@ ENV SYSROOT="/sysroot"
 # Configure bootstrapping toolchain related environment variables (for providence)
 # prefer LLVM's toolchain (clang, lld, llvm-ar, llvm-ranlib, etc.)
 ENV CC=clang
-ENV CPP="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/cpp-clang"
+ENV CPP="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/cpp"
 ENV CXX=clang++
 ENV AR=llvm-ar
 ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"

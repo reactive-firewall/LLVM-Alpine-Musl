@@ -456,9 +456,6 @@ case "$prog" in
 		;;
 esac
 
-
-set -- $NEW_ARGS
-
 # -----------------------
 # Finalize and execute
 # Transform linker long options for CC fallback when necessary (convert --dynamic-linker=... and --oformat=... to -Xlinker pairs)
