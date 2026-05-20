@@ -176,7 +176,7 @@ scan_token() {
 		-U_POSIX_SOURCE) undef_posix_source=1 ;;
 		-D_XOPEN_SOURCE=*|-D_XOPEN_SOURCE) has_xopen_source=1 ;;
 		-D_POSIX_SOURCE* ) has_posix_source_macro=1 ;;
-		--nostdinc++) has_nostdincxx=1 ;;
+		--nostdinc++|-nohipwrapperinc|-nostdlibinc) has_nostdincxx=1 ;;
 		-stdlib=*) has_stdlib=1 ;;
 		-mseses) has_mseses=1 ;;
 		-fPIC) has_fPIC=1 ;;
@@ -342,7 +342,7 @@ while [ $# -gt 0 ]; do
 			fi
 			continue
 			;;
-		-U_POSIX_C_SOURCE|-U_POSIX_SOURCE|-D_XOPEN_SOURCE*|-D_POSIX_SOURCE*|--nostdinc++|-stdlib=*|-mseses|-fPIC|-ffunction-sections|-fdata-sections|-fseparate-named-sections|-fgnuc-version*|-fgnu-keywords|-fno-digraphs|-fstack-size-section|-fintegrated-as|-fno-integrated-as)
+		-U_POSIX_C_SOURCE|-U_POSIX_SOURCE|-D_XOPEN_SOURCE*|-D_POSIX_SOURCE*|-nostdinc++|-nohipwrapperinc|-nostdlibinc|-stdlib=*|-mseses|-fPIC|-ffunction-sections|-fdata-sections|-fseparate-named-sections|-fgnuc-version*|-fgnu-keywords|-fno-digraphs|-fstack-size-section|-fintegrated-as|-fno-integrated-as)
 			case "$a" in
 				-fgnuc-version*)
 					has_fgnuc_version=1

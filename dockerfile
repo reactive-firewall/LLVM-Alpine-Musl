@@ -1598,7 +1598,7 @@ RUN mkdir -p build-libcxxabi-config && \
 RUN set -eux; \
     printf "%s\n" "Test Headers:" && \
     printf '%s\n' '#include <vector>' '#include <string>' 'int main() {' '  std::vector<std::string> v;' '  v.push_back("ok");' '  return (int)v.size();' '}' > /tmp/test.cpp; \
-    ${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-c++ -v -fsyntax-only -std=c++17 -cxx-isystem /headers/usr/include/c++/v1 -I/headers/usr/include/c++/v1 -isystem /headers/usr/include -I/headers/usr/include/ /tmp/test.cpp ;
+    ${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-c++ -v -fsyntax-only -std=c++17 -nohipwrapperinc -nostdlibinc -nostdinc++ -I/headers/usr/include/c++/v1 -I/headers/usr/include/c++/v1 -isystem /headers/usr/include /tmp/test.cpp ;
 
 # Cleanup build packages and intermediate files to keep this stage small
 RUN apk del --no-cache \
