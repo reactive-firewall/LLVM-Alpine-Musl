@@ -41,7 +41,7 @@ march_mcpu_for_arch() {
 # Tools that accept --target (clang style)
 target_accepting() {
   case "$1" in
-    clang|cc|c++|cpp|as) return 0 ;;
+    clang|cc|c++|clang++|cpp|as) return 0 ;;
     *) return 1 ;;
   esac
 }
