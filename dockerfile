@@ -315,7 +315,7 @@ ENV CPP="${CC:-clang} -E"
 ENV CXX=clang++
 ENV AR=llvm-ar
 ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
-ENV ASM="${CC:-clang} -integrated-as -c"
+ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
 ENV LD=ld.lld
 ENV RANLIB=llvm-ranlib
 
@@ -869,7 +869,6 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 
 # WORKAROUND: cmake still thinks that clang++ requires g++
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
-  apk update && \
   apk add --no-cache \
     cmd:clang++ \
     cmd:g++
