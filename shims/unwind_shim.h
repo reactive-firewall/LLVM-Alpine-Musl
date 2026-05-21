@@ -25,7 +25,6 @@
  */
 
 #ifndef __UNWIND_SHIM_H_
-#define __UNWIND_SHIM_H_
 
 /* unwind_shim.h
  * Provide either llvm's unwind.h (at unwind-llvm.h) or libcxxrt's unwind.h (at unwind-cxxabi.h).
@@ -71,11 +70,16 @@
 #include <unwind-llvm.h>
 #define __UNWIND_SHIM_H_ <unwind.h>
 #else /* !__has_include(<unwind-llvm.h>) */
+#if __has_include(<unwind/unwind-llvm.h>)
+#include <unwind/unwind-llvm.h>
+#define __UNWIND_SHIM_H_ <unwind/unwind.h>
+#else /* !__has_include(<unwind/unwind-llvm.h>) */
 #if __has_include("unwind-llvm.h")
 #define __UNWIND_SHIM_H_ "unwind-llvm.h"
 #else /* !__has_include("unwind-llvm.h") */
 #define __UNWIND_SHIM_H_ 0
 #endif /* End __has_include("unwind-llvm.h") (inner) */
+#endif /* End __has_include(<unwind/unwind-llvm.h>) (outer) */
 #endif /* End __has_include(<unwind-llvm.h>) (outer) */
 #endif /* End defined(_Unwind_Reason_Code) */
 
@@ -94,24 +98,36 @@
 #include <unwind-cxxabi.h>
 #define __UNWIND_SHIM_H_ <unwind-cxxabi.h>
 #else /* !__has_include(<unwind-cxxabi.h>) */
+#if __has_include(<cxxabi/unwind-cxxabi.h>)
+#include <cxxabi/unwind-cxxabi.h>
+#define __UNWIND_SHIM_H_ <cxxabi/unwind-cxxabi.h>
+#else /* !__has_include(<cxxabi/unwind-cxxabi.h>) */
 #if __has_include("unwind-cxxabi.h")
 #define __UNWIND_SHIM_H_ "unwind-cxxabi.h"
 #else /* !__has_include("unwind-llvm.h") */
 #define __UNWIND_SHIM_H_ 0
 #endif /* End __has_include("unwind-cxxabi.h") (inner) */
+#endif /* End __has_include(<cxxabi/unwind-cxxabi.h>) (outer) */
 #endif /* End __has_include(<unwind-cxxabi.h>) (outer) */
 #endif /* End defined(_Unwind_Reason_Code) */
 
 #endif /* End (__UNWIND_SHIM_HAS_LLVM_CONFIG_H_ > 0) */
 
 /* 3. Otherwise warn of unsupported compile environment. */
-#if defined(_Unwind_Reason_Code)
-#warning "Can not resolve an unwind implementation for C++ ABI - Build environment unsupported"
+#if !defined(_Unwind_Reason_Code)
+#warning "Can not find an unwind reason-code map for C++ ABI - Build environment unsupported"
 #endif /* !_Unwind_Reason_Code */
 
+#if !defined(_Unwind_Exception)
+#warning "Can not resolve an unwind implementation for C++ ABI - Build environment unsupported"
+#endif /* !_Unwind_Exception */
+
 #else /* !defined(__has_include) */
-#if defined(_Unwind_Reason_Code)
+#if defined(_Unwind_Reason_Code) || defined(_Unwind_Exception)
+#define __UNWIND_SHIM_H_
+#else
 #warning "Can not use '__has_include'; will attempt blind include of an unwind implementation. This may break things."
+#define __UNWIND_SHIM_H_
 #include <unwind.h>
 #endif /* !_Unwind_Reason_Code */
 #endif /* END defined(__has_include) */
