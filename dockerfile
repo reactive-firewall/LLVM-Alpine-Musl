@@ -1282,14 +1282,19 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
     -DCMAKE_C_FLAGS="-std=c11 ${CFLAGS} -Qunused-arguments" \
     -DCMAKE_CXX_FLAGS="-std=c++11 ${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
     -DLIBCXXRT_ENABLE_EXCEPTIONS=ON \
-    -DLIBCXXRT_ENABLE_THREADS=ON \
     -DLIBCXXRT_USE_COMPILER_RT=ON \
     -DCMAKE_INSTALL_PREFIX=/usr \
     -DCMAKE_LINKER=lld \
     -DCMAKE_LINKER_FLAGS="${CFLAGS} ${LDFLAGS} -Xlinker --exclude-libs=libgcc_s.so.1" && \
   cd /bootstrap && \
   cmake --build libcxxrt -- -j$(nproc) && \
+  ls -l libcxxrt/ && \
   ls -l libcxxrt/lib && \
+  ls -l libcxxrt/bin && \
+  if [ -f /bootstrap/libcxxrt/bin/libcxxrt.so ] ; then \
+    printf "Patching runtime lib paths\n" ;\
+    cp -vf /bootstrap/libcxxrt/lib/libcxxrt.so /bootstrap/libcxxrt/bin/libcxxrt.so ;\
+  fi ;\
   apk del --no-cache \
     g++ \
     cmd:g++ ;\
@@ -1322,7 +1327,7 @@ RUN ls -1 "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind.h" && \
     ls -1 "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind-cxxabi.h" && \
     ls -1 "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind-llvm.h" && \
     ls -1 "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/cxxabi.h" && \
-    { llvm-objdump -harp ${SYSROOT:-/sysroot}/usr/lib/libcxxrt.so || true ;} 2>/dev/null | grep -iF "musl" || true ;
+    { llvm-objdump -harp ${SYSROOT:-/sysroot}/usr/lib/libcxxrt.so || true ;} 2>/dev/null | grep -iF "musl" || exit 1 ;
 
 # Cleanup build packages and intermediate files to keep this stage small
 RUN apk del --no-cache \
