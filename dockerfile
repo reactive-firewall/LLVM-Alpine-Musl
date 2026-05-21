@@ -1087,6 +1087,7 @@ RUN cmake -S runtimes -B build-libunwind -Wno-dev -G "Ninja" \
     -DCMAKE_CXX_FLAGS="${CXXFLAGS} -v -Qunused-arguments -Xlinker --eh-frame-hdr -Xlinker --verbose" \
     -DLIBUNWIND_HAS_DL_LIB=OFF \
     -DLIBUNWIND_IS_BAREMETAL=ON \
+    -DCMAKE_COLOR_DIAGNOSTICS=ON \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
@@ -1281,6 +1282,7 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
     -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
     -DCMAKE_C_FLAGS="-std=c11 ${CFLAGS} -Qunused-arguments" \
     -DCMAKE_CXX_FLAGS="-std=c++11 ${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
+    -DCMAKE_COLOR_DIAGNOSTICS=ON \
     -DLIBCXXRT_ENABLE_EXCEPTIONS=ON \
     -DCXXRT_NO_EXCEPTIONS=OFF \
     -DLIBCXXRT_USE_COMPILER_RT=ON \
@@ -1289,9 +1291,6 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
     -DCMAKE_LINKER_FLAGS="${CFLAGS} ${LDFLAGS} -Xlinker --exclude-libs=libgcc_s.so -Xlinker --exclude-libs=libgcc_s.so.1" && \
   cd /bootstrap && \
   cmake --build libcxxrt -- -j$(nproc) && \
-  ls -l libcxxrt/ && \
-  ls -l libcxxrt/lib && \
-  ls -l libcxxrt/bin && \
   if [ -f /bootstrap/libcxxrt/bin/libcxxrt.so ] ; then \
     printf "Patching runtime lib paths\n" ;\
     cp -vf /bootstrap/libcxxrt/bin/libcxxrt.so /bootstrap/libcxxrt/lib/libcxxrt.so ;\
@@ -1310,7 +1309,6 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
       install -m 0644 libcxxrt/lib/libcxxrt.so "${SYSROOT:-/sysroot}/usr/lib/libcxxrt.so" ;\
       touch -d "${SOME_DATE_EPOCH}" "${SYSROOT:-/sysroot}/usr/lib/libcxxrt.so" || true ; \
   fi ;\
-  ls -lap libcxxrt-project/src && \
   if [ -r "libcxxrt-project/src/cxxabi.h" ] ; then \
     file "libcxxrt-project/src/cxxabi.h" 2>/dev/null || true;\
     { wc -l libcxxrt-project/src/cxxabi.h || true ;} 2>/dev/null;\
@@ -1333,6 +1331,7 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
   fi ;
 
 RUN ls -lap "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi" && \
+    { llvm-objdump -harp ${SYSROOT:-/sysroot}/usr/lib/libcxxrt.so || true ;} 2>/dev/null | grep -iF "NEEDED" && \
     { llvm-objdump -harp ${SYSROOT:-/sysroot}/usr/lib/libcxxrt.so || true ;} 2>/dev/null | grep -iF "musl" || exit 1 ;
 
 # Cleanup build packages and intermediate files to keep this stage small
@@ -1342,7 +1341,7 @@ RUN apk del --no-cache \
         cmake \
         samurai \
         python3 \
-        find ;
+        cmd:find ;
 
 # --- Lib C++ headers ---
 FROM --platform="linux/${TARGETARCH}" alpine:latest AS libcxxheaders
@@ -2553,6 +2552,7 @@ RUN mkdir -p /work/build-libcxx-final && cd /work/build-libcxx-final && \
       -DLIBCXXABI_ENABLE_THREADS=ON \
       -DLIBCXXABI_HAS_PTHREAD_LIB=ON \
       -DLIBCXXABI_HAS_C_LIB=ON \
+      -DCMAKE_COLOR_DIAGNOSTICS=ON \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
       -DLIBCXX_LINK_FLAGS="${CXX_UNWINDER_FLAGS} -v ${LDFLAGS} -Xlinker --verbose" \
