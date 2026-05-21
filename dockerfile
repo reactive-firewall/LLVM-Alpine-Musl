@@ -1310,26 +1310,29 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
       install -m 0644 libcxxrt/lib/libcxxrt.so "${SYSROOT:-/sysroot}/usr/lib/libcxxrt.so" ;\
       touch -d "${SOME_DATE_EPOCH}" "${SYSROOT:-/sysroot}/usr/lib/libcxxrt.so" || true ; \
   fi ;\
-  ls -lap libcxxrt/src && \
-  if [ -r "libcxxrt/src/cxxabi.h" ] ; then \
-    file "libcxxrt/src/cxxabi.h" 2>/dev/null || true;\
-    { wc -l libcxxrt/src/cxxabi.h || true ;} 2>/dev/null;\
+  ls -lap libcxxrt-project/src && \
+  if [ -r "libcxxrt-project/src/cxxabi.h" ] ; then \
+    file "libcxxrt-project/src/cxxabi.h" 2>/dev/null || true;\
+    { wc -l libcxxrt-project/src/cxxabi.h || true ;} 2>/dev/null;\
     mkdir -vm 0755 -p "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi" && \
-    install -m 0644 libcxxrt/src/unwind.h "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind-cxxabi.h" && \
+    install -m 0644 libcxxrt-project/src/unwind.h "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind-cxxabi.h" && \
     install -m 0644 /stage/usr/include/__libunwind_config.h "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/__libunwind_config.h" && \
     install -m 0644 /stage/usr/include/unwind.h "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind-llvm.h" && \
     install -m 0644 /tmp/unwind_shim.h "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind.h" && \
-    install -m 0644 libcxxrt/src/unwind-arm.h "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind-arm.h" && \
-    install -m 0644 libcxxrt/src/unwind-itanium.h "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind-itanium.h" && \
-    install -m 0644 libcxxrt/src/cxxabi.h "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/cxxabi.h" && \
-    { touch -d "${SOME_DATE_EPOCH}" "${SYSROOT:-/sysroot}/usr/lib/libcxxrt.so" || true ;} && \
+    install -m 0644 libcxxrt-project/src/unwind-arm.h "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind-arm.h" && \
+    install -m 0644 libcxxrt-project/src/unwind-itanium.h "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind-itanium.h" && \
+    install -m 0644 libcxxrt-project/src/cxxabi.h "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/cxxabi.h" && \
+    { touch -d "${SOME_DATE_EPOCH}" "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind-cxxabi.h" || true ;} && \
+    { touch -d "${SOME_DATE_EPOCH}" "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/__libunwind_config.h" || true ;} && \
+    { touch -d "${SOME_DATE_EPOCH}" "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind-llvm.h" || true ;} && \
+    { touch -d "${SOME_DATE_EPOCH}" "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind.h" || true ;} && \
+    { touch -d "${SOME_DATE_EPOCH}" "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind-arm.h" || true ;} && \
+    { touch -d "${SOME_DATE_EPOCH}" "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind-itanium.h" || true ;} && \
+    { touch -d "${SOME_DATE_EPOCH}" "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/cxxabi.h" || true ;} && \
     ls -lap ${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/ ;\
   fi ;
 
-RUN ls -1 "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind.h" && \
-    ls -1 "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind-cxxabi.h" && \
-    ls -1 "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/unwind-llvm.h" && \
-    ls -1 "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi/cxxabi.h" && \
+RUN ls -lap "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi" && \
     { llvm-objdump -harp ${SYSROOT:-/sysroot}/usr/lib/libcxxrt.so || true ;} 2>/dev/null | grep -iF "musl" || exit 1 ;
 
 # Cleanup build packages and intermediate files to keep this stage small
