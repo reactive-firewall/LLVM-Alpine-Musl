@@ -1282,10 +1282,11 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
     -DCMAKE_C_FLAGS="-std=c11 ${CFLAGS} -Qunused-arguments" \
     -DCMAKE_CXX_FLAGS="-std=c++11 ${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
     -DLIBCXXRT_ENABLE_EXCEPTIONS=ON \
+    -DCXXRT_NO_EXCEPTIONS=OFF \
     -DLIBCXXRT_USE_COMPILER_RT=ON \
     -DCMAKE_INSTALL_PREFIX=/usr \
     -DCMAKE_LINKER=lld \
-    -DCMAKE_LINKER_FLAGS="${CFLAGS} ${LDFLAGS} -Xlinker --exclude-libs=libgcc_s.so.1" && \
+    -DCMAKE_LINKER_FLAGS="${CFLAGS} ${LDFLAGS} -Xlinker --exclude-libs=libgcc_s.so -Xlinker --exclude-libs=libgcc_s.so.1" && \
   cd /bootstrap && \
   cmake --build libcxxrt -- -j$(nproc) && \
   ls -l libcxxrt/ && \
@@ -1293,7 +1294,7 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
   ls -l libcxxrt/bin && \
   if [ -f /bootstrap/libcxxrt/bin/libcxxrt.so ] ; then \
     printf "Patching runtime lib paths\n" ;\
-    cp -vf /bootstrap/libcxxrt/lib/libcxxrt.so /bootstrap/libcxxrt/bin/libcxxrt.so ;\
+    cp -vf /bootstrap/libcxxrt/bin/libcxxrt.so /bootstrap/libcxxrt/lib/libcxxrt.so ;\
   fi ;\
   apk del --no-cache \
     g++ \
@@ -1335,7 +1336,8 @@ RUN apk del --no-cache \
         cmd:clang++ \
         cmake \
         samurai \
-        python3 ;
+        python3 \
+        find ;
 
 # --- Lib C++ headers ---
 FROM --platform="linux/${TARGETARCH}" alpine:latest AS libcxxheaders
@@ -1385,7 +1387,7 @@ ENV SYSROOT="/sysroot"
 # Configure bootstrapping toolchain related environment variables (for providence)
 # prefer LLVM's toolchain (clang, lld, llvm-ar, llvm-ranlib, etc.)
 ENV CC=clang
-ENV CPP="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/cpp-clang"
+ENV CPP="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/cpp"
 ENV CXX=clang++
 ENV AR=llvm-ar
 ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
