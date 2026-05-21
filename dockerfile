@@ -11,7 +11,7 @@ FROM --platform="linux/${TARGETARCH}" alpine:latest AS fetcher
 # shellcheck disable=SC2154
 ARG LIBEXECINFO_VERSION=${LIBEXECINFO_VERSION:-1.3}
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -193,7 +193,7 @@ FROM --platform="linux/${TARGETARCH}" alpine:latest AS sysroot-bootstrap
 # Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -632,7 +632,7 @@ FROM --platform="linux/${TARGETARCH}" alpine:latest AS sysroot
 # Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -755,7 +755,7 @@ COPY payloads/ld.libunwind/ehframe.ld /bootstrap/ehframe.ld
 # Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -882,7 +882,7 @@ WORKDIR /bootstrap
 # Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -1009,7 +1009,7 @@ WORKDIR /bootstrap
 # Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -1153,7 +1153,7 @@ COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cma
 # Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -1351,7 +1351,7 @@ COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cma
 # Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -1669,7 +1669,7 @@ COPY payloads/tests/test_exception.cpp /work/test_exception.cpp
 # Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -2021,7 +2021,7 @@ COPY payloads/tests/test_exception.cpp /work/test_exception.cpp
 # Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -2322,7 +2322,7 @@ COPY payloads/tests/test_exception.cpp /work/test_exception.cpp
 # Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -2465,8 +2465,8 @@ RUN mkdir -p /work/builds/opt/ && \
     /work/run_dir_check.sh /work/builds/opt/libcxx-final/usr 5 ;
 
 
-ENV HOST_CC=clang
-ENV HOST_CXX=clang++
+ENV HOST_CC=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang
+ENV HOST_CXX=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++
 ENV HOST_LD=lld
 
 # DEBUG Mark 1
@@ -2634,7 +2634,7 @@ COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cma
 # Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.5}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -2815,8 +2815,8 @@ RUN apk add --no-cache \
 
 # DEBUG Mark 2
 RUN printf "%s\n" "CMake Version: $(cmake --version)" && \
-    printf "%s\n" "Clang-cpp Version: $(clang-cpp --version)" && \
-    printf "%s\n" "Clang++ Version: $(clang++ --version)" && \
+    printf "%s\n" "Clang-cpp Version: $(${CPP} --version)" && \
+    printf "%s\n" "Clang++ Version: $(${CXX} --version)" && \
     printf "%s\n" "Installed Libraries:" && \
     ls -1 ${SYSROOT:-/sysroot}/usr/lib/ && ls -1 ${SYSROOT:-/sysroot}/usr/lib/generic/ && \
     printf "\n"
@@ -2864,6 +2864,7 @@ RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
       -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
+      -DCMAKE_COLOR_DIAGNOSTICS=ON \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
@@ -3098,7 +3099,7 @@ LABEL org.opencontainers.image.vendor="individual"
 LABEL org.opencontainers.image.licenses="MIT"
 
 # provenance ENV (kept intentionally)
-ARG LLVM_VERSION=${LLVM_VERSION:-"22.1.4"}
+ARG LLVM_VERSION=${LLVM_VERSION:-"22.1.6"}
 ENV LLVM_VERSION=${LLVM_VERSION}
 ENV LLVM_URL="https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-${LLVM_VERSION}.tar.gz"
 ARG TARGET_TRIPLE

@@ -33,8 +33,22 @@ set(CMAKE_EXECUTABLE_FORMAT "ELF" CACHE STRING "Executable format")
 set(CMAKE_STATIC_LIBRARY_SUFFIX ".a")
 set(CMAKE_STATIC_LIBRARY_FORMAT "ELF" CACHE STRING "Static Library format")
 set(CMAKE_SHARED_LIBRARY_SUFFIX ".so")
+set(CMAKE_EXTRA_SHARED_LIBRARY_SUFFIXES
+  ".so.${CMAKE_SYSTEM_VERSION}"
+  ".so.${CMAKE_SYSTEM_VERSION}.0"
+  ".${CMAKE_SYSTEM_VERSION}.0.so"
+  ".lib"
+  ".lo"
+)
+set(CMAKE_IMPORT_LIBRARY_SUFFIX "${CMAKE_SHARED_LIBRARY_SUFFIX}")
 set(CMAKE_SHARED_MODULE_SUFFIX ".so")
-set(CMAKE_POSITION_INDEPENDENT_CODE ON CACHE BOOL "Position independent code for shared libs" FORCE)
+
+if(NOT DEFINED CMAKE_C_LIBRARY_ARCHITECTURE)
+  set(CMAKE_C_LIBRARY_ARCHITECTURE "generic")
+endif()
+
+# require PIC by default
+set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
 # musl does NOT need GNU extensions, but can leverage them when either one of
 #  _GNU_SOURCE or _ALL_SOURCE is defined.
@@ -149,16 +163,16 @@ endforeach()
 find_program(_llvm_objdump NAMES llvm-objdump)
 find_program(_gnu_objdump NAMES objdump)
 if(_llvm_objdump)
-  set(_OBJDUMP "${_llvm_objdump}")
+  set(CMAKE_OBJDUMP "${_llvm_objdump}")
 elseif(_gnu_objdump)
-  set(_OBJDUMP "${_gnu_objdump}")
+  set(CMAKE_OBJDUMP "${_gnu_objdump}")
 else()
-  set(_OBJDUMP "")
+  set(CMAKE_OBJDUMP "")
 endif()
 
-if(_OBJDUMP AND EXISTS "${libc_path}")
+if(CMAKE_OBJDUMP AND EXISTS "${libc_path}")
   execute_process(
-    COMMAND ${_OBJDUMP} -p "${libc_path}"
+    COMMAND ${CMAKE_OBJDUMP} -p "${libc_path}"
     RESULT_VARIABLE _od_res
     OUTPUT_VARIABLE _od_out
     ERROR_QUIET
@@ -218,12 +232,14 @@ set(CMAKE_FIND_LIBRARY_PREFIXES "lib")
 set(CMAKE_FIND_LIBRARY_SUFFIXES ".so" ".a")
 
 # support position independance
-set(CMAKE_C_COMPILE_OPTIONS_PIC "-fPIC -Xlinker --pic-veneer")
-set(CMAKE_C_COMPILE_OPTIONS_PIE "-Xlinker --pic-veneer -fPIE -Xlinker --pie")
+# https://discourse.cmake.org/t/potential-bug-in-cmake-modules-compiler-clang-cmake-cmake-c-xx-compile-options-pic/1933/2
+set(CMAKE_C_COMPILE_OPTIONS_PIC "-fPIC")
+set(CMAKE_C_COMPILE_OPTIONS_PIE "-fPIE") ## needs -Xlinker --pic-veneer -fPIE -Xlinker --pie
 
 # Detect libpthread / libm near libc
 set(CMAKE_PLATFORM_HAS_PTHREADS OFF)
 set(CMAKE_PLATFORM_HAS_MATH_LIB OFF)
+set(CMAKE_PLATFORM_HAS_RT_LIB OFF)
 if(_musl_loader)
   get_filename_component(_loader_dir "${_musl_loader}" DIRECTORY)
   # search sibling dirs (lib, lib64, usr/lib) for libpthread/libm
@@ -244,6 +260,10 @@ if(_musl_loader)
       if(_math_candidates)
         set(CMAKE_PLATFORM_HAS_MATH_LIB ON CACHE BOOL "Does the platform provide libm (math)")
       endif()
+      file(GLOB _rt_candidates "${_d}/librt.*" "${_d}/librt.so" "${_d}/librt.a")
+      if(_rt_candidates)
+        set(CMAKE_PLATFORM_HAS_RT_LIB ON CACHE BOOL "Does the platform provide librt (real-time)")
+      endif()
     endif()
   endforeach()
 else()
@@ -257,6 +277,10 @@ else()
       file(GLOB _math_candidates "${_d}/libm.*" "${_d}/libm.a")
       if(_math_candidates)
         set(CMAKE_PLATFORM_HAS_MATH_LIB ON CACHE BOOL "Does the platform provide libm (math)")
+      endif()
+      file(GLOB _rt_candidates "${_d}/librt.*" "${_d}/librt.a")
+      if(_rt_candidates)
+        set(CMAKE_PLATFORM_HAS_RT_LIB ON CACHE BOOL "Does the platform provide librt (real-time)")
       endif()
     endif()
   endforeach()
@@ -289,18 +313,18 @@ endif()
 
 # Shared linking flags when supported
 if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
-  set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "-Xlinker --shared")
-  set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "-Xlinker --shared")
-  set(CMAKE_SHARED_MODULE_LINK_C_FLAGS "-Xlinker --shared")
-  set(CMAKE_SHARED_MODULE_LINK_CXX_FLAGS "-Xlinker --shared")
-
   # Prefer LLD where available
   if(LD_LLD OR LLD_LINK OR LLVM_LLD)
     set(_use_lld ON)
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
-    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fuse-ld=lld")
+    foreach(type SHARED MODULE EXE)
+      set(CMAKE_${type}_LINKER_FLAGS "${CMAKE_${type}_LINKER_FLAGS} -fuse-ld=lld")
+    endforeach()
   endif()
+  foreach(lang C CXX)
+    foreach(type SHARED_LIBRARY SHARED_MODULE)
+      set(CMAKE_${type}_LINK_${lang}_FLAGS "-Xlinker --shared")
+    endforeach()
+  endforeach()
 
   if (NOT DEFINED CMAKE_SHARED_LINKER_FLAGS_INIT)
     set(CMAKE_SHARED_LINKER_FLAGS_INIT "")
@@ -308,6 +332,10 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
 
   # Set dynamic linker path for musl
   if(_musl_loader)
+    list(FIND CMAKE_EXE_LINKER_FLAGS "--pic-veneer" _found_lld_veneer_flag)
+    if(_found_lld_veneer_flag EQUAL -1)
+      set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Xlinker --pic-veneer")
+    endif()
     list(FIND CMAKE_EXE_LINKER_FLAGS "--unique" _found_uniq_flag)
     if(_found_uniq_flag EQUAL -1)
       set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Xlinker --no-gnu-unique -Xlinker --unique")
@@ -319,6 +347,10 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
     list(FIND CMAKE_EXE_LINKER_FLAGS "--pack-dyn-relocs=relr" _found_dyn_reloc_flag)
     if(_found_dyn_reloc_flag EQUAL -1)
       set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Xlinker --pack-dyn-relocs=relr")
+    endif()
+    list(FIND CMAKE_SHARED_LINKER_FLAGS_INIT "--pic-veneer" _found_lld_veneer_flag2)
+    if(_found_lld_veneer_flag2 EQUAL -1)
+      set(CMAKE_SHARED_LINKER_FLAGS_INIT "${CMAKE_SHARED_LINKER_FLAGS_INIT} -Xlinker --pic-veneer")
     endif()
     list(FIND CMAKE_SHARED_LINKER_FLAGS_INIT "--unique" _found_musl_lib2)
     if(_found_uniq_flag2 EQUAL -1)
@@ -346,13 +378,9 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS_INIT}")
   endif()
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Xlinker -z -Xlinker relro -Xlinker -z -Xlinker now")
-else()
-  # Ensure shared lib variables don't advertise support
-  set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
-  set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
-  set(CMAKE_SHARED_MODULE_LINK_C_FLAGS "")
-  set(CMAKE_SHARED_MODULE_LINK_CXX_FLAGS "")
 
+  # else
+  # Ensure shared lib variables don't advertise support
 endif()
 
 # TODO: handle adding excludes when linking clang_rt
