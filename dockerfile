@@ -1754,6 +1754,8 @@ RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi && \
     for CXXRT_FILE_ARTIFACT in usr/include/c++/v1/cxxabi/cxxabi.h \
         usr/include/c++/v1/cxxabi/unwind-llvm.h \
         usr/include/c++/v1/cxxabi/unwind-cxxabi.h \
+        usr/include/c++/v1/cxxabi/unwind-arm.h \
+        usr/include/c++/v1/cxxabi/unwind-itanium.h \
         usr/include/c++/v1/cxxabi/unwind.h \
         usr/lib/libcxxrt.so ; do \
           cp -vf /stage-cxxrt/${CXXRT_FILE_ARTIFACT} ${SYSROOT:-/sysroot}/${CXXRT_FILE_ARTIFACT} || true ; \
@@ -1838,7 +1840,7 @@ RUN "${HOST_CXX}" $CXXFLAGS $CFLAGS -fuse-ld=lld -Xlinker -Bdynamic -Xlinker --r
 
 # Stage 1: Build libc++ (bootstrap0) but link against existing libcxxabi (libcxxrt) in sysroot
 RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 && \
-    /work/run_cmake_build.sh /work/llvm-project/libcxx /work/build-libcxx-bootstrap0 \
+    cmake -S "/work/llvm-project/libcxx" -B "/work/build-libcxx-bootstrap0" -Wno-dev \
       -G Ninja \
       -DCMAKE_C_COMPILER=${HOST_CC} \
       -DCMAKE_CXX_COMPILER=${HOST_CXX} \
@@ -1878,6 +1880,16 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
       -DLIBCXX_INCLUDE_TESTS=OFF && \
+    { for CXXABI_FILE_ARTIFACT in cxxabi.h \
+        unwind-llvm.h \
+        unwind-cxxabi.h \
+        unwind-arm.h \
+        unwind-itanium.h \
+        unwind.h ; do \
+          cp -vf ${SYS_INCLUDE}/c++/v1/cxxabi/${CXXABI_FILE_ARTIFACT} /work/build-libcxx-bootstrap0/private-abi-headers/${CXXABI_FILE_ARTIFACT} || true ; \
+          touch -d "${SOME_DATE_EPOCH}" /work/build-libcxx-bootstrap0/private-abi-headers/${CXXABI_FILE_ARTIFACT} || true ; \
+    done ;} && \
+    cmake --build "/work/build-libcxx-bootstrap0" && \
     python3 ../llvm-project/libcxx/utils/generate_iwyu_mapping.py -o include/c++/v1/libcxx.imp || true ;\
     cmake --install /work/build-libcxx-bootstrap0 ;
 
