@@ -2141,6 +2141,7 @@ RUN  touch -d "${SOME_DATE_EPOCH}" ${SYSROOT:-/sysroot}/usr/lib && \
     done ;
 
 # install minimal build tooling (musl-based; no libstdc++/glibc packages used)
+# needs llvm-elfedit for this stage?
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
   apk update && \
   apk add --no-cache \
@@ -2156,6 +2157,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:lld \
     cmd:llvm-ar \
     cmd:llvm-ranlib \
+    cmd:llvm-elfedit \
     cmd:llvm-strip \
     cmd:llvm-readelf \
     cmd:llvm-objdump \
@@ -2212,6 +2214,7 @@ ENV CXX_UNWINDER_FLAGS="--unwindlib=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib
 # swap the linker script logic to OFF
 # swap to abi NEW/DELETE DEFINITIONS and thus disable LIBCXX_ENABLE_NEW_DELETE_DEFINITIONS
 # use ABI=libcxxabi (from stage 2)
+# may need       -DLIBCXXABI_SHARED_OUTPUT_NAME=libc++abi
 
 # Stage 3: Rebuild libc++ linking against libcxxabi-bootstrap0 (round-trip libc++ bootstrap1)
 RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 && \
@@ -2249,6 +2252,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DLIBCXXABI_USE_LLVM_UNWINDER=NO \
       -DLIBCXXABI_USE_COMPILER_RT=ON \
       -DLIBCXXABI_ENABLE_SHARED=ON \
+      -DLIBCXXABI_SHARED_OUTPUT_NAME=libc++abi \
       -DLIBCXXABI_ENABLE_STATIC=OFF \
       -DLIBCXXABI_USE_COMPILER_RT=ON \
       -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
