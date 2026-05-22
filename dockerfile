@@ -1829,8 +1829,8 @@ ENV CXXFLAGS="-ffunction-sections -fdata-sections --unwindlib=${SYSROOT:-/sysroo
 # force the correct libunwinder
 ENV CXX_UNWINDER_FLAGS="--unwindlib=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib/libunwind.so.1.0"
 
-RUN "${HOST_CC}" $CFLAGS -fuse-ld=lld $LDFLAGS -O2 -Qunused-arguments -x c -c /work/__stack_chk_fail_local.c -o /work/__stack_chk_fail_local.o && \
-    llvm-ar --format=bsd rcs ${SYSROOT:-/sysroot}/usr/lib/generic/libssp_nonshared.a /work/__stack_chk_fail_local.o && \
+RUN "${HOST_CC}" $CFLAGS -fuse-ld=lld $LDFLAGS -O2 -Qunused-arguments -x c -c /work/__stack_chk_fail_local.c -o /work/__stack_chk_fail_local.lo && \
+    llvm-ar --format=bsd rcs ${SYSROOT:-/sysroot}/usr/lib/generic/libssp_nonshared.a /work/__stack_chk_fail_local.lo && \
     ln -svf generic/libssp_nonshared.a ${SYSROOT:-/sysroot}/usr/lib/libssp_nonshared.a
 
 RUN "${HOST_CXX}" $CXXFLAGS $CFLAGS -fuse-ld=lld -Xlinker -Bdynamic -Xlinker --relocatable $LDFLAGS -Qunused-arguments -x c++ -fno-rtti -fno-exceptions -c /work/bootstrap_cxa_stubs.cpp -o /work/bootstrap_cxa_stubs.o && \
@@ -1845,6 +1845,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
       -DCMAKE_C_COMPILER=${HOST_CC} \
       -DCMAKE_CXX_COMPILER=${HOST_CXX} \
       -DCMAKE_LINKER=${HOST_LD} \
+      -DCMAKE_COLOR_DIAGNOSTICS=ON \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl-Libcxxrt \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
@@ -1880,13 +1881,15 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
       -DLIBCXX_INCLUDE_TESTS=OFF && \
+      printf "%s\n" "Injecting unwind shims into build:" && \
+      mkdir -vp /work/build-libcxx-bootstrap0/private-abi-headers/ && \
     { for CXXABI_FILE_ARTIFACT in cxxabi.h \
         unwind-llvm.h \
         unwind-cxxabi.h \
         unwind-arm.h \
         unwind-itanium.h \
         unwind.h ; do \
-          cp -vf ${SYS_INCLUDE}/c++/v1/cxxabi/${CXXABI_FILE_ARTIFACT} /work/build-libcxx-bootstrap0/private-abi-headers/${CXXABI_FILE_ARTIFACT} || true ; \
+          cp -vf ${SYS_INCLUDE}/c++/v1/cxxabi/${CXXABI_FILE_ARTIFACT} /work/build-libcxx-bootstrap0/private-abi-headers/${CXXABI_FILE_ARTIFACT} ; \
           touch -d "${SOME_DATE_EPOCH}" /work/build-libcxx-bootstrap0/private-abi-headers/${CXXABI_FILE_ARTIFACT} || true ; \
     done ;} && \
     cmake --build "/work/build-libcxx-bootstrap0" && \
