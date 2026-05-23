@@ -734,7 +734,10 @@ RUN set -eux; \
 COPY payloads/etc/ld-musl-arm.path /etc/ld-musl-arm.path
 RUN set -eux; \
     [ -L "${SYSROOT}"/etc/ld-musl-armv7.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-armv7.path; \
-    [ -L "${SYSROOT}"/etc/ld-musl-armhf.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-armhf.path;
+    [ -L "${SYSROOT}"/etc/ld-musl-armhf.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-armhf.path; \
+    [ -L "${SYSROOT}"/etc/ld-musl-armeabihf.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-armeabihf.path;
+
+
 
 RUN printf '#! /bin/sh --norc\n%s\n' "no_op_cmd() { return 0; } ; no_op_cmd ;" >"${SYSROOT}/bin/:" && \
     chmod 755 "${SYSROOT}/bin/:"
@@ -1492,8 +1495,14 @@ RUN mkdir -pv /headers && \
     mkdir -pv /headers/tmp && \
     mkdir -pv /headers/etc && \
     mkdir -pv /headers/usr/include && \
-    for MUSL_SDK_FILE_ARTIFACT in bin sbin lib libexec \
-        usr/bin usr/sbin usr/lib usr/libexec \
+    for MUSL_SDK_FILE_ARTIFACT in bin \
+        sbin \
+        lib \
+        libexec \
+        usr/bin \
+        usr/sbin \
+        usr/lib \
+        usr/libexec \
         usr/share usr/man \
         usr/include/arpa \
         usr/include/bits \
@@ -1995,12 +2004,10 @@ RUN ls -lap /work/builds/opt/libcxx-bootstrap0/lib && \
       for SOME_SUFFIX_R2 in ".a" ".so" ".so.1" ".so.1.0" ; do \
         if [ -f "/work/builds/opt/libcxx-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ] ; then \
           install -m 755 "/work/builds/opt/libcxx-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" "${SYSROOT:-/sysroot}/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ;\
-          /work/run_post_build_strip.sh "${SYSROOT:-/sysroot}/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ;\
           file "${SYSROOT:-/sysroot}/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" || true; \
         fi ; \
         if [ -f "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ] ; then \
           install -m 755 "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" "${SYSROOT:-/sysroot}/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ;\
-          /work/run_post_build_strip.sh "${SYSROOT:-/sysroot}/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ;\
           file "${SYSROOT:-/sysroot}/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" || true; \
         fi ; \
       done ;\
@@ -2181,8 +2188,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 # but we remove it anyway afterwards
 
 RUN chmod +x /work/run_cmake_build.sh && \
-    chmod +x /work/run_dir_check.sh && \
-    chmod +x /work/run_post_build_strip.sh ;
+    chmod +x /work/run_dir_check.sh ;
 
 # Create helper dirs
 RUN mkdir -p /work/builds/opt/libcxx-final /work/builds && \
@@ -2651,7 +2657,7 @@ COPY --from=build-libcxx /libcxx-final /stage-cxx-root
 #COPY --from=libcxxheaders /headers /stage-cxx
 
 COPY payloads/bin/run_dir_check.sh /bootstrap/bin/run_dir_check.sh
-COPY payloads/bin/run_post_build_strip.sh /bootstrap/bin/run_post_build_strip.sh
+#COPY payloads/bin/run_post_build_strip.sh /bootstrap/bin/run_post_build_strip.sh
 
 # Copy custom Generic-Musl.cmake into the image build context before building the image
 COPY Generic-Musl/Platforms/Generic-Musl.cmake /tmp/Generic-Musl.cmake
@@ -2722,7 +2728,7 @@ ENV LDFLAGS="-fuse-ld=lld -v -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L
 ENV CFLAGS="-I${SYSROOT:-/sysroot}/usr/include -rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -iwithsysroot /usr/include"
 ENV CXXFLAGS="-std=c++17 -stdlib=libc++ -nostdinc++ -resource-dir ${SYSROOT:-/sysroot}/usr --sysroot=${SYSROOT:-/sysroot} -cxx-isystem /usr/include/c++/v1 -I${SYSROOT:-/sysroot}/usr/include/c++/v1 -I${SYSROOT:-/sysroot}/usr/include -unwindlib=libunwind -fbinutils-version=none"
 
-RUN chmod +x /bootstrap/bin/run_dir_check.sh && chmod +x /bootstrap/bin/run_post_build_strip.sh
+RUN chmod +x /bootstrap/bin/run_dir_check.sh # && chmod +x /bootstrap/bin/run_post_build_strip.sh
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/mach-o && \

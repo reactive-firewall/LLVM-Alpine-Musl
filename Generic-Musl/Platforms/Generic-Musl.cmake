@@ -20,9 +20,29 @@ endif()
 
 # To help the find_xxx() commands, set at least the following so CMAKE_FIND_ROOT_PATH
 # works at least for some simple cases:
+set(CMAKE_SYSTEM_PROGRAM_PATH "${CMAKE_SYSROOT}/bin")
 set(CMAKE_SYSTEM_INCLUDE_PATH "${CMAKE_SYSROOT}/include" )
 set(CMAKE_SYSTEM_LIBRARY_PATH "${CMAKE_SYSROOT}/lib;${CMAKE_SYSROOT}/usr/lib" )
-set(CMAKE_SYSTEM_PROGRAM_PATH "${CMAKE_SYSROOT}/bin" )
+set(LIBRARY_OUTPUT_PATH "${CMAKE_SYSROOT}/lib")
+if(NOT DEFINED CMAKE_LIBRARY_OUTPUT_DIRECTORY)
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SYSROOT}/lib")
+endif()
+if(NOT DEFINED EXECUTABLE_OUTPUT_PATH)
+  if(EXISTS "${CMAKE_SYSROOT}/bin")
+    set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SYSROOT}/bin")
+  endif()
+endif()
+if(NOT DEFINED CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+  if(EXISTS "${CMAKE_SYSROOT}/libexec")
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SYSROOT}/libexec")
+  else()
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
+  endif()
+endif()
+if(NOT DEFINED CMAKE_ARCHIVE_OUTPUT_DIRECTORY)
+  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SYSROOT}/lib")
+endif()
+
 
 set(UNIX 1)
 include(Platform/UnixPaths)
@@ -39,7 +59,6 @@ set(CMAKE_EXTRA_SHARED_LIBRARY_SUFFIXES
   ".so.${CMAKE_SYSTEM_VERSION}.0"
   ".${CMAKE_SYSTEM_VERSION}.0.so"
   ".lib"
-  ".lo"
 )
 set(CMAKE_IMPORT_LIBRARY_SUFFIX "${CMAKE_SHARED_LIBRARY_SUFFIX}")
 set(CMAKE_SHARED_MODULE_SUFFIX ".so")
@@ -97,12 +116,12 @@ if(NOT DEFINED CLANG_RT_PATH AND _GENERIC_MUSL_HAVE_CLANG)
   get_filename_component(_clang_bin_dir "${CMAKE_C_COMPILER}" DIRECTORY)
   get_filename_component(_clang_parent_dir "${_clang_bin_dir}" PATH)
   set(_try_paths
-    "${CMAKE_SYSROOT}/lib/generic"
-    "${CMAKE_SYSROOT}/usr/lib/generic"
-    "${CMAKE_INSTALL_PREFIX}/lib/generic"
-    "${CMAKE_INSTALL_PREFIX}/usr/lib/generic"
-    "/lib/generic"
-    "/usr/lib/generic"
+    "${CMAKE_SYSROOT}/lib/${CMAKE_C_LIBRARY_ARCHITECTURE}"
+    "${CMAKE_SYSROOT}/usr/lib/${CMAKE_C_LIBRARY_ARCHITECTURE}"
+    "${CMAKE_INSTALL_PREFIX}/lib/${CMAKE_C_LIBRARY_ARCHITECTURE}"
+    "${CMAKE_INSTALL_PREFIX}/usr/lib/${CMAKE_C_LIBRARY_ARCHITECTURE}"
+    "/lib/${CMAKE_C_LIBRARY_ARCHITECTURE}"
+    "/usr/lib/${CMAKE_C_LIBRARY_ARCHITECTURE}"
     "${_clang_parent_dir}/lib/clang"
     "${_clang_parent_dir}/lib64/clang"
     "${_clang_parent_dir}/../lib/clang"
@@ -165,7 +184,7 @@ find_program(_llvm_objdump NAMES llvm-objdump)
 find_program(_gnu_objdump NAMES objdump)
 if(_llvm_objdump)
   set(CMAKE_OBJDUMP "${_llvm_objdump}")
-elseif(_gnu_objdump)
+elseif(ENABLE_C_EXTENSIONS AND _gnu_objdump)
   set(CMAKE_OBJDUMP "${_gnu_objdump}")
 else()
   set(CMAKE_OBJDUMP "")
