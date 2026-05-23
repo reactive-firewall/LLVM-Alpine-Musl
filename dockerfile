@@ -996,6 +996,8 @@ RUN apk del --no-cache \
         libc++-dev \
         compiler-rt \
         cmd:llvm-ar \
+        cmd:llvm-ranlib \
+        cmd:llvm-strip \
         llvm-runtimes \
         cmake \
         python3 \
@@ -1671,7 +1673,7 @@ COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cma
 # Copy helper scripts and sources into the image
 # (Ensure these files exist next to the Dockerfile when building)
 COPY payloads/bin/run_cmake_build.sh /work/run_cmake_build.sh
-COPY payloads/bin/run_post_build_strip.sh /work/run_post_build_strip.sh
+#COPY payloads/bin/run_post_build_strip.sh /work/run_post_build_strip.sh
 COPY payloads/bin/run_dir_check.sh /work/run_dir_check.sh
 COPY shims/bootstrap_cxa_stubs.cpp /work/bootstrap_cxa_stubs.cpp
 COPY shims/__stack_chk_fail_local.c /work/__stack_chk_fail_local.c
@@ -1874,8 +1876,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
       -DLIBCXX_LINK_FLAGS="${CXX_UNWINDER_FLAGS} -v ${LDFLAGS} -Xlinker --verbose" \
-      -DCMAKE_EXE_LINKER_FLAGS="${CXX_UNWINDER_FLAGS} -Xlinker -Bdynamic -Xlinker --whole-archive -Xlinker /work/libbootstrap_cxa.a -Xlinker --no-whole-archive -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath-link=${SYS_LIB}" \
-      -DCMAKE_INSTALL_RPATH=/work/builds/opt/libcxx-bootstrap0/lib \
+      -DCMAKE_EXE_LINKER_FLAGS="${CXX_UNWINDER_FLAGS} -Xlinker -Bdynamic -Xlinker --whole-archive -Xlinker /work/libbootstrap_cxa.a -Xlinker --no-whole-archive -Xlinker -L -Xlinker ${SYS_LIB}" \
       -DLLVM_ENABLE_RUNTIMES= \
       -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
@@ -1934,7 +1935,6 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DCMAKE_SYSROOT=${SYSROOT:-/sysroot} \
       -DCMAKE_FIND_ROOT_PATH=${SYSROOT:-/sysroot} \
       -DCMAKE_INSTALL_PREFIX=/work/builds/opt/libcxxabi-bootstrap0 \
-      -DCMAKE_INSTALL_RPATH=/work/builds/opt/libcxxabi-bootstrap0/lib \
       -DLIBCXXABI_LIBCXX_PATH=/work/build-libcxx-bootstrap0 \
       -DLIBCXXABI_LIBCXX_LIBRARY_PATH=/work/builds/opt/libcxx-bootstrap0/lib \
       -DLIBCXXABI_ENABLE_SHARED=ON \
@@ -1951,8 +1951,8 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DCMAKE_PREFIX_PATH=/work/builds/opt/libcxx-bootstrap0 \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} -I/work/builds/opt/libcxx-bootstrap0/include/c++/v1 -I/work/builds/opt/libcxx-bootstrap0/include/c++/v1 -I/work/llvm-project/libcxx/src -I/work/builds/opt/libcxx-bootstrap0/include ${CFLAGS} -Qunused-arguments -I/work/builds/opt/libcxx-bootstrap0/include -isystem ${SYS_INCLUDE} -fuse-ld=lld" \
-      -DCMAKE_LINK_FLAGS="-rtlib=compiler-rt $CXX_UNWINDER_FLAGS -fno-math-errno -fPIC -fuse-ld=lld -v -Xlinker --why-live=_Unwind_Resume -Xlinker --nostdlib ${LDFLAGS} -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker --verbose -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap0/lib:${SYSROOT:-/sysroot}/usr/lib:/work/builds/opt/libcxx-bootstrap0/lib" \
-      -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxxabi-bootstrap0/lib:/work/builds/opt/libcxx-bootstrap0/lib:${SYS_LIB}" \
+      -DCMAKE_LINK_FLAGS="-rtlib=compiler-rt $CXX_UNWINDER_FLAGS -fno-math-errno -fPIC -fuse-ld=lld -v -Xlinker --nostdlib ${LDFLAGS} -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker --verbose" \
+      -DCMAKE_EXE_LINKER_FLAGS="-Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap0/lib -Xlinker -L -Xlinker ${SYS_LIB}" \
       -DLLVM_ENABLE_RUNTIMES= \
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
@@ -1969,7 +1969,6 @@ RUN mkdir -p -m 755 /bootstrap-stage && \
     rm -vfr /work/build-libcxx-bootstrap0 && \
     { rm -vf /work/libbootstrap_cxa.{a,o,c,cpp} || true ;} && \
     { rm -vf /work/libssp_nonshared.{a,o,c} || true ;} && \
-    chmod +x /work/run_post_build_strip.sh && \
     ls -lp /work/ ;
 
 # DEBUG missing stuff
@@ -2040,7 +2039,7 @@ COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cma
 # Copy helper scripts and sources into the image
 # (Ensure these files exist next to the Dockerfile when building)
 COPY payloads/bin/run_cmake_build.sh /work/run_cmake_build.sh
-COPY payloads/bin/run_post_build_strip.sh /work/run_post_build_strip.sh
+#COPY payloads/bin/run_post_build_strip.sh /work/run_post_build_strip.sh
 COPY payloads/bin/run_dir_check.sh /work/run_dir_check.sh
 COPY payloads/tests/test_exception.cpp /work/test_exception.cpp
 
@@ -2157,7 +2156,6 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:lld \
     cmd:llvm-ar \
     cmd:llvm-ranlib \
-    cmd:llvm-elfedit \
     cmd:llvm-strip \
     cmd:llvm-readelf \
     cmd:llvm-objdump \
@@ -2252,7 +2250,6 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DLIBCXXABI_USE_LLVM_UNWINDER=NO \
       -DLIBCXXABI_USE_COMPILER_RT=ON \
       -DLIBCXXABI_ENABLE_SHARED=ON \
-      -DLIBCXXABI_SHARED_OUTPUT_NAME=libc++abi \
       -DLIBCXXABI_ENABLE_STATIC=OFF \
       -DLIBCXXABI_USE_COMPILER_RT=ON \
       -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
@@ -2264,7 +2261,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
       -DLIBCXX_LINK_FLAGS="${CXX_UNWINDER_FLAGS} -v ${LDFLAGS} -Xlinker --verbose" \
-      -DCMAKE_EXE_LINKER_FLAGS="${CXX_UNWINDER_FLAGS} -Xlinker -Bdynamic -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap1/lib -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker --rpath=/work/builds/opt/libcxx-bootstrap1/lib -Xlinker --rpath-link=${SYS_LIB}" \
+      -DCMAKE_EXE_LINKER_FLAGS="${CXX_UNWINDER_FLAGS} -Xlinker -Bdynamic -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap1/lib -Xlinker -L -Xlinker ${SYS_LIB}" \
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER && \
@@ -2295,7 +2292,6 @@ RUN ls -lap /work/builds/opt/libcxx-bootstrap1/lib ;\
           else \
              strip --strip-unneeded "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" || true; \
           fi ; \
-          /work/run_post_build_strip.sh "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" || true; \
         fi ; \
       done ;\
       for SOME_SUFFIX_R2 in ".a" ".so" ".so.1" ".so.1.0" ; do \
@@ -2315,7 +2311,7 @@ RUN ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
     -unwindlib=libunwind ${CFLAGS} \
     -x c++ /work/test_exception.cpp -o /work/test_exception \
     -fuse-ld=lld -L/work/builds/opt/libcxx-bootstrap1/lib -lunwind -lc++ -lc++abi \
-    -Xlinker --sysroot=${SYSROOT} -Xlinker --rpath="/work/builds/opt/libcxx-bootstrap1/lib:${SYS_LIB}" ;
+    -Xlinker --sysroot=${SYSROOT}" ;
 
 # Cleanup build packages and intermediate files to keep this stage small
 RUN apk del --no-cache \
@@ -2345,7 +2341,7 @@ COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cma
 # Copy helper scripts and sources into the image
 # (Ensure these files exist next to the Dockerfile when building)
 COPY payloads/bin/run_cmake_build.sh /work/run_cmake_build.sh
-COPY payloads/bin/run_post_build_strip.sh /work/run_post_build_strip.sh
+#COPY payloads/bin/run_post_build_strip.sh /work/run_post_build_strip.sh
 COPY payloads/bin/run_dir_check.sh /work/run_dir_check.sh
 COPY payloads/tests/test_exception.cpp /work/test_exception.cpp
 
@@ -2593,7 +2589,7 @@ RUN ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
     -unwindlib=libunwind ${CFLAGS} \
     -x c++ /work/test_exception.cpp -o /work/test_exception \
     -fuse-ld=lld -L/work/builds/opt/libcxx-final/lib -lunwind -lc++ -lc++abi \
-    -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker --rpath="/work/builds/opt/libcxx-final/lib:${SYS_LIB}" ;
+    -Xlinker --sysroot=${SYSROOT:-/sysroot}" ;
 
 # see https://libcxx.llvm.org/Modules.html for why /share/libc++/v1/
 RUN set -eux && \
@@ -2617,7 +2613,6 @@ RUN set -eux && \
           else \
              strip --strip-unneeded "/libcxx-final/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" || true; \
           fi ; \
-          /work/run_post_build_strip.sh "/libcxx-final/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" || true; \
         fi ; \
       done ;\
     done ;
