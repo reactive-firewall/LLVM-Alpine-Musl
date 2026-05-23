@@ -1904,7 +1904,11 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
     done ;} && \
     cmake --build "/work/build-libcxx-bootstrap0" && \
     python3 ../llvm-project/libcxx/utils/generate_iwyu_mapping.py -o include/c++/v1/libcxx.imp || true ;\
-    cmake --install /work/build-libcxx-bootstrap0 ;
+    cmake --install /work/build-libcxx-bootstrap0 && \
+    { if [ -f /work/builds/opt/libcxx-bootstrap0/bin/libc++.so ] ; then \
+      printf "Patching shared C++ runtime lib paths\n" ;\
+      cp -vf /work/builds/opt/libcxx-bootstrap0/bin/libc++.so /work/builds/opt/libcxx-bootstrap0/lib/libc++.so ;\
+    fi ;}
 
 # WORKAROUND https://github.com/llvm/llvm-project/issues/116088
 RUN "${CC}" $CXXFLAGS $CFLAGS -Qunused-arguments -fuse-ld=lld -Qunused-arguments -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB:-ld-musl-generic.so} -c /work/cxx-headers.c -o /work/cxx-headers.o && \
@@ -1969,10 +1973,14 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DLIBCXXABI_INCLUDE_TESTS=OFF && \
     cmake --build /work/build-libcxxabi-bootstrap0 -- -j$(nproc) && \
     { if [ -f /work/build-libcxxabi-bootstrap0/bin/libc++abi.so ] ; then \
-      printf "Patching runtime lib paths\n" ;\
-      cp -vf /work/build-libcxxabi-bootstrap0/bin/libc++abi.so /work/build-libcxxabi-bootstrap0/lib/libc++abi ;\
+      printf "Patching shared runtime C++ ABI lib paths\n" ;\
+      cp -vf /work/build-libcxxabi-bootstrap0/bin/libc++abi.so /work/build-libcxxabi-bootstrap0/lib/libc++abi.so ;\
     fi ;} && \
-    cmake --install /work/build-libcxxabi-bootstrap0
+    cmake --install /work/build-libcxxabi-bootstrap0 && \
+    { if [ -f /work/builds/opt/libcxxabi-bootstrap0/bin/libc++abi.so ] ; then \
+      printf "Patching C++ ABI lib paths\n" ;\
+      cp -vf /work/builds/opt/libcxxabi-bootstrap0/bin/libc++abi.so /work/builds/opt/libcxxabi-bootstrap0/lib/libc++abi.so ;\
+    fi ;}
 
 WORKDIR /work
 
