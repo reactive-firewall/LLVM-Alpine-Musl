@@ -1930,7 +1930,7 @@ RUN "${CC}" $CXXFLAGS $CFLAGS -Qunused-arguments -fuse-ld=lld -Qunused-arguments
 # Stage 2: Build libc++abi against libc++ bootstrap0 (abi-bootstrap0)
 # If you still want to build libc++abi in-stage using bootstrap libc++, point to both the sysroot (for libunwind) and the bootstrap libc++ install.
 RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootstrap0 && \
-    /work/run_cmake_build.sh /work/llvm-project/libcxxabi /work/build-libcxxabi-bootstrap0 \
+    cmake -S /work/llvm-project/libcxxabi -B /work/build-libcxxabi-bootstrap0 -Wno-dev \
       -G Ninja \
       -DCMAKE_C_COMPILER=${HOST_CC} \
       -DCMAKE_CXX_COMPILER=${HOST_CXX} \
@@ -1967,17 +1967,22 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
       -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
       -DLIBCXXABI_INCLUDE_TESTS=OFF && \
+    cmake --build /work/build-libcxxabi-bootstrap0 -- -j$(nproc) && \
+    { if [ -f /work/build-libcxxabi-bootstrap0/bin/libc++abi.so ] ; then \
+      printf "Patching runtime lib paths\n" ;\
+      cp -vf /work/build-libcxxabi-bootstrap0/bin/libc++abi.so /work/build-libcxxabi-bootstrap0/lib/libc++abi ;\
+    fi ;} && \
     cmake --install /work/build-libcxxabi-bootstrap0
 
 WORKDIR /work
 
 # cleanup and reset the llvm project source for next stage
 RUN mkdir -p -m 755 /bootstrap-stage && \
-    { rm -vfr /work/llvm-project || true ;} && \
-    rm -vfr /work/build-libcxxabi-bootstrap0 && \
-    rm -vfr /work/build-libcxx-bootstrap0 && \
-    { rm -vf /work/libbootstrap_cxa.{a,o,c,cpp} || true ;} && \
-    { rm -vf /work/libssp_nonshared.{a,o,c} || true ;} && \
+    { rm -fr /work/llvm-project || true ;} && \
+    rm -fr /work/build-libcxxabi-bootstrap0 && \
+    rm -fr /work/build-libcxx-bootstrap0 && \
+    { rm -f /work/libbootstrap_cxa.{a,o,c,cpp} || true ;} && \
+    { rm -f /work/libssp_nonshared.{a,o,c} || true ;} && \
     ls -lp /work/ ;
 
 # DEBUG missing stuff
@@ -2222,7 +2227,7 @@ ENV CXX_UNWINDER_FLAGS="--unwindlib=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib
 
 # Stage 3: Rebuild libc++ linking against libcxxabi-bootstrap0 (round-trip libc++ bootstrap1)
 RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 && \
-    /work/run_cmake_build.sh /work/llvm-project/runtimes /work/build-libcxx-bootstrap1 \
+    cmake -S "/work/llvm-project/runtimes" -B "/work/build-libcxx-bootstrap1" -Wno-dev \
       -G Ninja \
       -DCMAKE_C_COMPILER=${HOST_CC} \
       -DCMAKE_CXX_COMPILER=${HOST_CXX} \
@@ -2271,6 +2276,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER && \
+    cmake --build /work/build-libcxx-bootstrap1 && \
     { find /work/build-libcxx-bootstrap1 -type f -iname "*.so" -exec file {} + || true ;} && \
     cmake --install /work/build-libcxx-bootstrap1 && \
     { find /work/build-libcxx-bootstrap1 -type f -iname "*.so" -exec file {} + || true ;} ;
