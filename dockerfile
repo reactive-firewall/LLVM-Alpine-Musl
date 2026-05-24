@@ -2236,7 +2236,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
     cmake -S "/work/llvm-project/runtimes" -B "/work/build-libcxx-bootstrap1" -Wno-dev \
       -G Ninja \
       -DCMAKE_C_COMPILER=${HOST_CC} \
-      -DCMAKE_C_COMPILER_ID="Clang"
+      -DCMAKE_C_COMPILER_ID="Clang" \
       -DCMAKE_CXX_COMPILER=${HOST_CXX} \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
