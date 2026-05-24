@@ -2331,7 +2331,7 @@ RUN ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
     -unwindlib=libunwind ${CFLAGS} \
     -x c++ /work/test_exception.cpp -o /work/test_exception \
     -fuse-ld=lld -L/work/builds/opt/libcxx-bootstrap1/lib -lunwind -lc++ -lc++abi \
-    -Xlinker --sysroot=${SYSROOT}" ;
+    -Xlinker --sysroot=${SYSROOT} ;
 
 # Cleanup build packages and intermediate files to keep this stage small
 RUN apk del --no-cache \
@@ -2527,7 +2527,7 @@ RUN printf "%s\n" "Rebuild (reproducible) stage libc++" && \
 # may need -Xlinker --sysroot=/sysroot
 # may want linker flag -Xlinker --nostdlib to prevent linking to any std c++
 # may want to link -Xlinker -l${LLVM_RTLIB_STUB}
-ENV LDFLAGS="-fuse-ld=lld -v -Xlinker --trace-symbol=_Unwind_Resume -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/lib -Xlinker -L -Xlinker ${SYS_LIB}/generic -Xlinker -l${LLVM_RTLIB_STUB} -Xlinker --exclude-libs=libgcc_s.so.1 -Xlinker --exclude-libs=libgcc_s.so -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB}"
+ENV LDFLAGS="-fuse-ld=lld -v -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/lib -Xlinker -L -Xlinker ${SYS_LIB}/generic -Xlinker -l${LLVM_RTLIB_STUB} -Xlinker --exclude-libs=libgcc_s.so.1 -Xlinker --exclude-libs=libgcc_s.so -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB}"
 # Does NOT require -D__ELF__
 ENV CFLAGS="--no-default-config --target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -Xlinker --pic-veneer -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT:-/sysroot}/usr/include"
 # might need -nostdinc++
@@ -2609,7 +2609,7 @@ RUN ${HOST_CXX} -std=c++17 -stdlib=libc++ -nostdinc -nostdinc++ \
     -unwindlib=libunwind ${CFLAGS} \
     -x c++ /work/test_exception.cpp -o /work/test_exception \
     -fuse-ld=lld -L/work/builds/opt/libcxx-final/lib -lunwind -lc++ -lc++abi \
-    -Xlinker --sysroot=${SYSROOT:-/sysroot}" ;
+    -Xlinker --sysroot=${SYSROOT:-/sysroot} ;
 
 # see https://libcxx.llvm.org/Modules.html for why /share/libc++/v1/
 RUN set -eux && \
