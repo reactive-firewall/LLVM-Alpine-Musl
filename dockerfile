@@ -2003,7 +2003,6 @@ RUN ls -lap /work/builds/opt/libcxx-bootstrap0/lib && \
           else \
              strip --strip-unneeded "/work/builds/opt/libcxx-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" || true; \
           fi ; \
-          llvm-objdump -hd "/work/builds/opt/libcxx-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" ;\
         fi ; \
         if [ -f "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" ] ; then \
           if command -v llvm-strip >/dev/null 2>&1; then \
@@ -2011,7 +2010,6 @@ RUN ls -lap /work/builds/opt/libcxx-bootstrap0/lib && \
           else \
              strip --strip-unneeded "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" || true; \
           fi ; \
-          llvm-objdump -hd "/work/builds/opt/libcxxabi-bootstrap0/lib/${SOME_LIB_NAME}${SOME_SUFFIX:-}" ;\
         fi ; \
       done ;\
       for SOME_SUFFIX_R2 in ".a" ".so" ".so.1" ".so.1.0" ; do \
@@ -2059,7 +2057,7 @@ COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cma
 # Copy helper scripts and sources into the image
 # (Ensure these files exist next to the Dockerfile when building)
 COPY payloads/bin/run_cmake_build.sh /work/run_cmake_build.sh
-#COPY payloads/bin/run_post_build_strip.sh /work/run_post_build_strip.sh
+COPY payloads/bin/run_post_build_strip.sh /work/run_post_build_strip.sh
 COPY payloads/bin/run_dir_check.sh /work/run_dir_check.sh
 COPY payloads/tests/test_exception.cpp /work/test_exception.cpp
 
@@ -2097,7 +2095,7 @@ ENV SYSROOT="/sysroot"
 ENV CC=clang
 ENV CPP="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/cpp"
 ENV CXX=clang++
-ENV AR=llvm-ar
+ENV AR="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/ar-clang"
 ENV AS="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/as-clang"
 ENV ASM="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-as"
 ENV LD=lld
@@ -2196,11 +2194,11 @@ RUN mkdir -p /usr/share/cmake/Modules/Platform \
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
   apk update && \
   apk add --no-cache \
-    cmd:clang++ \
-    cmd:g++
+    cmd:clang++
 # but we remove it anyway afterwards
 
 RUN chmod +x /work/run_cmake_build.sh && \
+    chmod +x /work/run_post_build_strip.sh && \
     chmod +x /work/run_dir_check.sh ;
 
 # Create helper dirs
@@ -2210,8 +2208,8 @@ RUN mkdir -p /work/builds/opt/libcxx-final /work/builds && \
     /work/run_dir_check.sh /work/builds/opt/libcxx-bootstrap1/usr 5 && \
     /work/run_dir_check.sh /work/builds/opt/libcxxabi-final/usr 5 ;
 
-ENV HOST_CC=clang
-ENV HOST_CXX=clang++
+ENV HOST_CC="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang"
+ENV HOST_CXX="${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/${TARGET_TRIPLE}-clang++"
 ENV HOST_LD=lld
 
 # may need -Xlinker --sysroot=/sysroot
@@ -2238,6 +2236,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
     cmake -S "/work/llvm-project/runtimes" -B "/work/build-libcxx-bootstrap1" -Wno-dev \
       -G Ninja \
       -DCMAKE_C_COMPILER=${HOST_CC} \
+      -DCMAKE_C_COMPILER_ID="Clang"
       -DCMAKE_CXX_COMPILER=${HOST_CXX} \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
@@ -2316,8 +2315,9 @@ RUN ls -lap /work/builds/opt/libcxx-bootstrap1/lib ;\
       done ;\
       for SOME_SUFFIX_R2 in ".a" ".so" ".so.1" ".so.1.0" ; do \
         if [ -f "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ] ; then \
-          file "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" || true; \
-          rm -f "/${SYSROOT}/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" && \
+          { file "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" || true ;} && \
+          { /work/run_post_build_strip.sh "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" || true ;} && \
+          { rm -f "/${SYSROOT}/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" || true ;} && \
           install -m 755 "/stage0-cxx/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" "/${SYSROOT}/usr/lib/${SOME_LIB_NAME}${SOME_SUFFIX_R2:-}" ;\
         fi ; \
       done ;\
