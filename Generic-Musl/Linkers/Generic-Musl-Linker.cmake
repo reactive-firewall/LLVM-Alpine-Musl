@@ -8,7 +8,7 @@ macro(__musl_linker_clang lang)
     set(CMAKE_${lang}_COMPILE_OPTIONS_VISIBILITY "-fvisibility=")
     # linker selection
     if(CMAKE_${lang}_LINK_MODE MATCHES "DRIVER")
-      set(CMAKE_${lang}_USING_LINKER_SYSTEM "")
+      set(CMAKE_${lang}_USING_LINKER_SYSTEM "-fuse-ld=ld.lld")
       set(CMAKE_${lang}_USING_LINKER_LLD "-fuse-ld=lld")
     endif()
     # Features for LINK_LIBRARY generator expression
