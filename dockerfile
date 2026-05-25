@@ -2232,15 +2232,14 @@ ENV CXX_UNWINDER_FLAGS="--unwindlib=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib
 # may need       -DLIBCXXABI_SHARED_OUTPUT_NAME=libc++abi
 
 # Stage 3: Rebuild libc++ linking against libcxxabi-bootstrap0 (round-trip libc++ bootstrap1)
-RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 && \
-    cmake -S "/work/llvm-project/runtimes" -B "/work/build-libcxx-bootstrap1" -Wno-dev \
+RUN mkdir -m 755 -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 && \
+    cmake -S "/work/llvm-project/runtimes" -B "/work/build-libcxx-bootstrap1" \
       -G Ninja \
       -DCMAKE_C_COMPILER=${HOST_CC} \
-      -DCMAKE_C_COMPILER_ID="Clang" \
       -DCMAKE_CXX_COMPILER=${HOST_CXX} \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
-      -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi" \
+      -DLLVM_ENABLE_RUNTIMES="libcxxabi;libcxx" \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
@@ -2260,15 +2259,13 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DLIBCXX_INCLUDE_BENCHMARKS=OFF \
       -DLIBCXX_HARDENING_MODE=extensive \
       -DLIBCXX_ABI_VERSION=1 \
-      -DLIBCXX_CXX_ABI=system-libcxxabi \
+      -DLIBCXX_CXX_ABI=libcxxabi \
       -DLIBCXX_CXX_ABI_LIBRARY_PATH=${SYS_LIB} \
       -DLIBCXX_CXX_ABI_INCLUDE_PATHS="${SYS_INCLUDE}/c++/v1" \
       -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=OFF \
       -DLIBCXX_ENABLE_NEW_DELETE_DEFINITIONS=OFF \
-      -DLIBCXXABI_USE_LLVM_UNWINDER=NO \
       -DLIBCXXABI_USE_COMPILER_RT=ON \
       -DLIBCXXABI_ENABLE_SHARED=ON \
-      -DLIBCXXABI_ENABLE_STATIC=OFF \
       -DLIBCXXABI_USE_COMPILER_RT=ON \
       -DLIBCXXABI_ENABLE_EXCEPTIONS=ON \
       -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
@@ -2276,6 +2273,8 @@ RUN mkdir -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-bootstrap1 &
       -DLIBCXXABI_ENABLE_THREADS=ON \
       -DLIBCXXABI_HAS_PTHREAD_LIB=ON \
       -DLIBCXXABI_HAS_C_LIB=ON \
+      -DLIBCXXABI_HAS_GCC_S_LIB=NO \
+      -DLIBCXXABI_HAS_GCC_LIB=NO \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
       -DLIBCXX_LINK_FLAGS="${CXX_UNWINDER_FLAGS} -v ${LDFLAGS} -Xlinker --verbose" \

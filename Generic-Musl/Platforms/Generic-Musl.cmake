@@ -20,10 +20,20 @@ endif()
 
 # To help the find_xxx() commands, set at least the following so CMAKE_FIND_ROOT_PATH
 # works at least for some simple cases:
-set(CMAKE_SYSTEM_PROGRAM_PATH "${CMAKE_SYSROOT}/bin")
-set(CMAKE_SYSTEM_INCLUDE_PATH "${CMAKE_SYSROOT}/include" )
-set(CMAKE_SYSTEM_LIBRARY_PATH "${CMAKE_SYSROOT}/lib;${CMAKE_SYSROOT}/usr/lib" )
+if(EXISTS "${CMAKE_SYSROOT}/bin")
+  set(CMAKE_SYSTEM_PROGRAM_PATH "${CMAKE_SYSROOT}/bin")
+endif()
+if(EXISTS "${CMAKE_SYSROOT}/include")
+  set(CMAKE_SYSTEM_INCLUDE_PATH "${CMAKE_SYSROOT}/include")
+endif()
+if(EXISTS "${CMAKE_SYSROOT}/usr/lib")
+  set(CMAKE_SYSTEM_LIBRARY_PATH "${CMAKE_SYSROOT}/lib;${CMAKE_SYSROOT}/usr/lib" )
+else()
+  set(CMAKE_SYSTEM_LIBRARY_PATH "${CMAKE_SYSROOT}/lib")
+endif()
+
 set(LIBRARY_OUTPUT_PATH "${CMAKE_SYSROOT}/lib")
+
 if(NOT DEFINED CMAKE_LIBRARY_OUTPUT_DIRECTORY)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SYSROOT}/lib")
 endif()
@@ -85,6 +95,9 @@ endif()
 set(_GENERIC_MUSL_HAVE_CLANG OFF)
 if(CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_C_COMPILER_ID MATCHES "AppleClang")
   set(_GENERIC_MUSL_HAVE_CLANG ON)
+else()
+  message(AUTHOR_WARNING "Unrecognized compiler ID: ${CMAKE_C_COMPILER_ID}")
+  message(FATAL_ERROR "Generic-Musl platform can only be used with Clang toolchains at this time.")
 endif()
 
 # Also allow explicit option override
@@ -134,6 +147,10 @@ if(NOT DEFINED CLANG_RT_PATH AND _GENERIC_MUSL_HAVE_CLANG)
       if(_builtins_glob)
         list(GET _builtins_glob 0 _first_builtins)
         set(CLANG_RT_PATH "${_first_builtins}" CACHE PATH "Path to libclang_rt.builtins.a")
+        get_filename_component(basename "${_first_builtins}" NAME)
+        string(REGEX MATCH "libclang_rt\\.builtins-(.*)\\.a$" _match "${basename}")  # capture group 1 = the '*' part (possibly empty)
+        set(target_part "${CMAKE_MATCH_1}")                                        # empty string if no target
+        set(COMPILER_RT_LIBRARY_builtins_${${target_part} "${CLANG_RT_PATH}" CACHE INTERNAL)
         break()
       endif()
     endif()
@@ -245,7 +262,7 @@ endif()
 # Remove duplicates and set cached variable
 list(REMOVE_DUPLICATES _known_features)
 set(CMAKE_C_KNOWN_FEATURES "${_known_features}" CACHE STRING "Detected C known features" FORCE)
-message(STATUS "C known features: ${CMAKE_C_KNOWN_FEATURES}")
+message(VERBOSE "C known features: ${CMAKE_C_KNOWN_FEATURES}")
 
 set(CMAKE_DL_LIBS "" CACHE STRING "dl linker flags") # or empty static dl (libdl.a) stub
 set(CMAKE_FIND_LIBRARY_PREFIXES "lib")
@@ -449,8 +466,7 @@ if(LLVM_AR)
     endif()
   endif()
   # Expose for debugging if needed
-  set(CMAKE_MESSAGE_LOG_LEVEL "STATUS")
-  message(STATUS "Selected llvm-ar format: ${AR_FORMAT}")
+  message(VERBOSE "Selected llvm-ar format: ${AR_FORMAT}")
 
   # Override the archive commands so CMake calls llvm-ar with the chosen --format
   # Use the per-language variables; here for C and CXX (repeat for other languages if needed).
@@ -506,7 +522,7 @@ if(_GENERIC_MUSL_HAVE_CLANG)
     set(CXX_EXTENSIONS ON)
   endif()
 else()
-  message(STATUS "No Clang detected; leaving most toolchain variables unchanged (GNU toolchains are unsupported).")
+  message(WARNING "No Clang detected; leaving most toolchain variables unchanged (GNU toolchains are unsupported).")
 endif()
 
 # STDC detection for Musl
@@ -568,7 +584,7 @@ if(CMAKE_C_STANDARD_REQUIRED OR FORCE_DEFINE_STDC_VERSION)
   endif()
 
   message(STATUS "Requested C standard: ${_requested_std} -> selected __STDC_VERSION__=${SELECTED_STD_VALUE}")
-  message(STATUS "MUSL_HAS_ANNEX_K = ${MUSL_HAS_ANNEX_K}; DEFINE_NO_ANNEX_K = ${DEFINE_NO_ANNEX_K}; FORCE_DEFINE_STDC_VERSION = ${FORCE_DEFINE_STDC_VERSION}")
+  message(VERBOSE "MUSL_HAS_ANNEX_K = ${MUSL_HAS_ANNEX_K}; DEFINE_NO_ANNEX_K = ${DEFINE_NO_ANNEX_K}; FORCE_DEFINE_STDC_VERSION = ${FORCE_DEFINE_STDC_VERSION}")
 
   if(FORCE_DEFINE_STDC_VERSION)
     add_compile_definitions("__STDC_VERSION__=${SELECTED_STD_VALUE}")
