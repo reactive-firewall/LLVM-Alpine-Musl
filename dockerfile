@@ -1267,8 +1267,7 @@ RUN mkdir -p /usr/share/cmake/Modules/Platform \
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
   apk update && \
   apk add --no-cache \
-    cmd:clang++ \
-    cmd:g++
+    cmd:clang++
 # but we remove it anyway afterwards
 
 RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
@@ -1276,6 +1275,7 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_SYSTEM_NAME=Generic-Musl \
     -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_C_COMPILER_ID=Clang \
     -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
     -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
@@ -1524,8 +1524,7 @@ RUN mkdir -pv /headers && \
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
   apk update && \
   apk add --no-cache \
-    cmd:clang++ \
-    cmd:g++
+    cmd:clang++
 # but we remove it anyway afterwards
 
 WORKDIR /bootstrap/llvmorg
@@ -1559,6 +1558,7 @@ RUN mkdir -p build-libcxx-config && \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CFLAGS} ${CXXFLAGS} -Qunused-arguments" \
       -DCMAKE_C_COMPILER=clang \
+      -DCMAKE_C_COMPILER_ID=Clang \
       -DCMAKE_CXX_COMPILER=clang++ \
       -DCMAKE_LINKER=lld \
       -DLLVM_ENABLE_RUNTIMES= \
@@ -1602,6 +1602,7 @@ RUN mkdir -p build-libcxxabi-config && \
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
       -DCMAKE_C_COMPILER=clang \
+      -DCMAKE_C_COMPILER_ID=Clang \
       -DCMAKE_CXX_COMPILER=clang++ \
       -DCMAKE_LINKER=lld \
       -DLLVM_ENABLE_RUNTIMES= \
@@ -1645,7 +1646,7 @@ RUN for MUSL_SDK_FILE_ARTIFACT in bin sbin lib libexec \
         usr/include/netpacket \
         usr/include/scsi \
         usr/include/sys ; do \
-          if [ -L ${SYSROOT}/${MUSL_SDK_FILE_ARTIFACT} ] ; then \
+          if [ -L /headers/${MUSL_SDK_FILE_ARTIFACT} ] ; then \
             rm -vf -- /headers/${MUSL_SDK_FILE_ARTIFACT} || true ; \
           fi ; \
     done ; \
@@ -1855,6 +1856,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
       -G Ninja \
       -DCMAKE_C_COMPILER=${HOST_CC} \
       -DCMAKE_CXX_COMPILER=${HOST_CXX} \
+      -DCMAKE_C_COMPILER_ID=Clang \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_COLOR_DIAGNOSTICS=ON \
       -DCMAKE_BUILD_TYPE=Release \
@@ -1937,6 +1939,7 @@ RUN mkdir -p /work/build-libcxxabi-bootstrap0 && cd /work/build-libcxxabi-bootst
     cmake -S /work/llvm-project/libcxxabi -B /work/build-libcxxabi-bootstrap0 -Wno-dev \
       -G Ninja \
       -DCMAKE_C_COMPILER=${HOST_CC} \
+      -DCMAKE_C_COMPILER_ID=Clang \
       -DCMAKE_CXX_COMPILER=${HOST_CXX} \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
@@ -2138,6 +2141,8 @@ RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi && \
     for CXXRT_FILE_ARTIFACT in usr/include/c++/v1/cxxabi/cxxabi.h \
         usr/include/c++/v1/cxxabi/unwind-llvm.h \
         usr/include/c++/v1/cxxabi/unwind-cxxabi.h \
+        usr/include/c++/v1/cxxabi/unwind-arm.h \
+        usr/include/c++/v1/cxxabi/unwind-itanium.h \
         usr/include/c++/v1/cxxabi/unwind.h \
         usr/lib/libcxxrt.so ; do \
           cp -vf /stage-cxxrt/${CXXRT_FILE_ARTIFACT} ${SYSROOT:-/sysroot}/${CXXRT_FILE_ARTIFACT} || true ; \
@@ -2236,6 +2241,7 @@ RUN mkdir -m 755 -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-boots
     cmake -S "/work/llvm-project/runtimes" -B "/work/build-libcxx-bootstrap1" \
       -G Ninja \
       -DCMAKE_C_COMPILER=${HOST_CC} \
+      -DCMAKE_C_COMPILER_ID=Clang \
       -DCMAKE_CXX_COMPILER=${HOST_CXX} \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
@@ -2278,6 +2284,7 @@ RUN mkdir -m 755 -p /work/build-libcxx-bootstrap1 && cd /work/build-libcxx-boots
       -DCMAKE_C_FLAGS="${CFLAGS} -Qunused-arguments" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
       -DLIBCXX_LINK_FLAGS="${CXX_UNWINDER_FLAGS} -v ${LDFLAGS} -Xlinker --verbose" \
+      -DLIBCXXABI_LINK_FLAGS="${CXX_UNWINDER_FLAGS} -v ${LDFLAGS} -Xlinker --verbose" \
       -DCMAKE_EXE_LINKER_FLAGS="${CXX_UNWINDER_FLAGS} -Xlinker -Bdynamic -Xlinker -L -Xlinker /work/builds/opt/libcxx-bootstrap1/lib -Xlinker -L -Xlinker ${SYS_LIB}" \
       -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
       -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
@@ -2547,6 +2554,7 @@ RUN mkdir -p /work/build-libcxx-final && cd /work/build-libcxx-final && \
     /work/run_cmake_build.sh /work/llvm-project/runtimes /work/build-libcxx-final \
       -G Ninja \
       -DCMAKE_C_COMPILER=${HOST_CC} \
+      -DCMAKE_C_COMPILER_ID=Clang \
       -DCMAKE_CXX_COMPILER=${HOST_CXX} \
       -DCMAKE_LINKER=${HOST_LD} \
       -DCMAKE_BUILD_TYPE=Release \
@@ -2915,6 +2923,7 @@ RUN cmake -S compiler-rt -B build-compiler-rt -G "Ninja" \
       -DCMAKE_CXX_FLAGS="${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
       -DCMAKE_C_COMPILER=clang \
       -DCMAKE_CXX_COMPILER=clang++ \
+      -DCMAKE_C_COMPILER_ID=Clang \
       -DCMAKE_SYSTEM_NAME=Generic-Musl \
       -DCMAKE_LINKER=lld \
       -DCMAKE_SYSROOT="${SYSROOT}" && \
@@ -2934,6 +2943,7 @@ RUN cmake -S llvm -B build-llvm -G "Ninja" \
     -DLLVM_MAIN_SRC_DIR=/bootstrap/llvmorg/llvm \
     -DClang_DIR=/bootstrap/llvmorg/clang \
     -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_C_COMPILER_ID=Clang \
     -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_SYSTEM_NAME=Generic-Musl \
     -DCMAKE_SYSROOT="${SYSROOT:-/sysroot}" \
