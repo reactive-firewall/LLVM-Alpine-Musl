@@ -150,7 +150,7 @@ if(NOT DEFINED CLANG_RT_PATH AND _GENERIC_MUSL_HAVE_CLANG)
         get_filename_component(basename "${_first_builtins}" NAME)
         string(REGEX MATCH "libclang_rt\\.builtins-(.*)\\.a$" _match "${basename}")  # capture group 1 = the '*' part (possibly empty)
         set(target_part "${CMAKE_MATCH_1}")                                        # empty string if no target
-        set(COMPILER_RT_LIBRARY_builtins_${${target_part} "${CLANG_RT_PATH}" CACHE INTERNAL)
+        set(COMPILER_RT_LIBRARY_builtins_${target_part} "${CLANG_RT_PATH}" CACHE INTERNAL)
         break()
       endif()
     endif()
