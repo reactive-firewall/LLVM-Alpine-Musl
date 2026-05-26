@@ -1208,7 +1208,8 @@ ENV TZ='UTC+0'
 # may want linker flag -Wl,--nostdlib to prevent linking to any std c++
 ENV LDFLAGS="-v -fuse-ld=lld -Xlinker --sysroot=/sysroot -Xlinker -L -Xlinker /sysroot/usr/lib -Xlinker -L -Xlinker /sysroot/lib -Xlinker -L -Xlinker /sysroot/usr/lib/generic"
 # Does NOT require -D__ELF__
-ENV CFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -Xlinker --pic-veneer -ffunction-sections -fdata-sections -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -I${SYSROOT:-/sysroot}/usr/include"
+# does pickup '-D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700' from Generic.cmake
+ENV CFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -Xlinker --pic-veneer -ffunction-sections -fdata-sections -D_BSD_SOURCE -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -I${SYSROOT:-/sysroot}/usr/include"
 # might need -nostdinc++
 ENV CXXFLAGS="-ffunction-sections -fdata-sections --unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
 
@@ -1416,7 +1417,8 @@ ENV TZ='UTC+0'
 # may want linker flag -Xlinker --nostdlib to prevent linking to any std c++
 ENV LDFLAGS="-v -Xlinker --sysroot=/sysroot -Xlinker -L -Xlinker /sysroot/usr/lib -Xlinker -L -Xlinker /sysroot/lib -Xlinker -L -Xlinker /sysroot/usr/lib/generic"
 # Does NOT require -D__ELF__
-ENV CFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -Xlinker --pic-veneer -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -iwithsysroot /usr/include"
+# does pickup '-D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700' from Generic.cmake
+ENV CFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -Xlinker --pic-veneer -ffunction-sections -fdata-sections -D_ALL_SOURCE -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -iwithsysroot /usr/include"
 # might need -nostdinc++
 ENV CXXFLAGS="-iwithsysroot /usr/include/c++/v1 -ffunction-sections -fdata-sections --unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
 
