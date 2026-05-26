@@ -1272,7 +1272,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
 # but we remove it anyway afterwards
 
 RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
-  cmake -S . -B ../libcxxrt -G Ninja \
+  cmake --log-level=VERBOSE -S . -B ../libcxxrt -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_SYSTEM_NAME=Generic-Musl \
     -DCMAKE_C_COMPILER=clang \
