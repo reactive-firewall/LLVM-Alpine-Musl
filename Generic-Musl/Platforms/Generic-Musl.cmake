@@ -58,6 +58,7 @@ endif()
 
 
 set(UNIX 1)
+set_property(GLOBAL PROPERTY FIND_LIBRARY_USE_OPENBSD_VERSIONING TRUE)
 include(Platform/UnixPaths)
 
 # musl does NOT need GNU extensions, but can leverage them when either one of
@@ -158,15 +159,20 @@ set(_libc_candidates
 # search must have set libc_path to the path of musl libc.so (or empty if not detecting musl)
 if(NOT DEFINED libc_path)
   set(libc_path "")
+  message(VERBOSE "No pervious libc found yet.")
 endif()
 
+# musl implements it's dynamic loader within libc.sh when called via a symbolic link from ld-musl-*.so.1 (e.g., ld-musl-aarch64.ld.1)
+# search must have set MUSL_LOADER to the path of musl ld-musl-*.so.${CMAKE_SYSTEM_VERSION:-1} (or empty if not detecting musl's symbolic link)
 if(NOT DEFINED MUSL_LOADER)
   set(MUSL_LOADER "")
 endif()
 
 foreach(_c IN LISTS _libc_candidates)
+  message(VERBOSE "Searching for a libc at '${_c}' ...")
   if(EXISTS "${_c}")
     set(libc_path "${_c}")
+    message(VERBOSE "Found a libc at '${libc_path}'")
     # try to guess loader name in same dir: ld-musl-*.so.${CMAKE_SYSTEM_VERSION:-1}
     get_filename_component(_c_dir "${_c}" DIRECTORY)
     set(CMAKE_SYSTEM_LIBRARY_PATH "${_c_dir}")
@@ -181,10 +187,12 @@ foreach(_c IN LISTS _libc_candidates)
 endforeach()
 
 # optional debug
-if(NOT MUSL_LOADER)
+message(VERBOSE "libc_path='${libc_path}'\n CMAKE_SYSTEM_LIBRARY_PATH='${CMAKE_SYSTEM_LIBRARY_PATH}'\n _musl_loader='${MUSL_LOADER}'")
+if(libc_path AND NOT MUSL_LOADER)
+  # should be a warning, but this needs to pass for libcxxrt build case, so fail here for our use-case
   message(FATAL_ERROR "Generic-Musl is expected to have built the dynamic loader by now (because there is a libc.so).")
 else()
-  message(VERBOSE "libc_path='${libc_path}' CMAKE_SYSTEM_LIBRARY_PATH='${CMAKE_SYSTEM_LIBRARY_PATH}' _musl_loader='${MUSL_LOADER}'")
+  message(VERBOSE "Found Musl Dynamic Loader: '${MUSL_LOADER}'")
 endif()
 
 find_program(_llvm_objdump NAMES llvm-objdump)
