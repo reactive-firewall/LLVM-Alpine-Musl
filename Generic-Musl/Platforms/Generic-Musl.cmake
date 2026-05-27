@@ -160,6 +160,10 @@ if(NOT DEFINED libc_path)
   set(libc_path "")
 endif()
 
+if(NOT DEFINED _musl_loader)
+  set(_musl_loader "")
+endif()
+
 foreach(_c IN LISTS _libc_candidates)
   if(EXISTS "${_c}")
     set(libc_path "${_c}")
