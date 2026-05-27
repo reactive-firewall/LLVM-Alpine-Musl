@@ -56,7 +56,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_C_COMPILER_ID MATCHES "AppleClan
   set(_GENERIC_MUSL_HAVE_CLANG ON)
 else()
   message(AUTHOR_WARNING "Unrecognized compiler ID: ${CMAKE_C_COMPILER_ID}")
-  if(NOT CMAKE_C_COMPILER_ID)
+  if(CMAKE_C_COMPILER_ID)
     message(FATAL_ERROR "Generic-Musl platform can only be used with Clang toolchains at this time.")
   endif()
 endif()
