@@ -49,6 +49,7 @@ set(CMAKE_CXX_EXTENSIONS_DEFAULT OFF)
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU")
   message(FATAL_ERROR "Generic-Musl platform can not be used with GNU toolchains.")
+  return()
 endif()
 
 set(_GENERIC_MUSL_HAVE_CLANG OFF)
@@ -57,7 +58,8 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_C_COMPILER_ID MATCHES "AppleClan
 else()
   message(AUTHOR_WARNING "Unrecognized compiler ID: ${CMAKE_C_COMPILER_ID}")
   if(CMAKE_C_COMPILER_ID)
-    message(FATAL_ERROR "Generic-Musl platform can only be used with Clang toolchains at this time.")
+    return()
+    # message(FATAL_ERROR "Generic-Musl platform can only be used with Clang toolchains at this time.")
   endif()
 endif()
 
