@@ -1273,6 +1273,10 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:clang++
 # but we remove it anyway afterwards
 
+# Ensure we have the dynamic loader and libs present (sysroot paths)
+RUN ls -lap ${SYSROOT}${MUSL_PREFIX}/lib || true && \
+    file ${SYSROOT}${MUSL_PREFIX}/lib/* || true
+
 RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
   cmake --log-level=VERBOSE -S . -B ../libcxxrt -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
