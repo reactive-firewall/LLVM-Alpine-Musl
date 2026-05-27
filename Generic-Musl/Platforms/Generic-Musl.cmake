@@ -165,12 +165,11 @@ foreach(_c IN LISTS _libc_candidates)
     set(libc_path "${_c}")
     # try to guess loader name in same dir: ld-musl-*.so.${CMAKE_SYSTEM_VERSION:-1}
     get_filename_component(_c_dir "${_c}" DIRECTORY)
+    set(CMAKE_SYSTEM_LIBRARY_PATH "${_c_dir}")
     # only support v1 for musl
     file(GLOB _ldcandidates "${_c_dir}/ld-musl-*.so.1")
     if(_ldcandidates)
       list(GET _ldcandidates 0 _musl_loader)
-      set(CMAKE_SYSTEM_LIBRARY_PATH "${_c_dir}")
-      set(_musl_loader "${_musl_loader}")
     endif()
     break()
   endif()
@@ -227,7 +226,7 @@ endif()
 # Preserve any existing known features
 set(_known_features "${CMAKE_C_KNOWN_FEATURES}")
 
-if(libc_path)
+if(libc_path AND EXISTS "${libc_path}")
   # Musl libc trys to be strict ISO 9899:1999 Aligned
   # If musl libc is present, assume at least C99 support and probe related features.
   list(APPEND _known_features "c_std_99")
@@ -277,10 +276,12 @@ set(CMAKE_DL_LIBS "" CACHE STRING "dl linker flags") # or empty static dl (libdl
 set(CMAKE_FIND_LIBRARY_PREFIXES "lib")
 set(CMAKE_FIND_LIBRARY_SUFFIXES ".so" ".a")
 
-# support position independance
-# https://discourse.cmake.org/t/potential-bug-in-cmake-modules-compiler-clang-cmake-cmake-c-xx-compile-options-pic/1933/2
-set(CMAKE_C_COMPILE_OPTIONS_PIC "-fPIC")
-set(CMAKE_C_COMPILE_OPTIONS_PIE "-fPIE") ## needs -Xlinker --pic-veneer -fPIE -Xlinker --pie
+if(CMAKE_POSITION_INDEPENDENT_CODE)
+  # support position independance
+  # https://discourse.cmake.org/t/potential-bug-in-cmake-modules-compiler-clang-cmake-cmake-c-xx-compile-options-pic/1933/2
+  set(CMAKE_C_COMPILE_OPTIONS_PIC "-fPIC")
+  set(CMAKE_C_COMPILE_OPTIONS_PIE "-fPIE") ## needs -Xlinker --pic-veneer -fPIE -Xlinker --pie
+endif()
 
 # Detect libpthread / libm near libc
 set(CMAKE_PLATFORM_HAS_PTHREADS OFF)

@@ -582,8 +582,9 @@ RUN set -eux \
 
 # Ensure loader has canonical name (example: /lib/libc.so ->/lib/ld-musl-x86_64.so.1)
 RUN set -eux \
-    && ln -fns libc.so "${SYSROOT}${MUSL_PREFIX}/lib/${MUSL_LDLIB}" \
-    && ln -fns "${MUSL_LDLIB}" "${SYSROOT}${MUSL_PREFIX}/lib/ld-musl.so.1"
+    && ln -fs libc.so "${SYSROOT}${MUSL_PREFIX}/lib/${MUSL_LDLIB}" \
+    && ln -fs "${MUSL_LDLIB}" "${SYSROOT}${MUSL_PREFIX}/lib/ld-musl.so.1" \
+    && ln -fs "${MUSL_LDLIB}" "${SYSROOT}${MUSL_PREFIX}/lib/ld-musl.so"
 
 # TODO: implement bootstraping tool to walk dirs and find files with glob names and
 #       then update those matches filesystem dates (and decouple from overkill find tool here)
