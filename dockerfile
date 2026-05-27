@@ -714,7 +714,7 @@ ENV SOME_DATE_EPOCH=${SOME_DATE_EPOCH}
 COPY --from=sysroot-bootstrap /sysroot /sysroot
 
 # Ensure the dynamic loader is configured to search paths correctly
-COPY payloads/etc/ld-musl-x86_64.path /etc/ld-musl-x86_64.path
+COPY payloads/etc/ld-musl-x86_64.path "${SYSROOT}"/etc/ld-musl-x86_64.path
 RUN set -eux; \
     if [ "$(uname -m)" = "x86_64" ]; then \
       [ -L "${SYSROOT}"/etc/ld-musl-i486.path ] || ln -svf ld-musl-x86_64.path "${SYSROOT}"/etc/ld-musl-i486.path; \
@@ -724,14 +724,14 @@ RUN set -eux; \
       [ -L "${SYSROOT}"/etc/ld-musl-generic.path ] || ln -svf ld-musl-x86_64.path "${SYSROOT}"/etc/ld-musl-generic.path; \
     fi ;
 
-COPY payloads/etc/ld-musl-aarch64.path /etc/ld-musl-aarch64.path
+COPY payloads/etc/ld-musl-aarch64.path "${SYSROOT}"/etc/ld-musl-aarch64.path
 RUN set -eux; \
     if [ "$(uname -m)" = "aarch64" ]; then \
       [ -L "${SYSROOT}"/etc/ld-musl-generic.path ] || ln -svf ld-musl-aarch64.path "${SYSROOT}"/etc/ld-musl-generic.path; \
       [ -L "${SYSROOT}"/etc/ld-musl-armv8.path ] || ln -svf ld-musl-aarch64.path "${SYSROOT}"/etc/ld-musl-armv8.path; \
     fi;
 
-COPY payloads/etc/ld-musl-arm.path /etc/ld-musl-arm.path
+COPY payloads/etc/ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-arm.path
 RUN set -eux; \
     [ -L "${SYSROOT}"/etc/ld-musl-armv7.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-armv7.path; \
     [ -L "${SYSROOT}"/etc/ld-musl-armhf.path ] || ln -svf ld-musl-arm.path "${SYSROOT}"/etc/ld-musl-armhf.path; \
@@ -1208,8 +1208,9 @@ ENV TZ='UTC+0'
 # may want linker flag -Wl,--nostdlib to prevent linking to any std c++
 ENV LDFLAGS="-v -fuse-ld=lld -Xlinker --sysroot=/sysroot -Xlinker -L -Xlinker /sysroot/usr/lib -Xlinker -L -Xlinker /sysroot/lib -Xlinker -L -Xlinker /sysroot/usr/lib/generic"
 # Does NOT require -D__ELF__
-# does pickup '-D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700' from Generic.cmake
-ENV CFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -Xlinker --pic-veneer -ffunction-sections -fdata-sections -D_BSD_SOURCE -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -I${SYSROOT:-/sysroot}/usr/include"
+# does pickup '-D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700' from Generic-Musl.cmake
+# does pick up  '-Xlinker --pic-veneer' from Generic-Musl.cmake
+ENV CFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_BSD_SOURCE -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -I${SYSROOT:-/sysroot}/usr/include"
 # might need -nostdinc++
 ENV CXXFLAGS="-ffunction-sections -fdata-sections --unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
 

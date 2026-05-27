@@ -167,17 +167,17 @@ foreach(_c IN LISTS _libc_candidates)
     get_filename_component(_c_dir "${_c}" DIRECTORY)
     # only support v1 for musl
     file(GLOB _ldcandidates "${_c_dir}/ld-musl-*.so.1")
-    list(LENGTH _ldcandidates _ld_count)
-    if(_ld_count GREATER 0)
+    if(_ldcandidates)
       list(GET _ldcandidates 0 _musl_loader)
       set(CMAKE_SYSTEM_LIBRARY_PATH "${_c_dir}")
+      set(_musl_loader "${_musl_loader}")
     endif()
     break()
   endif()
 endforeach()
 
 # optional debug
-message(VERBOSE "libc_path='${libc_path}' _musl_loader='${_musl_loader}'")
+message(VERBOSE "libc_path='${libc_path}' CMAKE_SYSTEM_LIBRARY_PATH='${CMAKE_SYSTEM_LIBRARY_PATH}' _musl_loader='${_musl_loader}'")
 
 find_program(_llvm_objdump NAMES llvm-objdump)
 find_program(_gnu_objdump NAMES objdump)
