@@ -1300,6 +1300,7 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
     -DLIBCXXRT_USE_COMPILER_RT=ON \
     -DCMAKE_INSTALL_PREFIX=/usr \
     -DCMAKE_LINKER=lld \
+    -DCMAKE_SYSTEM_NAME=Generic-Musl \
     -DCMAKE_LINKER_FLAGS="${CFLAGS} ${LDFLAGS} -Xlinker --exclude-libs=libgcc_s.so -Xlinker --exclude-libs=libgcc_s.so.1" && \
   cd /bootstrap && \
   cmake --build libcxxrt -- -j$(nproc) && \
