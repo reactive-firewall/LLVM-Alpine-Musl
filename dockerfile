@@ -1280,7 +1280,6 @@ RUN ls -lap ${SYSROOT}${MUSL_PREFIX}/lib || true && \
 RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
   cmake --log-level=VERBOSE -S . -B ../libcxxrt -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_SYSTEM_NAME=Generic-Musl \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_C_COMPILER_ID=Clang \
     -DCMAKE_CXX_COMPILER=clang++ \

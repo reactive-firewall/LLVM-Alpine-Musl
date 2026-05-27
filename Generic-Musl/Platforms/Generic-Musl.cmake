@@ -124,16 +124,54 @@ if(NOT DEFINED CLANG_RT_PATH AND _GENERIC_MUSL_HAVE_CLANG)
   endforeach()
 endif()
 
-# Detect libc and musl dynamic linker presence for shared support
+# Prepare to detect musl libc
 # Candidate libc paths relative to sysroot or absolute
-set(_libc_candidates
-  "${CMAKE_SYSROOT}/lib/libc.so"
-  "${CMAKE_INSTALL_PREFIX}/lib/libc.so"
-  "${CMAKE_SYSROOT}/usr/lib/libc.so"
-  "${CMAKE_INSTALL_PREFIX}/usr/lib/libc.so"
-  "/lib/libc.so"
-  "/usr/lib/libc.so"
-)
+# Search order: CMAKE_FIND_ROOT_PATH, CMAKE_SYSROOT_LINK, CMAKE_SYSROOT, CMAKE_INSTALL_PREFIX (relative), HOST (absolute)
+# Sub-Search Order: lib/, usr/lib/ (musl expects to be in one of these "lib" dirs)
+set(_candidate_bases)
+if (CMAKE_FIND_ROOT_PATH AND EXISTS "${CMAKE_FIND_ROOT_PATH}")
+  list(APPEND _candidate_bases "${CMAKE_FIND_ROOT_PATH}")
+  message(DEBUG "Will search for a lib path at '${CMAKE_FIND_ROOT_PATH}'")
+endif()
+
+if (CMAKE_SYSROOT_LINK AND EXISTS "${CMAKE_SYSROOT_LINK}")
+  list(APPEND _candidate_bases "${CMAKE_SYSROOT_LINK}")
+  message(DEBUG "Will search for a lib path at '${CMAKE_SYSROOT_LINK}'")
+endif()
+
+if (CMAKE_SYSROOT AND EXISTS "${CMAKE_SYSROOT}")
+  list(APPEND _candidate_bases "${CMAKE_SYSROOT}")
+  message(DEBUG "Will search for a lib path at '${CMAKE_SYSROOT}'")
+endif()
+
+if (CMAKE_INSTALL_PREFIX AND EXISTS "${CMAKE_INSTALL_PREFIX}")
+  list(APPEND _candidate_bases "${CMAKE_INSTALL_PREFIX}")
+  message(DEBUG "Will search for a lib path at '${CMAKE_INSTALL_PREFIX}'")
+endif()
+
+# If no sysroot/prefix candidates were found, fall back to host absolute locations
+if (NOT _candidate_bases)
+  message(DEBUG "Will search for a lib path on host")
+  set(_candidate_bases "/")
+endif()
+
+# For each base, prefer "lib/" then "usr/lib/" (musl expects one of these)
+set(_libc_candidates)
+foreach(_base IN LISTS _candidate_bases)
+  # Normalize trailing slash removal to avoid double slashes, but allow root "/"
+  if("${_base}" STREQUAL "/")
+    list(APPEND _libc_candidates "/lib/libc.so" "/usr/lib/libc.so")
+  else()
+    # remove any trailing slash for consistent concatenation
+    string(REGEX REPLACE "/$" "" _b "${_base}")
+    list(APPEND _libc_candidates
+      "${_b}/lib/libc.so"
+      "${_b}/usr/lib/libc.so"
+    )
+  endif()
+endforeach()
+
+message(VERBOSE "Search candidates selected: ${_libc_candidates}")
 
 # search must have set libc_path to the path of musl libc.so (or empty if not detecting musl)
 if(NOT DEFINED libc_path)
@@ -147,6 +185,8 @@ if(NOT DEFINED MUSL_LOADER)
   set(MUSL_LOADER "")
 endif()
 
+# Detect libc and musl dynamic linker presence for shared support
+list(REMOVE_DUPLICATES _libc_candidates)
 foreach(_c IN LISTS _libc_candidates)
   message(VERBOSE "Searching for a libc at '${_c}' ...")
   if(EXISTS "${_c}")
