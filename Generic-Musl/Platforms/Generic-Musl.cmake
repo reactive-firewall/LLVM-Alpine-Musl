@@ -127,50 +127,8 @@ if(_GENERIC_MUSL_HAVE_CLANG)
   endif()
 endif()
 
-# Try to locate libclang_rt.builtins*.a (common locations + /{usr/}lib/generic)
-if(NOT DEFINED CLANG_RT_PATH AND _GENERIC_MUSL_HAVE_CLANG)
-
-  if(NOT DEFINED CMAKE_C_LIBRARY_ARCHITECTURE)
-    set(CMAKE_C_LIBRARY_ARCHITECTURE "generic")
-  endif()
-
-  get_filename_component(_clang_bin_dir "${CMAKE_C_COMPILER}" DIRECTORY)
-  get_filename_component(_clang_parent_dir "${_clang_bin_dir}" PATH)
-  set(_try_paths
-    "${CMAKE_SYSROOT}/lib/${CMAKE_C_LIBRARY_ARCHITECTURE}"
-    "${CMAKE_SYSROOT}/usr/lib/${CMAKE_C_LIBRARY_ARCHITECTURE}"
-    "${CMAKE_INSTALL_PREFIX}/lib/${CMAKE_C_LIBRARY_ARCHITECTURE}"
-    "${CMAKE_INSTALL_PREFIX}/usr/lib/${CMAKE_C_LIBRARY_ARCHITECTURE}"
-    "/lib/${CMAKE_C_LIBRARY_ARCHITECTURE}"
-    "/usr/lib/${CMAKE_C_LIBRARY_ARCHITECTURE}"
-    "${_clang_parent_dir}/lib/clang"
-    "${_clang_parent_dir}/lib64/clang"
-    "${_clang_parent_dir}/../lib/clang"
-    "/usr/lib/clang"
-    "/usr/lib64/clang"
-  )
-  foreach(_p IN LISTS _try_paths)
-    if(EXISTS "${_p}")
-      message(VERBOSE "Searching for a compiler builtins at '${_p}' ...")
-      file(GLOB _builtins_glob "${_p}/libclang_rt.builtins*.a" "${_p}/*/libclang_rt.builtins*.a")
-      if(_builtins_glob)
-        list(GET _builtins_glob 0 _first_builtins)
-        set(CLANG_RT_PATH "${_first_builtins}" CACHE PATH "Path to libclang_rt.builtins.a")
-        if(EXISTS "$CLANG_RT_PATH")
-          message(VERBOSE "Found a compiler builtins at '${CLANG_RT_PATH}'")
-          get_filename_component(basename "${_first_builtins}" NAME)
-          string(REGEX MATCH "libclang_rt\\.builtins-(.*)\\.a$" _match "${basename}")  # capture group 1 = the '*' part (possibly empty)
-          set(target_part "${CMAKE_MATCH_1}")                                        # empty string if no target
-          set(COMPILER_RT_LIBRARY_builtins_${target_part} "${CLANG_RT_PATH}" CACHE INTERNAL "Compiler Runtime builtins (detected from libclang_rt)")
-          break()
-        endif()
-      endif()
-    endif()
-  endforeach()
-endif()
-
-# Prepare to detect musl libc
-# Candidate libc paths relative to sysroot or absolute
+# Prepare to detect builtins, musl libc, and musl dynamic loader
+# Candidate search paths relative to sysroot or absolute
 # Search order: CMAKE_FIND_ROOT_PATH, CMAKE_SYSROOT_LINK, CMAKE_SYSROOT, CMAKE_INSTALL_PREFIX (relative), HOST (absolute)
 # Sub-Search Order: lib/, usr/lib/ (musl expects to be in one of these "lib" dirs)
 set(_candidate_bases)
@@ -200,6 +158,56 @@ if (NOT _candidate_bases)
   set(_candidate_bases "/")
 endif()
 
+# Try to locate libclang_rt.builtins*.a (common locations + /{usr/}lib/generic)
+if(NOT DEFINED CLANG_RT_PATH AND _GENERIC_MUSL_HAVE_CLANG)
+
+  if(NOT DEFINED CMAKE_C_LIBRARY_ARCHITECTURE)
+    set(CMAKE_C_LIBRARY_ARCHITECTURE "generic")
+  endif()
+
+  get_filename_component(_clang_bin_dir "${CMAKE_C_COMPILER}" DIRECTORY)
+  get_filename_component(_clang_parent_dir "${_clang_bin_dir}" PATH)
+
+  # For each base, prefer "lib/" then "usr/lib/" (musl expects one of these)
+  set(_libclang_rt_candidates)
+  foreach(_base IN LISTS _candidate_bases)
+    # Normalize trailing slash removal to avoid double slashes, but allow root "/"
+    if("${_base}" STREQUAL "/")
+      list(APPEND _libclang_rt_candidates "/usr/lib/clang" "/usr/lib64/clang")
+    else()
+      # remove any trailing slash for consistent concatenation
+      string(REGEX REPLACE "/$" "" _b "${_base}")
+      list(APPEND _libclang_rt_candidates
+        "${_b}/lib/${CMAKE_C_LIBRARY_ARCHITECTURE}"
+        "${_b}/usr/lib/${CMAKE_C_LIBRARY_ARCHITECTURE}"
+        "${_b}/usr/lib/clang"
+      )
+    endif()
+  endforeach()
+
+  message(VERBOSE "Search candidates selected: ${_libclang_rt_candidates}")
+
+  foreach(_p IN LISTS _libclang_rt_candidates)
+    if(EXISTS "${_p}")
+      message(VERBOSE "Searching for compiler builtins at '${_p}' ...")
+      file(GLOB _builtins_glob "${_p}/libclang_rt.builtins*.a" "${_p}/*/libclang_rt.builtins*.a")
+      if(_builtins_glob)
+        list(GET _builtins_glob 0 _first_builtins)
+        set(CLANG_RT_PATH "${_first_builtins}" CACHE PATH "Path to libclang_rt.builtins.a")
+        if(EXISTS "$CLANG_RT_PATH")
+          message(VERBOSE "Found a compiler builtins at '${CLANG_RT_PATH}'")
+          get_filename_component(basename "${_first_builtins}" NAME)
+          string(REGEX MATCH "libclang_rt\\.builtins-(.*)\\.a$" _match "${basename}")  # capture group 1 = the '*' part (possibly empty)
+          set(target_part "${CMAKE_MATCH_1}")                                        # empty string if no target
+          set(COMPILER_RT_LIBRARY_builtins_${target_part} "${CLANG_RT_PATH}" CACHE INTERNAL "Compiler Runtime builtins (detected from libclang_rt)")
+          break()
+        endif()
+      endif()
+    endif()
+  endforeach()
+endif()
+
+# after builtins look for musl stuff
 # For each base, prefer "lib/" then "usr/lib/" (musl expects one of these)
 set(_libc_candidates)
 foreach(_base IN LISTS _candidate_bases)
@@ -251,10 +259,9 @@ foreach(_c IN LISTS _libc_candidates)
 endforeach()
 
 # optional debug
-message(VERBOSE "libc_path='${libc_path}'\n CMAKE_SYSTEM_LIBRARY_PATH='${CMAKE_SYSTEM_LIBRARY_PATH}'\n _musl_loader='${MUSL_LOADER}'")
+message(DEBUG "libc_path='${libc_path}'\n CMAKE_SYSTEM_LIBRARY_PATH='${CMAKE_SYSTEM_LIBRARY_PATH}'\n _musl_loader='${MUSL_LOADER}'")
 if(libc_path AND NOT MUSL_LOADER)
-  # should be a warning, but this needs to pass for libcxxrt build case, so fail here for our use-case
-  message(FATAL_ERROR "Generic-Musl is expected to have built the dynamic loader by now (because there is a libc.so).")
+  message(WARNING "Generic-Musl is expected to have built the dynamic loader by now (because there is a libc.so).")
 else()
   message(VERBOSE "Found Musl Dynamic Loader: '${MUSL_LOADER}'")
 endif()
@@ -293,7 +300,7 @@ if(CMAKE_OBJDUMP AND EXISTS "${libc_path}")
 
     if(_ver_candidate)
       # set the CMake cached vars only if not already set by user
-      if(NOT DEFINED CMAKE_HOST_SYSTEM_VERSION)
+      if(NOT DEFINED CMAKE_HOST_SYSTEM_VERSION AND CMAKE_CROSSCOMPILING)
         set(CMAKE_HOST_SYSTEM_VERSION "${_ver_candidate}" CACHE STRING "Host system version (detected from libc)" FORCE)
       endif()
       if(DEFINED CMAKE_SYSTEM_VERSION AND (CMAKE_SYSTEM_VERSION STREQUAL "1" OR NOT CMAKE_SYSTEM_VERSION))
@@ -323,16 +330,20 @@ if(libc_path AND EXISTS "${libc_path}")
   # musl dos not care about .exe nor .elf (and does not support .app)
   # set(CMAKE_EXECUTABLE_SUFFIX "")
   set(CMAKE_EXECUTABLE_FORMAT "ELF" CACHE STRING "Executable format")
+  set(CMAKE_STATIC_LIBRARY_PREFIX "lib")
   set(CMAKE_STATIC_LIBRARY_SUFFIX ".a")
   set(CMAKE_STATIC_LIBRARY_FORMAT "ELF" CACHE STRING "Static Library format")
   set(CMAKE_SHARED_LIBRARY_PREFIX "lib")
   set(CMAKE_SHARED_LIBRARY_SUFFIX ".so")
-  set(CMAKE_EXTRA_SHARED_LIBRARY_SUFFIXES
-    ".so.${CMAKE_SYSTEM_VERSION}"
-    ".so.${CMAKE_SYSTEM_VERSION}.0"
-    ".${CMAKE_SYSTEM_VERSION}.0.so"
-    ".lib"
-  )
+  set(CMAKE_SHARED_LIBRARY_FORMAT "ELF" CACHE STRING "Shared Library format")
+  set_property(GLOBAL PROPERTY FIND_LIBRARY_USE_OPENBSD_VERSIONING TRUE)
+  # Musl mimics OpenBSD style suffixes kinda like this:
+  #set(CMAKE_EXTRA_SHARED_LIBRARY_SUFFIXES
+  #  ".so.${CMAKE_SYSTEM_VERSION}"
+  #  ".so.${CMAKE_SYSTEM_VERSION}.0"
+  #  ".${CMAKE_SYSTEM_VERSION}.0.so"
+  #  ".lib"
+  #)
   set(CMAKE_IMPORT_LIBRARY_SUFFIX "${CMAKE_SHARED_LIBRARY_SUFFIX}")
   set(CMAKE_SHARED_MODULE_SUFFIX ".so")
 
@@ -436,6 +447,8 @@ if(NOT DEFINED CMAKE_ARCHIVE_OUTPUT_DIRECTORY)
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SYSROOT}/lib")
 endif()
 
+# End of Musl C stuff
+
 # Detect available CXX Compilers (clang++, c++)
 find_program(CLANG_CXX clang++) # clang++
 find_program(JUST_CXX c++) # c++
@@ -508,6 +521,10 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
           list(APPEND _generic_musl_${type}_linker_flags_INIT "-fuse-ld=lld")
         endif()
       endif()
+      list(FIND _generic_musl_${type}_linker_flags_INIT "-pipe" _found_pipe_for_${type}_flag)
+      if(_found_pipe_for_${type}_flag EQUAL -1)
+        list(APPEND _generic_musl_${type}_linker_flags_INIT "-pipe")
+      endif()
     endforeach()
   endif()
   foreach(lang C CXX)
@@ -519,6 +536,10 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
       list(FIND CMAKE_${lang}_FLAGS "-fuse-ld=lld" _found_use_lld_${lang}_flag2)
       if(_found_use_lld_${lang}_flag2 EQUAL -1)
         set(CMAKE_${lang}_FLAGS "-fuse-ld=lld ${CMAKE_${lang}_FLAGS}")
+      endif()
+      list(FIND CMAKE_${lang}_FLAGS "-pipe" _found_use_pipe_${lang}_flag)
+      if(_found_use_pipe_${lang}_flag EQUAL -1)
+        set(CMAKE_${lang}_FLAGS "-pipe ${CMAKE_${lang}_FLAGS}")
       endif()
     endif()
     foreach(type SHARED_LIBRARY SHARED_MODULE)
