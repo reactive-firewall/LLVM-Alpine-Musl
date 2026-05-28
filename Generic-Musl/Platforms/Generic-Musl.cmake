@@ -71,7 +71,6 @@ include(Platform/UnixPaths)
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU")
   message(FATAL_ERROR "Generic-Musl platform can not be used with GNU toolchains.")
-  return()
 endif()
 
 set(_GENERIC_MUSL_HAVE_CLANG OFF)
@@ -422,6 +421,28 @@ if(NOT DEFINED CMAKE_RUNTIME_OUTPUT_DIRECTORY)
 endif()
 if(NOT DEFINED CMAKE_ARCHIVE_OUTPUT_DIRECTORY)
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SYSROOT}/lib")
+endif()
+
+# Detect available CXX Compilers (clang++, c++)
+find_program(CLANG_CXX clang++) # clang++
+find_program(JUST_CXX c++) # c++
+
+if(CLANG_CXX OR JUST_CXX OR CMAKE_CXX_COMPILER)
+  if(CLANG_CXX AND NOT CMAKE_CXX_COMPILER)
+    set(CMAKE_CXX_COMPILER CLANG_CXX)
+    message(VERBOSE "Found a C++ Compiler at '${CMAKE_CXX_COMPILER}'")
+  else()
+    if(JUST_CXX AND NOT CMAKE_CXX_COMPILER)
+      set(CMAKE_CXX_COMPILER JUST_CXX)
+      message(VERBOSE "Found a C++ Compiler at '${CMAKE_CXX_COMPILER}'")
+    endif()
+  endif()
+  if(_GENERIC_MUSL_HAVE_CLANG)
+    if(NOT DEFINED CMAKE_CXX_COMPILER_ID OR CMAKE_CXX_COMPILER_ID STREQUAL "")
+      set(CMAKE_C_COMPILER_ID Clang) # LLVM Clang
+    endif()
+  endif()
+  # TODO: detect libc++ libs
 endif()
 
 # Detect available linkers (ld.lld, ld.clang, lld/llvm-lld as proxy)
