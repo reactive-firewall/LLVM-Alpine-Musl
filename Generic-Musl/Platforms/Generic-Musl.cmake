@@ -2,7 +2,17 @@
 # Platform file for System-V style embedded targets using musl libc and Clang/LLVM.
 # Use: -DCMAKE_SYSTEM_NAME=Generic-Musl -DCMAKE_C_COMPILER=... -DCMAKE_CXX_COMPILER=...
 
-set(CMAKE_SYSTEM_NAME "Generic" CACHE STRING "Target system")
+# Block multiple inclusion because "CMakeCInformation.cmake" includes
+# "Platform/${CMAKE_SYSTEM_NAME}" even though the generic module
+# "CMakeSystemSpecificInformation.cmake" already included it.
+# The extra inclusion is a work-around documented next to the include()
+# call, so this can be removed when the work-around is removed.
+if(__MUSL_SYS_INCLUDED)
+  return()
+endif()
+set(__MUSL_SYS_INCLUDED 1)
+
+set(CMAKE_SYSTEM_NAME "Generic-Musl" CACHE STRING "Target system")
 set(CMAKE_SYSTEM_VERSION 1)
 
 # Provide a CMAKE_SYSROOT fallback from env if still not set
@@ -10,9 +20,9 @@ if(NOT DEFINED CMAKE_SYSROOT OR CMAKE_SYSROOT STREQUAL "")
   if(DEFINED ENV{SYSROOT})
     set(CMAKE_SYSROOT "$ENV{SYSROOT}" CACHE PATH "Target sysroot" FORCE)
     set(CMAKE_CROSSCOMPILING ON)
+  else()
+    set(CMAKE_SYSROOT "")
   endif()
-else()
-  set(CMAKE_SYSROOT "")
 endif()
 
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -141,17 +151,19 @@ if(NOT DEFINED CLANG_RT_PATH AND _GENERIC_MUSL_HAVE_CLANG)
   )
   foreach(_p IN LISTS _try_paths)
     if(EXISTS "${_p}")
+      message(VERBOSE "Searching for a compiler builtins at '${_p}' ...")
       file(GLOB _builtins_glob "${_p}/libclang_rt.builtins*.a" "${_p}/*/libclang_rt.builtins*.a")
       if(_builtins_glob)
         list(GET _builtins_glob 0 _first_builtins)
         set(CLANG_RT_PATH "${_first_builtins}" CACHE PATH "Path to libclang_rt.builtins.a")
         if(EXISTS "$CLANG_RT_PATH")
+          message(VERBOSE "Found a compiler builtins at '${CLANG_RT_PATH}'")
           get_filename_component(basename "${_first_builtins}" NAME)
           string(REGEX MATCH "libclang_rt\\.builtins-(.*)\\.a$" _match "${basename}")  # capture group 1 = the '*' part (possibly empty)
           set(target_part "${CMAKE_MATCH_1}")                                        # empty string if no target
           set(COMPILER_RT_LIBRARY_builtins_${target_part} "${CLANG_RT_PATH}" CACHE INTERNAL "Compiler Runtime builtins (detected from libclang_rt)")
+          break()
         endif()
-        break()
       endif()
     endif()
   endforeach()
