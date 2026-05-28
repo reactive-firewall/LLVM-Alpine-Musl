@@ -19,9 +19,6 @@ if(NOT DEFINED CMAKE_INSTALL_PREFIX)
   set(CMAKE_INSTALL_PREFIX "")
 endif()
 
-set(_generic_musl_EXE_linker_flags_INIT "${CMAKE_EXE_LINKER_FLAGS_INIT}")
-set(_generic_musl_SHARED_linker_flags_INIT "${CMAKE_SHARED_LINKER_FLAGS_INIT}")
-
 if (CMAKE_FIND_ROOT_PATH AND EXISTS "${CMAKE_FIND_ROOT_PATH}")
   # To help the find_xxx() commands, set at least the following so CMAKE_FIND_ROOT_PATH
   # works at least for most musl cases:
@@ -83,6 +80,10 @@ else()
     # message(FATAL_ERROR "Generic-Musl platform can only be used with Clang toolchains at this time.")
   endif()
 endif()
+
+# copy the current exe/linker flags init values
+set(_generic_musl_EXE_linker_flags_INIT "${CMAKE_EXE_LINKER_FLAGS_INIT}")
+set(_generic_musl_SHARED_linker_flags_INIT "${CMAKE_SHARED_LINKER_FLAGS_INIT}")
 
 # musl does NOT need GNU extensions, but can leverage them when either one of
 #  _GNU_SOURCE or _ALL_SOURCE is defined.
@@ -883,8 +884,10 @@ if(POLICY CMP0128)
 endif()
 
 foreach(type SHARED EXE)
+  list(REMOVE_DUPLICATES _generic_musl_${type}_linker_flags_INIT)
   string(REPLACE ";" " " joined_${type}_linkerflags_init "${_generic_musl_${type}_linker_flags_INIT}")
   set(CMAKE_${type}_LINKER_FLAGS_INIT "${CMAKE_${type}_LINKER_FLAGS_INIT} ${joined_${type}_linkerflags_init}")
+  list(REMOVE_DUPLICATES _generic_musl_${type}_linker_flags)
   string(REPLACE ";" " " joined_${type}_linkerflags "${_generic_musl_${type}_linker_flags}")
   set(CMAKE_${type}_LINKER_FLAGS "${CMAKE_${type}_LINKER_FLAGS} ${joined_${type}_linkerflags}")
 endforeach()
