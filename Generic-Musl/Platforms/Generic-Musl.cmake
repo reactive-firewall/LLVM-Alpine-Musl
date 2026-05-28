@@ -9,6 +9,7 @@ set(CMAKE_SYSTEM_VERSION 1)
 if(NOT DEFINED CMAKE_SYSROOT OR CMAKE_SYSROOT STREQUAL "")
   if(DEFINED ENV{SYSROOT})
     set(CMAKE_SYSROOT "$ENV{SYSROOT}" CACHE PATH "Target sysroot" FORCE)
+    set(CMAKE_CROSSCOMPILING ON)
   endif()
 else()
   set(CMAKE_SYSROOT "")
@@ -21,31 +22,52 @@ endif()
 set(_generic_musl_EXE_linker_flags_INIT "${CMAKE_EXE_LINKER_FLAGS_INIT}")
 set(_generic_musl_SHARED_linker_flags_INIT "${CMAKE_SHARED_LINKER_FLAGS_INIT}")
 
-# To help the find_xxx() commands, set at least the following so CMAKE_FIND_ROOT_PATH
-# works at least for some simple cases:
-if(EXISTS "${CMAKE_SYSROOT}/bin")
-  set(CMAKE_SYSTEM_PROGRAM_PATH "${CMAKE_SYSROOT}/bin")
-endif()
-if(EXISTS "${CMAKE_SYSROOT}/include")
-  set(CMAKE_SYSTEM_INCLUDE_PATH "${CMAKE_SYSROOT}/include")
-endif()
-if(EXISTS "${CMAKE_SYSROOT}/usr/lib")
-  set(CMAKE_SYSTEM_LIBRARY_PATH "${CMAKE_SYSROOT}/lib;${CMAKE_SYSROOT}/usr/lib" )
+if (CMAKE_FIND_ROOT_PATH AND EXISTS "${CMAKE_FIND_ROOT_PATH}")
+  # To help the find_xxx() commands, set at least the following so CMAKE_FIND_ROOT_PATH
+  # works at least for most musl cases:
+  if(EXISTS "${CMAKE_FIND_ROOT_PATH}/bin")
+    set(CMAKE_SYSTEM_PROGRAM_PATH "${CMAKE_FIND_ROOT_PATH}/bin")
+  endif()
+  if(EXISTS "${CMAKE_FIND_ROOT_PATH}/include")
+    set(CMAKE_SYSTEM_INCLUDE_PATH "${CMAKE_FIND_ROOT_PATH}/include")
+  endif()
+  if(EXISTS "${CMAKE_FIND_ROOT_PATH}/usr/lib")
+    set(CMAKE_SYSTEM_LIBRARY_PATH "${CMAKE_FIND_ROOT_PATH}/lib;${CMAKE_FIND_ROOT_PATH}/usr/lib" )
+  else()
+    set(CMAKE_SYSTEM_LIBRARY_PATH "${CMAKE_FIND_ROOT_PATH}/lib")
+  endif()
 else()
-  set(CMAKE_SYSTEM_LIBRARY_PATH "${CMAKE_SYSROOT}/lib")
+  if (CMAKE_SYSROOT AND EXISTS "${CMAKE_SYSROOT}")
+    # To help the find_xxx() commands, set at least the following so CMAKE_SYSROOT
+    # works at least for some simple cases:
+    if(EXISTS "${CMAKE_SYSROOT}/bin")
+      set(CMAKE_SYSTEM_PROGRAM_PATH "${CMAKE_SYSROOT}/bin")
+    endif()
+    if(EXISTS "${CMAKE_SYSROOT}/include")
+      set(CMAKE_SYSTEM_INCLUDE_PATH "${CMAKE_SYSROOT}/include")
+    endif()
+    if(EXISTS "${CMAKE_SYSROOT}/usr/lib")
+      set(CMAKE_SYSTEM_LIBRARY_PATH "${CMAKE_SYSROOT}/lib;${CMAKE_SYSROOT}/usr/lib" )
+    else()
+      set(CMAKE_SYSTEM_LIBRARY_PATH "${CMAKE_SYSROOT}/lib")
+    endif()
+  else()
+    # To help the find_xxx() commands, set at least the following so CMAKE_FIND_ROOT_PATH
+    # works at least for some simple cases:
+    set(CMAKE_SYSTEM_PROGRAM_PATH /bin)
+    set(CMAKE_SYSTEM_INCLUDE_PATH /include)
+    if(EXISTS "/usr/lib")
+      set(CMAKE_SYSTEM_LIBRARY_PATH "/lib;/usr/lib" )
+    else()
+      set(CMAKE_SYSTEM_LIBRARY_PATH /lib)
+    endif()
+  endif()
 endif()
 
 
 set(UNIX 1)
 set_property(GLOBAL PROPERTY FIND_LIBRARY_USE_OPENBSD_VERSIONING TRUE)
 include(Platform/UnixPaths)
-
-# musl does NOT need GNU extensions, but can leverage them when either one of
-#  _GNU_SOURCE or _ALL_SOURCE is defined.
-#  Treat compiler GNU extensions when _GNU_SOURCE or _ALL_SOURCE are defined
-#  (set these variables so the rest of the toolchain can use them)
-set(CMAKE_C_EXTENSIONS_DEFAULT OFF)
-set(CMAKE_CXX_EXTENSIONS_DEFAULT OFF)
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU")
   message(FATAL_ERROR "Generic-Musl platform can not be used with GNU toolchains.")
@@ -62,6 +84,13 @@ else()
     # message(FATAL_ERROR "Generic-Musl platform can only be used with Clang toolchains at this time.")
   endif()
 endif()
+
+# musl does NOT need GNU extensions, but can leverage them when either one of
+#  _GNU_SOURCE or _ALL_SOURCE is defined.
+#  Treat compiler GNU extensions when _GNU_SOURCE or _ALL_SOURCE are defined
+#  (set these variables so the rest of the toolchain can use them)
+set(CMAKE_C_EXTENSIONS_DEFAULT OFF)
+set(CMAKE_CXX_EXTENSIONS_DEFAULT OFF)
 
 # Also allow explicit option override
 option(ENABLE_C_EXTENSIONS "Enable C GNU extensions" ${C_EXTENSIONS})
