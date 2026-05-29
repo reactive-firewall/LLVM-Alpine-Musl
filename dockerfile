@@ -1155,6 +1155,7 @@ COPY shims/unwind_shim.h /tmp/unwind_shim.h
 
 # Copy Generic-Musl.cmake into the image build context before building the image
 COPY Generic-Musl/Platforms/Generic-Musl.cmake /tmp/Generic-Musl.cmake
+COPY Generic-Musl/Platforms/Generic-Musl-FindCompilerArch.cmake /tmp/FindCompilerArch.cmake
 COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
 
 # Use pinned versions
@@ -1257,10 +1258,13 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:find
 
 # Install into Alpine cmake's Platform dir as PlatformGeneric-Musl.cmake
-RUN mkdir -p /usr/share/cmake/Modules/Platform \
+RUN mkdir -p /usr/share/cmake/Modules/Platform/Generic-Musl \
  && install -m 0644 /tmp/Generic-Musl.cmake /usr/share/cmake/Modules/Platform/Generic-Musl.cmake \
  && rm /tmp/Generic-Musl.cmake \
  && chmod -R a+rX /usr/share/cmake/Modules/Platform \
+ && install -m 0644 /tmp/FindCompilerArch.cmake /usr/share/cmake/Modules/Platform/Generic-Musl/FindCompilerArch.cmake \
+ && rm /tmp/FindCompilerArch.cmake \
+ && chmod -R a+rX /usr/share/cmake/Modules/Platform/Generic-Musl \
  && mkdir -p /usr/share/cmake/Modules/Platform/Linker \
  && install -m 0644 /tmp/Generic-Musl-Linker.cmake /usr/share/cmake/Modules/Platform/Linker/Generic-Musl-Linker.cmake \
  && rm /tmp/Generic-Musl-Linker.cmake \
@@ -1368,6 +1372,7 @@ COPY --from=build-libcxxrt /sysroot /stage-cxxrt
 
 # Copy custom Generic-Musl.cmake into the image build context before building the image
 COPY Generic-Musl/Platforms/Generic-Musl.cmake /tmp/Generic-Musl.cmake
+COPY Generic-Musl/Platforms/Generic-Musl-FindCompilerArch.cmake /tmp/FindCompilerArch.cmake
 COPY Generic-Musl/Platforms/Generic-Musl-Libcxxrt.cmake /tmp/Generic-Musl-Libcxxrt.cmake
 COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
 
@@ -1481,10 +1486,13 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:find
 
 # Install into Alpine cmake's Platform dir as PlatformGeneric-Musl.cmake
-RUN mkdir -p /usr/share/cmake/Modules/Platform \
+RUN mkdir -p /usr/share/cmake/Modules/Platform/Generic-Musl \
  && install -m 0644 /tmp/Generic-Musl.cmake /usr/share/cmake/Modules/Platform/Generic-Musl.cmake \
  && rm /tmp/Generic-Musl.cmake \
  && chmod -R a+rX /usr/share/cmake/Modules/Platform \
+ && install -m 0644 /tmp/FindCompilerArch.cmake /usr/share/cmake/Modules/Platform/Generic-Musl/FindCompilerArch.cmake \
+ && rm /tmp/FindCompilerArch.cmake \
+ && chmod -R a+rX /usr/share/cmake/Modules/Platform/Generic-Musl \
  && install -m 0644 /tmp/Generic-Musl-Libcxxrt.cmake /usr/share/cmake/Modules/Platform/Generic-Musl-Libcxxrt.cmake \
  && rm /tmp/Generic-Musl-Libcxxrt.cmake \
  && mkdir -p /usr/share/cmake/Modules/Platform/Linker \
@@ -1685,6 +1693,7 @@ COPY shims/cxx-headers.c /work/cxx-headers.c
 
 # Copy custom Generic-Musl.cmake into the image build context before building the image
 COPY Generic-Musl/Platforms/Generic-Musl.cmake /tmp/Generic-Musl.cmake
+COPY Generic-Musl/Platforms/Generic-Musl-FindCompilerArch.cmake /tmp/FindCompilerArch.cmake
 COPY Generic-Musl/Platforms/Generic-Musl-Libcxxrt.cmake /tmp/Generic-Musl-Libcxxrt.cmake
 COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
 
@@ -1805,9 +1814,12 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:find
 
 # Install into Alpine cmake's Platform dir as PlatformGeneric-Musl.cmake
-RUN mkdir -p /usr/share/cmake/Modules/Platform \
+RUN mkdir -p /usr/share/cmake/Modules/Platform/Generic-Musl \
  && install -m 0644 /tmp/Generic-Musl.cmake /usr/share/cmake/Modules/Platform/Generic-Musl.cmake \
  && rm /tmp/Generic-Musl.cmake \
+ && install -m 0644 /tmp/FindCompilerArch.cmake /usr/share/cmake/Modules/Platform/Generic-Musl/FindCompilerArch.cmake \
+ && rm /tmp/FindCompilerArch.cmake \
+ && chmod -R a+rX /usr/share/cmake/Modules/Platform/Generic-Musl \
  && install -m 0644 /tmp/Generic-Musl-Libcxxrt.cmake /usr/share/cmake/Modules/Platform/Generic-Musl-Libcxxrt.cmake \
  && rm /tmp/Generic-Musl-Libcxxrt.cmake \
  && chmod -R a+rX /usr/share/cmake/Modules/Platform \
@@ -2063,6 +2075,7 @@ COPY --from=build-libcxx-bs /sysroot /stage-bootstrap
 
 # Copy custom Generic-Musl.cmake into the image build context before building the image
 COPY Generic-Musl/Platforms/Generic-Musl.cmake /tmp/Generic-Musl.cmake
+COPY Generic-Musl/Platforms/Generic-Musl-FindCompilerArch.cmake /tmp/FindCompilerArch.cmake
 COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
 
 # Copy helper scripts and sources into the image
@@ -2194,10 +2207,13 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:find
 
 # Install into Alpine cmake's Platform dir as PlatformGeneric-Musl.cmake
-RUN mkdir -p /usr/share/cmake/Modules/Platform \
+RUN mkdir -p /usr/share/cmake/Modules/Platform/Generic-Musl \
  && install -m 0644 /tmp/Generic-Musl.cmake /usr/share/cmake/Modules/Platform/Generic-Musl.cmake \
  && rm /tmp/Generic-Musl.cmake \
  && chmod -R a+rX /usr/share/cmake/Modules/Platform \
+ && install -m 0644 /tmp/FindCompilerArch.cmake /usr/share/cmake/Modules/Platform/Generic-Musl/FindCompilerArch.cmake \
+ && rm /tmp/FindCompilerArch.cmake \
+ && chmod -R a+rX /usr/share/cmake/Modules/Platform/Generic-Musl \
  && mkdir -p /usr/share/cmake/Modules/Platform/Linker \
  && install -m 0644 /tmp/Generic-Musl-Linker.cmake /usr/share/cmake/Modules/Platform/Linker/Generic-Musl-Linker.cmake \
  && rm /tmp/Generic-Musl-Linker.cmake \
@@ -2370,6 +2386,7 @@ COPY --from=libcxxheaders /headers/usr/include/c++ /sysroot/usr/include/c++
 
 # Copy custom Generic-Musl.cmake into the image build context before building the image
 COPY Generic-Musl/Platforms/Generic-Musl.cmake /tmp/Generic-Musl.cmake
+COPY Generic-Musl/Platforms/Generic-Musl-FindCompilerArch.cmake /tmp/FindCompilerArch.cmake
 COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
 
 # Copy helper scripts and sources into the image
@@ -2500,10 +2517,13 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
     cmd:find
 
 # Install into Alpine cmake's Platform dir as PlatformGeneric-Musl.cmake
-RUN mkdir -p /usr/share/cmake/Modules/Platform \
+RUN mkdir -p /usr/share/cmake/Modules/Platform/Generic-Musl \
  && install -m 0644 /tmp/Generic-Musl.cmake /usr/share/cmake/Modules/Platform/Generic-Musl.cmake \
  && rm /tmp/Generic-Musl.cmake \
  && chmod -R a+rX /usr/share/cmake/Modules/Platform \
+ && install -m 0644 /tmp/FindCompilerArch.cmake /usr/share/cmake/Modules/Platform/Generic-Musl/FindCompilerArch.cmake \
+ && rm /tmp/FindCompilerArch.cmake \
+ && chmod -R a+rX /usr/share/cmake/Modules/Platform/Generic-Musl \
  && mkdir -p /usr/share/cmake/Modules/Platform/Linker \
  && install -m 0644 /tmp/Generic-Musl-Linker.cmake /usr/share/cmake/Modules/Platform/Linker/Generic-Musl-Linker.cmake \
  && rm /tmp/Generic-Musl-Linker.cmake \
@@ -2690,6 +2710,7 @@ COPY payloads/bin/run_dir_check.sh /bootstrap/bin/run_dir_check.sh
 
 # Copy custom Generic-Musl.cmake into the image build context before building the image
 COPY Generic-Musl/Platforms/Generic-Musl.cmake /tmp/Generic-Musl.cmake
+COPY Generic-Musl/Platforms/Generic-Musl-FindCompilerArch.cmake /tmp/FindCompilerArch.cmake
 COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cmake
 
 # Use pinned versions
@@ -2862,6 +2883,9 @@ RUN mkdir -p /usr/share/cmake/Modules/Platform \
  && install -m 0644 /tmp/Generic-Musl.cmake /usr/share/cmake/Modules/Platform/Generic-Musl.cmake \
  && rm /tmp/Generic-Musl.cmake \
  && chmod -R a+rX /usr/share/cmake/Modules/Platform \
+ && install -m 0644 /tmp/FindCompilerArch.cmake /usr/share/cmake/Modules/Platform/Generic-Musl/FindCompilerArch.cmake \
+ && rm /tmp/FindCompilerArch.cmake \
+ && chmod -R a+rX /usr/share/cmake/Modules/Platform/Generic-Musl \
  && mkdir -p /usr/share/cmake/Modules/Platform/Linker \
  && install -m 0644 /tmp/Generic-Musl-Linker.cmake /usr/share/cmake/Modules/Platform/Linker/Generic-Musl-Linker.cmake \
  && rm /tmp/Generic-Musl-Linker.cmake \

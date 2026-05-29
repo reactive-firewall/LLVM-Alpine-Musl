@@ -15,6 +15,34 @@ set(__MUSL_SYS_INCLUDED 1)
 set(CMAKE_SYSTEM_NAME "Generic-Musl" CACHE STRING "Target system")
 set(CMAKE_SYSTEM_VERSION 1)
 
+set(_platform_module_dir "${CMAKE_ROOT}/Modules/Platform/Generic-Musl")
+
+# allow packager / integrator to disable vendor include at configure time
+# e.g. -DGENERIC_MUSL_USE_VENDOR_MODULE=OFF
+if(NOT DEFINED GENERIC_MUSL_USE_VENDOR_MODULE)
+  set(GENERIC_MUSL_USE_VENDOR_MODULE ON CACHE BOOL "Use vendor-supplied musl cmake modules")
+endif()
+
+if(GENERIC_MUSL_USE_VENDOR_MODULE)
+  # prefer the packaged module file if present
+  if(EXISTS "${_platform_module_dir}/FindCompilerArch.cmake")
+    list(INSERT CMAKE_MODULE_PATH 0 "${_platform_module_dir}")
+    include(FindCompilerArch OPTIONAL)  # OPTIONAL is harmless if module not found on PATH
+  else()
+    # safe fallback: try to find by name on CMAKE_MODULE_PATH
+    find_file(_find_compiler_arch FindCompilerArch.cmake PATHS "${_platform_module_dir}" NO_DEFAULT_PATH)
+    if(_find_compiler_arch)
+      list(INSERT CMAKE_MODULE_PATH 0 "${_platform_module_dir}")
+      include(FindCompilerArch OPTIONAL)
+    else()
+      # no vendor module available; do nothing (caller can handle absence)
+      message(VERBOSE "Vendor FindCompilerArch.cmake not found; skipping include")
+    endif()
+  endif()
+else()
+  message(VERBOSE "GENERIC_MUSL_USE_VENDOR_MODULE=OFF; skipping vendor FindCompilerArch include")
+endif()
+
 # Provide a CMAKE_SYSROOT fallback from env if still not set
 if(NOT DEFINED CMAKE_SYSROOT OR CMAKE_SYSROOT STREQUAL "")
   if(DEFINED ENV{SYSROOT})
@@ -91,6 +119,52 @@ else()
   endif()
 endif()
 
+# --- runtime knobs (can be set by packager/project) ---
+if(NOT DEFINED GENERIC_MUSL_USE_ARCH_DETECTION_LANGS)
+  set(GENERIC_MUSL_USE_ARCH_DETECTION_LANGS "C;CXX" CACHE STRING "Languages to probe with detect_compiler_architecture")
+endif()
+
+# If true, persist discovered value into the cache (packager/project decision).
+if(NOT DEFINED GENERIC_MUSL_PERSIST_DETECTED_ARCH)
+  set(GENERIC_MUSL_PERSIST_DETECTED_ARCH OFF CACHE BOOL "If ON, forces discovered CMAKE_<LANG>_COMPILER_ARCHITECTURE_ID into the cache")
+endif()
+
+# --- only call the detector if it was included and the function exists ---
+if(COMMAND detect_compiler_architecture)
+  foreach(lang IN LISTS GENERIC_MUSL_USE_ARCH_DETECTION_LANGS)
+    string(TOUPPER "${lang}" LANG_U)
+    set(cache_var "CMAKE_${LANG_U}_COMPILER_ARCHITECTURE_ID")
+    # Skip if cache already populated (preserve explicit choices).
+    if(DEFINED ${cache_var} AND NOT "${${cache_var}}" STREQUAL "")
+      message(VERBOSE "Skipping ${lang}: ${cache_var} already set in cache")
+      continue()
+    endif()
+
+    # Call the detector (it sets <lang>_COMPILER_ARCH_ID and _SOURCE in parent scope)
+    detect_compiler_architecture("${lang}")
+
+    # Use the detected result variables (they are non-cache variables named e.g. C_COMPILER_ARCH_ID)
+    set(res_var "${lang}_COMPILER_ARCH_ID")
+    set(src_var "${lang}_COMPILER_ARCH_ID_SOURCE")
+    if(DEFINED ${res_var} AND NOT "${${res_var}}" STREQUAL "")
+      message(VERBOSE "Detected ${lang} architecture: ${${res_var}} (source=${${src_var}})")
+
+      # write discovered value into the cache
+      if(GENERIC_MUSL_PERSIST_DETECTED_ARCH)
+        # — use FORCE
+        set(${cache_var} "${${res_var}}" CACHE STRING "Detected compiler architecture for ${lang} (auto-populated by platform)" FORCE)
+        else()
+        set(${cache_var} "${${res_var}}" CACHE STRING "Detected compiler architecture for ${lang} (auto-populated by platform)")
+      endif()
+    else()
+      message(VERBOSE "No conservative architecture detected for ${lang} (source=${${src_var}})")
+    endif()
+  endforeach()
+else()
+  message(VERBOSE "detect_compiler_architecture not available; skipping optional architecture detection")
+endif()
+
+
 # copy the current exe/linker flags init values
 set(_generic_musl_EXE_linker_flags_INIT "${CMAKE_EXE_LINKER_FLAGS_INIT}")
 set(_generic_musl_SHARED_linker_flags_INIT "${CMAKE_SHARED_LINKER_FLAGS_INIT}")
@@ -117,11 +191,12 @@ if(_GENERIC_MUSL_HAVE_CLANG)
   if(NOT DEFINED CMAKE_CXX_COMPILER)
     if(DEFINED ENV{CXX})
       set(CMAKE_CXX_COMPILER "$ENV{CXX}" CACHE STRING "Environment C++ compiler" FORCE)
+      set(CMAKE_CXX_COMPILER_ID Clang)
     else()
       get_filename_component(_cbin "${CMAKE_C_COMPILER}" NAME_WE)
       if(_cbin MATCHES "clang$")
         set(CMAKE_CXX_COMPILER "${CMAKE_C_COMPILER}++" CACHE FILEPATH "Inferred clang++" FORCE)
-        set(CMAKE_CXX_COMPILER_ID "Clang")
+        set(CMAKE_CXX_COMPILER_ID Clang)
       endif()
     endif()
   endif()
@@ -512,6 +587,7 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
   # Prefer LLD where available
   if(LD_LLD OR LLD_LINK OR LLVM_LLD)
     set(_use_lld ON)
+    set(CMAKE_LINKER_TYPE LLD)
     foreach(type SHARED MODULE EXE)
       if (NOT DEFINED _generic_musl_${type}_linker_flags_INIT)
         set(_generic_musl_${type}_linker_flags_INIT "-fuse-ld=lld")
