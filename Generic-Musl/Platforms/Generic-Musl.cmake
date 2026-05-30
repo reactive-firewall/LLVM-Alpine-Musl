@@ -826,6 +826,7 @@ if(_GENERIC_MUSL_HAVE_CLANG)
     set(C_EXTENSIONS ON)
     set(CXX_EXTENSIONS ON)
   else()
+    # see __musl_clang_not_gnu() from include(NoGNUCMode)
     foreach(lang C CXX)
       # remove any existing -fgnuc-version=<whatever> occurrences
       string(REGEX REPLACE "-fgnuc-version=[^[:space:]]+" "" CMAKE_${lang}_FLAGS "${CMAKE_${lang}_FLAGS}")

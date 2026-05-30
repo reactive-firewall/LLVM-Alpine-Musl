@@ -1270,6 +1270,11 @@ RUN mkdir -p /usr/share/cmake/Modules/Platform/Generic-Musl \
  && rm /tmp/Generic-Musl-Linker.cmake \
  && chmod -R a+rX /usr/share/cmake/Modules/Platform/Linker
 
+
+RUN set -eux && \
+    printf '%s\n' '#!/bin/sh' 'exec clang -x c++ "$@"' >"${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/g++" && \
+    chmod +x "${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/bin/g++" ;
+
 # WORKAROUND: cmake still thinks that clang++ requires g++
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
   apk update && \
