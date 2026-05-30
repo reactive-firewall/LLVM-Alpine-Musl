@@ -1272,7 +1272,7 @@ RUN mkdir -p /usr/share/cmake/Modules/Platform/Generic-Musl \
 
 
 RUN set -eux && \
-    printf '%s\n' '#!/bin/sh' 'exec clang -x c++ "$@"' >"/usr/bin/g++" && \
+    printf '%s\n' '#!/bin/sh' 'exec clang++ --no-default-config "$@"' >"/usr/bin/g++" && \
     chmod +x "/usr/bin/g++" ;
 
 # WORKAROUND: cmake still thinks that clang++ requires g++
