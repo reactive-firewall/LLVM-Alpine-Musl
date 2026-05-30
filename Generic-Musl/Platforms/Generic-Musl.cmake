@@ -827,19 +827,19 @@ if(_GENERIC_MUSL_HAVE_CLANG)
     set(CXX_EXTENSIONS ON)
   else()
     foreach(lang C CXX)
-      # remove any existing --fgnuc-version=<whatever> occurrences
-      string(REGEX REPLACE "--fgnuc-version=[^[:space:]]+" "" CMAKE_${lang}_FLAGS "${CMAKE_${lang}_FLAGS}")
+      # remove any existing -fgnuc-version=<whatever> occurrences
+      string(REGEX REPLACE "-fgnuc-version=[^[:space:]]+" "" CMAKE_${lang}_FLAGS "${CMAKE_${lang}_FLAGS}")
 
       # collapse multiple spaces and trim
       string(REGEX REPLACE "[[:space:]]+" " " CMAKE_${lang}_FLAGS "${CMAKE_${lang}_FLAGS}")
       string(STRIP "${_flags}" CMAKE_${lang}_FLAGS)
 
-      # ensure --fgnuc-version=0 is present (prepend if missing)
-      if (NOT CMAKE_${lang}_FLAGS MATCHES "(^|[[:space:]])--fgnuc-version=0($|[[:space:]])")
+      # ensure -fgnuc-version=0 is present (prepend if missing)
+      if (NOT CMAKE_${lang}_FLAGS MATCHES "(^|[[:space:]])-fgnuc-version=0($|[[:space:]])")
         if (CMAKE_${lang}_FLAGS STREQUAL "")
-          set(CMAKE_${lang}_FLAGS "--fgnuc-version=0")
+          set(CMAKE_${lang}_FLAGS "-fgnuc-version=0")
         else()
-          set(CMAKE_${lang}_FLAGS "--fgnuc-version=0 ${CMAKE_${lang}_FLAGS}")
+          set(CMAKE_${lang}_FLAGS "-fgnuc-version=0 ${CMAKE_${lang}_FLAGS}")
         endif()
       endif()
     endforeach()
