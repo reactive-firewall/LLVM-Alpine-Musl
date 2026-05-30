@@ -638,7 +638,8 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
       set(CMAKE_CXX_LINKER "${LLVM_LLD}")
       set(CMAKE_LINKER_WORKS TRUE CACHE BOOL "Linker works")
     endif()
-    set(CMAKE_LINKER_TYPE LLD)
+    # breaks here if we use:
+    # set(CMAKE_LINKER_TYPE LLD)
   endif()
 
   if (NOT DEFINED _generic_musl_EXE_linker_flags)
