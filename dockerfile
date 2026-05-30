@@ -1214,7 +1214,7 @@ ENV LDFLAGS="-v -fuse-ld=lld -Xlinker --sysroot=/sysroot -Xlinker -L -Xlinker /s
 # does pick up  '-Xlinker --pic-veneer' from Generic-Musl.cmake
 ENV CFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -ffunction-sections -fdata-sections -D_BSD_SOURCE -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -isysroot ${SYSROOT:-/sysroot} -I${SYSROOT:-/sysroot}/usr/include"
 # might need -nostdinc++
-ENV CXXFLAGS="-v -Wl,-v -ffunction-sections -fdata-sections --unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
+ENV CXXFLAGS="-v -Xlinker -v -ffunction-sections -fdata-sections --unwindlib=/sysroot/usr/lib/libunwind.so.1.0"
 
 # overlay the unwinder
 RUN mkdir -pv ${SYSROOT:-/sysroot}/usr/include/mach-o && \
