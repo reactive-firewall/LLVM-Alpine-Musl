@@ -11,6 +11,10 @@ macro(__musl_linker_clang lang)
       set(CMAKE_${lang}_USING_LINKER_SYSTEM "")
       set(CMAKE_${lang}_USING_LINKER_LLD "-fuse-ld=lld")
     endif()
+    if(CMAKE_${lang}_LINK_MODE MATCHES "LLD")
+      set(CMAKE_${lang}_USING_LINKER_SYSTEM "-fuse-ld=lld")
+      set(CMAKE_${lang}_USING_LINKER_LLD "-fuse-ld=lld")
+    endif()
     # Features for LINK_LIBRARY generator expression
     ## WHOLE_ARCHIVE: Force loading all members of an archive
     set(CMAKE_${lang}_LINKER_PUSHPOP_STATE_SUPPORTED FALSE)
