@@ -1271,15 +1271,17 @@ RUN mkdir -p /usr/share/cmake/Modules/Platform/Generic-Musl \
  && chmod -R a+rX /usr/share/cmake/Modules/Platform/Linker
 
 
-RUN set -eux && \
-    printf '%s\n' '#!/bin/sh' 'exec clang++ --no-default-config "$@"' >"/usr/bin/g++" && \
-    chmod +x "/usr/bin/g++" ;
+# unfortunately we can't just redirect g++ to clang (cmake will FORCE g++ and fail)
+#RUN set -eux && \
+#    printf '%s\n' '#!/bin/sh' 'exec clang++ --no-default-config "$@"' >"/usr/bin/g++" && \
+#    chmod +x "/usr/bin/g++" ;
 
 # WORKAROUND: cmake still thinks that clang++ requires g++
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
   apk update && \
   apk add --no-cache \
-    cmd:clang++
+    cmd:clang++ \
+    cmd:g++
 # but we remove it anyway afterwards
 
 # Ensure we have the dynamic loader and libs present (sysroot paths)
@@ -1545,7 +1547,8 @@ RUN mkdir -pv /headers && \
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --network=default \
   apk update && \
   apk add --no-cache \
-    cmd:clang++
+    cmd:clang++ \
+    cmd:g++
 # but we remove it anyway afterwards
 
 WORKDIR /bootstrap/llvmorg
