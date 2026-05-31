@@ -329,7 +329,7 @@ ENV RANLIB=llvm-ranlib
 # MAY want try -D_POSIX_C_SOURCE=202405L instead for v1.2.6+ (TODO: review)
 # Musl can expose some XOPEN interfaces too, so use -D_XOPEN_SOURCE=700 to configure those.
 # musl should be given these values too
-ENV CFLAGS="-D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_BSD_SOURCE -fPIC"
+ENV CFLAGS="-D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_BSD_SOURCE -fcolor-diagnostics -fPIC"
 # musl provides a C aware dynamic loader/linker implementation, once built
 # but can't use -Wl,--dynamic-linker=/lib/ld-musl-{x86_64,aarch64,armv7}.so.1 just yet
 # Key Linker Flags (for musl bootstraping)
