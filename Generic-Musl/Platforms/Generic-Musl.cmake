@@ -112,7 +112,7 @@ if(NOT DEFINED _GENERIC_MUSL_HAVE_CLANG OR NOT _GENERIC_MUSL_HAVE_CLANG)
   set(_GENERIC_MUSL_HAVE_CLANG OFF)
 endif()
 
-if(DEFINED CMAKE_C_COMPILER_ID)
+if(DEFINED CMAKE_C_COMPILER)
   if(CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_C_COMPILER_ID MATCHES "AppleClang")
     set(_GENERIC_MUSL_HAVE_CLANG ON)
   else()
@@ -550,7 +550,7 @@ if(CLANG_CXX OR JUST_CXX OR CMAKE_CXX_COMPILER)
   endif()
   if(_GENERIC_MUSL_HAVE_CLANG)
     if(NOT DEFINED CMAKE_CXX_COMPILER_ID OR CMAKE_CXX_COMPILER_ID STREQUAL "")
-      set(CMAKE_C_COMPILER_ID Clang) # LLVM Clang
+      set(CMAKE_CXX_COMPILER_ID Clang) # LLVM Clang
     endif()
   endif()
   # TODO: detect libc++ libs
@@ -851,7 +851,10 @@ if(_GENERIC_MUSL_HAVE_CLANG)
     endforeach()
   endif()
 else()
-  message(WARNING "No Clang detected; leaving most toolchain variables unchanged (GNU toolchains are unsupported).")
+  if(DEFINED CMAKE_C_COMPILER_ID)
+    message(AUTHOR_WARNING "No Clang selected (or was detected but deemed unsupported); leaving most toolchain variables unchanged.")
+    message(STATUS "No Clang detected and selected (or was detected but deemed unsupported); leaving most toolchain variables unchanged.")
+  endif()
 endif()
 
 # STDC detection for Musl
