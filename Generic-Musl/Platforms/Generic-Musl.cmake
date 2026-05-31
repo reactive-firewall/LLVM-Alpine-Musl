@@ -807,7 +807,6 @@ if(LLVM_STRIP)
 endif()
 
 # Defaults and hints
-set(CMAKE_SKIP_RPATH OFF)
 # POSIX -std=c99 is supported by musl (when defined)
 add_compile_definitions(_POSIX_C_SOURCE=200809L)
 # POSIX/XOPEN is also supported by musl (when defined)
@@ -954,19 +953,38 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
     set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")         # +s, flag for exe link to use shared lib
   endif()
 
+
+  # Musl does NOT support versioned sonames
+  set(CMAKE_PLATFORM_NO_VERSIONED_SONAME TRUE)
+
   # Not sure if rpaths are used by musl (ld-musl-ARCH.so.1 is hardcoded when linking to musl)
-  # Not sure about '-z' (including '-z origin') with musl linker
+  # So as it is assumed by musl's dynamic loader that paths are specified in /etc/ld-ARCH.paths
+  # or otherwise paths are just '/lib' then it should be safe to default to no rpaths with musl
+  # as such a default will lead to homogenous usage by default of /lib
+  # TODO: TEST THIS
+  # set(CMAKE_INSTALL_REMOVE_ENVIRONMENT_RPATH 1)
+
+
+  set(CMAKE_NO_BUILTIN_CHRPATH ON)
+  set(CMAKE_SKIP_RPATH OFF)
   foreach(lang C CXX ASM)
     foreach(type SHARED_LIBRARY SHARED_MODULE EXE)
+      # Not sure about including '-z origin' with musl dynamic loader
       set(CMAKE_${type}_RPATH_ORIGIN_TOKEN "\$ORIGIN")
       set(CMAKE_${type}_RUNTIME_${lang}_FLAG "-Xlinker --enable-new-dtags -Xlinker --rpath=")
       set(CMAKE_${type}_RPATH_LINK_${lang}_FLAG "-Xlinker --disable-new-dtags -Xlinker --rpath=")
       # probably works like FreeBSD
       set(CMAKE_${type}_RUNTIME_${lang}_FLAG_SEP ":")   # : or empty
+
+      # SONAME does work with musl
       set(CMAKE_${type}_SONAME_${lang}_FLAG "-Xlinker --soname=")
       set(CMAKE_${type}_EXPORTS_${lang}_FLAG "-Xlinker --export-dynamic")
     endforeach()
   endforeach()
+
+  # assuming all the CMAKE_<LANG>_RPATH_ORIGIN_TOKENS are now set: prefer relative paths
+  # TODO: TEST THIS
+  # set(CMAKE_BUILD_RPATH_USE_ORIGIN 1)
 
   # Features for LINK_GROUP generator expression
   ## RESCAN: request the linker to rescan static libraries until there is
@@ -982,9 +1000,6 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
   # Shared libraries with no builtin soname may not be linked safely by
   # specifying the file path.
   set(CMAKE_PLATFORM_USES_PATH_WHEN_NO_SONAME 1)
-
-  # Musl does NOT support versioned sonames
-  set(CMAKE_PLATFORM_NO_VERSIONED_SONAME TRUE)
 
   # Initialize C link type selection flags.  These flags are used when
   # building a shared library, shared module, or executable that links
