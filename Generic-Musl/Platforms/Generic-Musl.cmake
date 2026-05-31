@@ -966,7 +966,7 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
 
 
   set(CMAKE_NO_BUILTIN_CHRPATH ON)
-  set(CMAKE_SKIP_RPATH OFF)
+  # set(CMAKE_SKIP_RPATH OFF)
   foreach(lang C CXX ASM)
     foreach(type SHARED_LIBRARY SHARED_MODULE EXE)
       # Not sure about including '-z origin' with musl dynamic loader
@@ -984,7 +984,7 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
 
   # assuming all the CMAKE_<LANG>_RPATH_ORIGIN_TOKENS are now set: prefer relative paths
   # TODO: TEST THIS
-  # set(CMAKE_BUILD_RPATH_USE_ORIGIN 1)
+  # set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
 
   # Features for LINK_GROUP generator expression
   ## RESCAN: request the linker to rescan static libraries until there is
