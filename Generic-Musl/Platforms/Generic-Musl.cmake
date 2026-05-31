@@ -966,7 +966,11 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
 
 
   set(CMAKE_NO_BUILTIN_CHRPATH ON)
-  # set(CMAKE_SKIP_RPATH OFF)
+  # WORKAROUND
+  # because cmake thinks it should ignore it's own CMAKE_EXECUTABLE_FORMAT variable in favor of
+  # the CMAKE_GENERATOR stuff to rationalize the system not being ELF based when:
+  # CMAKE_EXECUTABLE_FORMAT == ELF is True
+  set(CMAKE_SKIP_RPATH ON)
   foreach(lang C CXX ASM)
     foreach(type SHARED_LIBRARY SHARED_MODULE EXE)
       # Not sure about including '-z origin' with musl dynamic loader
