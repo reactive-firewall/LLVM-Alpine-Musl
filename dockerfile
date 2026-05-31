@@ -1862,7 +1862,7 @@ ENV HOST_LD=lld
 # may want to link -Xlinker -l${LLVM_RTLIB_STUB}
 ENV LDFLAGS="-fuse-ld=lld -v -Xlinker --trace-symbol=_Unwind_Resume -Xlinker --sysroot=${SYSROOT:-/sysroot} -Xlinker -L -Xlinker ${SYS_LIB} -Xlinker -L -Xlinker ${SYSROOT:-/sysroot}/lib -Xlinker -L -Xlinker ${SYS_LIB}/generic -Xlinker -l${LLVM_RTLIB_STUB} -Xlinker --exclude-libs=libgcc_s.so.1 -Xlinker --exclude-libs=libgcc_s.so -Xlinker --dynamic-linker=${SYSROOT:-/sysroot}/lib/${MUSL_LDLIB}"
 # Does NOT require -D__ELF__
-ENV CFLAGS="--no-default-config --target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -Xlinker --pic-veneer -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT:-/sysroot}/usr/include"
+ENV CFLAGS="--no-default-config --target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -Xlinker --pic-veneer -ffunction-sections -fdata-sections -D_ALL_SOURCE -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT:-/sysroot}/usr/include"
 # might need -nostdinc++
 ENV CXXFLAGS="-ffunction-sections -fdata-sections --unwindlib=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib/libunwind.so.1.0"
 
@@ -1889,6 +1889,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
       -DCMAKE_COLOR_DIAGNOSTICS=ON \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl-Libcxxrt \
+      -DENABLE_CXX_EXTENSIONS=TRUE \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
