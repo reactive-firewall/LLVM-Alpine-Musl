@@ -325,11 +325,11 @@ ENV RANLIB=llvm-ranlib
 # Use -fPIC everywhere for position independent code
 # Musl Libc understands -D_ALL_SOURCE (but defaults to -D_DEFAULT_SOURCE / -D_BSD_SOURCE)
 # Musl can expose some POSIX interfaces, so use -D_POSIX_C_SOURCE=200809L to expose those.
-# Musl can expose BSD-compatible vasprintf, so use -D_BSD_SOURCE to expose those for use by libcxx.
+# Musl can expose BSD-compatible vasprintf, may need to expose those for use by libcxx. (depends on BSD)
 # MAY want try -D_POSIX_C_SOURCE=202405L instead for v1.2.6+ (TODO: review)
 # Musl can expose some XOPEN interfaces too, so use -D_XOPEN_SOURCE=700 to configure those.
 # musl should be given these values too
-ENV CFLAGS="-D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_BSD_SOURCE -fcolor-diagnostics -fPIC"
+ENV CFLAGS="-D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -fPIC"
 # musl provides a C aware dynamic loader/linker implementation, once built
 # but can't use -Wl,--dynamic-linker=/lib/ld-musl-{x86_64,aarch64,armv7}.so.1 just yet
 # Key Linker Flags (for musl bootstraping)
