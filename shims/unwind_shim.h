@@ -63,7 +63,24 @@
 
 /* Guard of unwind-llvm.h */
 #if defined(_Unwind_Reason_Code)
+
+#if defined(UNWIND_H_INCLUDED)
+#if defined(__clang__)
+#warning "Odd? '_Unwind_Reason_Code' is already defined, indicating an unwind implementation (but wrong import guard). This may break things."
+#endif /* !__clang__ */
+/* always define __UNWIND_H__ because we already found __UNWIND_SHIM_HAS_LLVM_CONFIG_H_ > 0 (alias) */
+#define __UNWIND_H__ UNWIND_H_INCLUDED
+
+#else /* UNWIND_H_INCLUDED */
+
+#if defined(__clang__)
+#warning "Odd? '_Unwind_Reason_Code' is already defined, indicating an unwind implementation (but no import guard). This will break things."
+#endif /* !__clang__ */
+/* always define __UNWIND_H__ because we already found __UNWIND_SHIM_HAS_LLVM_CONFIG_H_ > 0 (plain) */
 #define __UNWIND_H__
+
+#endif /* !UNWIND_H_INCLUDED */
+
 #else /* !defined(_Unwind_Reason_Code) */
 /* 1. Check for unwind-llvm.h and use it if available */
 #if __has_include(<unwind-llvm.h>)
@@ -83,11 +100,16 @@
 #endif /* End __has_include(<unwind-llvm.h>) (outer) */
 #endif /* End defined(_Unwind_Reason_Code) */
 
+/* can now assume that: define __UNWIND_H__ OR define __UNWIND_SHIM_H_ */
+#if !defined(__UNWIND_H__) && !defined(__UNWIND_SHIM_H_)
+#error "Could not verify status of libunwind - unsupported compiler environment"
+#endif /* END !defined(__UNWIND_H__) && !defined(__UNWIND_SHIM_H_) */
+
 #endif /* !__UNWIND_H__ */
 
 #else /* !(__UNWIND_SHIM_HAS_LLVM_CONFIG_H_ > 0) */
 
-#if defined(__clang__) && __clang__
+#if defined(__clang__)
 #warning "Can not use '__libunwind_config'; will attempt to find libcxxrt unwind implementation."
 #endif /* !__clang__ */
 
@@ -115,11 +137,21 @@
 #endif /* End __has_include(<unwind-cxxabi.h>) (outer) */
 #endif /* End defined(_Unwind_Reason_Code) */
 
+/* can now assume that: define __UNWIND_H__ OR define __UNWIND_SHIM_H_ */
+#if !defined(UNWIND_H_INCLUDED) && !defined(__UNWIND_SHIM_H_)
+#error "Could not verify status of libcxxrt (unwind) - unsupported compiler environment"
+#endif /* END !defined(__UNWIND_H__) && !defined(__UNWIND_SHIM_H_) */
+
 #endif /* End (__UNWIND_SHIM_HAS_LLVM_CONFIG_H_ > 0) */
 
 /* 3. Otherwise warn of unsupported compile environment. */
+
+#if defined(__UNWIND_SHIM_H_) && !__UNWIND_SHIM_H_
+#warning "Missing unwind shim headers - Incomplete environment unsupported"
+#endif /* !__UNWIND_SHIM_H_ */
+
 #if !defined(_Unwind_Reason_Code)
-#warning "Can not find an unwind reason-code map for C++ ABI - Build environment unsupported"
+#warning "Can not find an unwind reason-code map for C++ ABI - Build environment unsupported (best guess: __UNWIND_SHIM_H_ )"
 #endif /* !_Unwind_Reason_Code */
 
 #if !defined(_Unwind_Exception)
