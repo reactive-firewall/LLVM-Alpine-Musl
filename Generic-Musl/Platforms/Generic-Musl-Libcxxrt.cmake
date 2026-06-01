@@ -1,14 +1,16 @@
 include(Platform/Generic-Musl)
 
-# Detect optional shared libcxxrt and required cxxabi header location
-# Prefer an imported shared library if found and expose it as libcxxrt::lib
-# Respect sysroot by using CMAKE_SYSROOT
-find_library(_LIBCXXRT_NAMED NAMES libcxxrt.so libcxxrt cxxrt
-  PATHS ${CMAKE_SYSROOT}/usr/lib ${CMAKE_SYSROOT}/lib /usr/lib /lib
-  PATH_SUFFIXES ${CMAKE_C_LIBRARY_ARCHITECTURE}
-  NO_DEFAULT_PATH
-  NO_CMAKE_FIND_ROOT_PATH
-)
+if(NOT _LIBCXXRT_NAMED)
+  # Detect optional shared libcxxrt and required cxxabi header location
+  # Prefer an imported shared library if found and expose it as libcxxrt::lib
+  # Respect sysroot by using CMAKE_SYSROOT
+  find_library(_LIBCXXRT_NAMED NAMES libcxxrt.so libcxxrt cxxrt
+    PATHS ${CMAKE_SYSROOT}/usr/lib ${CMAKE_SYSROOT}/lib /usr/lib /lib
+    PATH_SUFFIXES ${CMAKE_C_LIBRARY_ARCHITECTURE}
+    NO_DEFAULT_PATH
+    NO_CMAKE_FIND_ROOT_PATH
+  )
+endif()
 
 # A more typical find: allow normal search too (useful if no sysroot)
 if(NOT _LIBCXXRT_NAMED)
@@ -38,14 +40,28 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS)
       get_filename_component(_inc_root "${_inc_root}" DIRECTORY) # include root
     endif()
 
-    # Create imported target for linkage convenience
-    add_library(libcxxrt::lib INTERFACE IMPORTED GLOBAL)
-    set_target_properties(libcxxrt::lib PROPERTIES
-      IMPORTED_LOCATION "${_LIBCXXRT_NAMED}"
-    )
-    set_target_properties(libcxxrt::lib PROPERTIES
-      IMPORTED_LIBNAME "cxxrt"
-    )
+    if(NOT TARGET libcxxrt::lib)
+      add_library(libcxxrt::lib INTERFACE IMPORTED GLOBAL)
+      message(VERBOSE "Selecting libcxxrt as the C++ ABI")
+      set_target_properties(libcxxrt::lib PROPERTIES
+        IMPORTED_LOCATION "${_LIBCXXRT_NAMED}"
+      )
+      set_target_properties(libcxxrt::lib PROPERTIES
+        IMPORTED_LIBNAME "cxxrt"
+      )
+    else()
+      message(VERBOSE "Overwriting the C++ ABI to libcxxrt")
+      # Optionally update the IMPORTED_LOCATION if you want to override
+      get_target_property(_existing_type libcxxrt::lib TYPE)
+      if(_existing_type STREQUAL "INTERFACE_LIBRARY" OR _existing_type STREQUAL "IMPORTED")
+        set_target_properties(libcxxrt::lib PROPERTIES
+          IMPORTED_LOCATION "${_LIBCXXRT_NAMED}"
+        )
+        set_target_properties(libcxxrt::lib PROPERTIES
+          IMPORTED_LIBNAME "cxxrt"
+        )
+      endif()
+    endif()
 
     if(_inc_root)
       target_include_directories(libcxxrt::lib INTERFACE "${_inc_root}")
