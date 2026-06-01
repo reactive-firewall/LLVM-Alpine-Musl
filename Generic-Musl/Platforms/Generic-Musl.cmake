@@ -102,6 +102,9 @@ endif()
 
 set(UNIX 1)
 set_property(GLOBAL PROPERTY FIND_LIBRARY_USE_OPENBSD_VERSIONING TRUE)
+# musl never uses the lib32 nor libX32 paths (lib{X32,32,64} should just symlink to ./lib if need)
+set_property(GLOBAL PROPERTY FIND_LIBRARY_USE_LIB32_PATHS FALSE)
+set_property(GLOBAL PROPERTY FIND_LIBRARY_USE_LIBX32_PATHS FALSE)
 include(Platform/UnixPaths)
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU")

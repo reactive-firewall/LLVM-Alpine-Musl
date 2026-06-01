@@ -1304,7 +1304,7 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
     -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
     -DCMAKE_POLICY_VERSION_MINIMUM=4.0 \
     -DCMAKE_C_FLAGS="-std=c11 ${CFLAGS} -Qunused-arguments" \
-    -DCMAKE_CXX_FLAGS="-std=c++11 ${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
+    -DCMAKE_CXX_FLAGS="-stdlib=libc++ -std=c++11 ${CXXFLAGS} ${CFLAGS} -Qunused-arguments" \
     -DCMAKE_COLOR_DIAGNOSTICS=ON \
     -DLIBCXXRT_ENABLE_EXCEPTIONS=ON \
     -DCXXRT_NO_EXCEPTIONS=OFF \

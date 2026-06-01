@@ -3,15 +3,18 @@ include(Platform/Generic-Musl)
 # Detect optional shared libcxxrt and required cxxabi header location
 # Prefer an imported shared library if found and expose it as libcxxrt::lib
 # Respect sysroot by using CMAKE_SYSROOT
-find_library(_LIBCXXRT_NAMED libcxxrt
+find_library(_LIBCXXRT_NAMED NAMES libcxxrt.so libcxxrt cxxrt
   PATHS ${CMAKE_SYSROOT}/usr/lib ${CMAKE_SYSROOT}/lib /usr/lib /lib
+  PATH_SUFFIXES ${CMAKE_C_LIBRARY_ARCHITECTURE}
   NO_DEFAULT_PATH
   NO_CMAKE_FIND_ROOT_PATH
 )
 
 # A more typical find: allow normal search too (useful if no sysroot)
 if(NOT _LIBCXXRT_NAMED)
-  find_library(_LIBCXXRT_NAMED libcxxrt)
+  find_library(_LIBCXXRT_NAMED NAMES libcxxrt.so libcxxrt cxxrt
+    PATH_SUFFIXES ${CMAKE_C_LIBRARY_ARCHITECTURE}
+  )
 endif()
 
 set(LIBCXXRT_FOUND FALSE)
