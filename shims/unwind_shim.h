@@ -87,6 +87,10 @@
 
 #else /* !(__UNWIND_SHIM_HAS_LLVM_CONFIG_H_ > 0) */
 
+#if defined(__clang__) && __clang__
+#warning "Can not use '__libunwind_config'; will attempt to find libcxxrt unwind implementation."
+#endif /* !__clang__ */
+
 /* Guard of unwind-cxxabi.h */
 #if defined(_Unwind_Reason_Code)
 #ifndef UNWIND_H_INCLUDED
@@ -119,7 +123,7 @@
 #endif /* !_Unwind_Reason_Code */
 
 #if !defined(_Unwind_Exception)
-#warning "Can not resolve an unwind implementation for C++ ABI - Build environment unsupported"
+#error "Can not resolve an unwind implementation for C++ ABI - Build environment unsupported"
 #endif /* !_Unwind_Exception */
 
 #else /* !defined(__has_include) */
