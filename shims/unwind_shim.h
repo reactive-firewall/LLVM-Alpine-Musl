@@ -155,11 +155,6 @@
 #endif /* End (__UNWIND_SHIM_HAS_LLVM_CONFIG_H_ > 0) */
 
 /* 3. Otherwise warn of unsupported compile environment. */
-
-#if defined(__UNWIND_SHIM_H_) && ( __UNWIND_SHIM_H_ == 0 )
-#warning "Missing unwind shim headers - Incomplete environment unsupported"
-#endif /* !__UNWIND_SHIM_H_ */
-
 #if !defined(_Unwind_Reason_Code)
 #warning "Can not find an unwind reason-code map for C++ ABI - Build environment unsupported (best guess: __UNWIND_SHIM_H_ )"
 #endif /* !_Unwind_Reason_Code */
