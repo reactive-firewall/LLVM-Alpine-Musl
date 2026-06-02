@@ -156,7 +156,7 @@
 
 /* 3. Otherwise warn of unsupported compile environment. */
 
-#if defined(__UNWIND_SHIM_H_) && !(__UNWIND_SHIM_H_ != 0)
+#if defined(__UNWIND_SHIM_H_) && ( __UNWIND_SHIM_H_ == 0 )
 #warning "Missing unwind shim headers - Incomplete environment unsupported"
 #endif /* !__UNWIND_SHIM_H_ */
 
