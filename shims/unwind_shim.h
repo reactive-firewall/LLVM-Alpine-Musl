@@ -146,7 +146,7 @@
 
 /* 3. Otherwise warn of unsupported compile environment. */
 
-#if defined(__UNWIND_SHIM_H_) && !__UNWIND_SHIM_H_
+#if defined(__UNWIND_SHIM_H_) && !(__UNWIND_SHIM_H_ != 0)
 #warning "Missing unwind shim headers - Incomplete environment unsupported"
 #endif /* !__UNWIND_SHIM_H_ */
 
@@ -160,7 +160,7 @@
 
 #else /* !defined(__has_include) */
 #if defined(_Unwind_Reason_Code) || defined(_Unwind_Exception)
-#define __UNWIND_SHIM_H_
+#define __UNWIND_SHIM_H_ 1
 #else
 #warning "Can not use '__has_include'; will attempt blind include of an unwind implementation. This may break things."
 #define __UNWIND_SHIM_H_
