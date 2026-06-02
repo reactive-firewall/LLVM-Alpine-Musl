@@ -26,6 +26,16 @@
 
 #ifndef __UNWIND_SHIM_H_
 
+#if defined(__clang__)
+/* Unclear if this should be __has_feature or __has_extension */
+#if __has_feature(attribute_unavailable)
+#define LIBUNWIND_UNAVAIL __attribute__ (( unavailable ))
+#pragma clang final(LIBUNWIND_UNAVAIL)
+#else
+#define LIBUNWIND_UNAVAIL
+#endif
+#endif /* !defined(__clang__) */
+
 /* unwind_shim.h
  * Provide either llvm's unwind.h (at unwind-llvm.h) or libcxxrt's unwind.h (at unwind-cxxabi.h).
  * Do not use as system header (e.g., <unwind.h>).

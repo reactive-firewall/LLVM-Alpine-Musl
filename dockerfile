@@ -11,7 +11,7 @@ FROM --platform="linux/${TARGETARCH}" alpine:latest AS fetcher
 # shellcheck disable=SC2154
 ARG LIBEXECINFO_VERSION=${LIBEXECINFO_VERSION:-1.3}
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.7}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -193,7 +193,7 @@ FROM --platform="linux/${TARGETARCH}" alpine:latest AS sysroot-bootstrap
 # Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.7}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -634,7 +634,7 @@ FROM --platform="linux/${TARGETARCH}" alpine:latest AS sysroot
 # Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.7}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -760,7 +760,7 @@ COPY payloads/ld.libunwind/ehframe.ld /bootstrap/ehframe.ld
 # Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.7}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -887,7 +887,7 @@ WORKDIR /bootstrap
 # Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.7}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -1016,7 +1016,7 @@ WORKDIR /bootstrap
 # Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.7}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -1162,7 +1162,7 @@ COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cma
 # Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.7}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -1387,7 +1387,7 @@ COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cma
 # Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.7}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -1719,7 +1719,7 @@ COPY payloads/tests/test_exception.cpp /work/test_exception.cpp
 # Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.7}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -2099,7 +2099,7 @@ COPY payloads/tests/test_exception.cpp /work/test_exception.cpp
 # Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.7}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -2410,7 +2410,7 @@ COPY payloads/tests/test_exception.cpp /work/test_exception.cpp
 # Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.7}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -2727,7 +2727,7 @@ COPY Generic-Musl/Linkers/Generic-Musl-Linker.cmake /tmp/Generic-Musl-Linker.cma
 # Use pinned versions
 # version is passed through by Docker.
 # shellcheck disable=SC2154
-ARG LLVM_VERSION=${LLVM_VERSION:-22.1.6}
+ARG LLVM_VERSION=${LLVM_VERSION:-22.1.7}
 # shellcheck disable=SC2154
 ARG MUSL_VERSION=${MUSL_VERSION:-1.2.6}
 
@@ -3197,7 +3197,7 @@ LABEL org.opencontainers.image.vendor="individual"
 LABEL org.opencontainers.image.licenses="MIT"
 
 # provenance ENV (kept intentionally)
-ARG LLVM_VERSION=${LLVM_VERSION:-"22.1.6"}
+ARG LLVM_VERSION=${LLVM_VERSION:-"22.1.7"}
 ENV LLVM_VERSION=${LLVM_VERSION}
 ENV LLVM_URL="https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-${LLVM_VERSION}.tar.gz"
 ARG TARGET_TRIPLE
