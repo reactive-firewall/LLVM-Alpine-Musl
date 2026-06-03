@@ -1358,7 +1358,8 @@ RUN mkdir -p /bootstrap/libcxxrt && cd libcxxrt-project && \
 
 RUN ls -lap "${SYSROOT:-/sysroot}/usr/include/c++/v1/cxxabi" && \
     { llvm-objdump -harp ${SYSROOT:-/sysroot}/usr/lib/libcxxrt.so || true ;} 2>/dev/null | grep -iF "NEEDED" && \
-    { llvm-objdump -harp ${SYSROOT:-/sysroot}/usr/lib/libcxxrt.so || true ;} 2>/dev/null | grep -iF "musl" || exit 1 ;
+    { { { llvm-objdump -harp ${SYSROOT:-/sysroot}/usr/lib/libcxxrt.so || true ;} 2>/dev/null | grep -iF "musl" ;} || \
+      { { llvm-objdump -harp ${SYSROOT:-/sysroot}/usr/lib/libcxxrt.so || true ;} 2>/dev/null | grep --context=12 -iF "libc.so" ;} ;} || exit 1 ;
 
 # Cleanup build packages and intermediate files to keep this stage small
 RUN apk del --no-cache \
