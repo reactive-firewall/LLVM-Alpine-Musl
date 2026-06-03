@@ -154,14 +154,29 @@
 
 #endif /* End (__UNWIND_SHIM_HAS_LLVM_CONFIG_H_ > 0) */
 
-/* 3. Otherwise warn of unsupported compile environment. */
-#if !defined(_Unwind_Reason_Code)
-#warning "Can not find an unwind reason-code map for C++ ABI - Build environment unsupported (best guess:" __UNWIND_SHIM_H_ ")"
-#endif /* !_Unwind_Reason_Code */
+#ifndef __has_builtin
+#define __has_builtin(x) 0
+#endif
 
-#if !defined(_Unwind_Exception)
-#error "Can not resolve an unwind implementation for C++ ABI - Build environment unsupported"
-#endif /* !_Unwind_Exception */
+#if __has_builtin(__builtin_static_assert)
+#define STATIC_ASSERT(cond, msg) __builtin_static_assert(cond, msg)
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+#define STATIC_ASSERT(cond, msg) _Static_assert(cond, msg)
+#else
+/* C99 fallback — msg must be identifier-like (no quotes/spaces) */
+#define STATIC_ASSERT(cond, msg) typedef char static_assertion_##msg[(cond) ? 1 : -1]
+#endif
+
+#ifndef __UNWIND_SHIM_MISSING_REASON_CODES_
+#define __UNWIND_SHIM_MISSING_REASON_CODES_ "Can not find an unwind reason-code map for C++ ABI - Build environment unsupported"
+#endif
+#ifndef __UNWIND_SHIM_MISSING_EXCEPTIONS_TYPE_
+#define __UNWIND_SHIM_MISSING_EXCEPTIONS_TYPE_ "Can not resolve an unwind implementation for C++ ABI - Build environment unsupported"
+#endif
+
+/* 3. Otherwise warn of unsupported compile environment. */
+STATIC_ASSERT(sizeof(_Unwind_Reason_Code) > 0, __UNWIND_SHIM_MISSING_REASON_CODES_);
+STATIC_ASSERT(sizeof(_Unwind_Exception) > 0, __UNWIND_SHIM_MISSING_EXCEPTIONS_TYPE_);
 
 #else /* !defined(__has_include) */
 #if defined(_Unwind_Reason_Code) || defined(_Unwind_Exception)
@@ -171,7 +186,7 @@
 #endif /* !__clang__ */
 #else
 #warning "Can not use '__has_include'; will attempt blind include of an unwind implementation. This may break things."
-#define __UNWIND_SHIM_H_
+#define __UNWIND_SHIM_H_ <unwind.h>
 #include <unwind.h>
 #endif /* !_Unwind_Reason_Code */
 #endif /* END defined(__has_include) */
