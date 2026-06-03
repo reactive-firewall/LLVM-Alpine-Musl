@@ -335,10 +335,11 @@ ENV CFLAGS="-D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -fPIC"
 # Key Linker Flags (for musl bootstraping)
 # Use -fPIC everywhere for position independent code (yes when linking too)
 # Also pass --pic-veneer to the linker whenever supported (e.g. lld)
+# Also use simple "--unique" rather than "--gnu-unique"
 # Use -fuse-ld=lld to prefer linking with LLVM's lld (simplifies cross-target linking)
 # Also pass -z relro to the linker whenever supported (helps prevent runtime GOT/PLT overwrites)
 # Also pass -z now to the linker whenever supported (helps prevent lazy-binding attacks)
-ENV LDFLAGS="-fPIC -fuse-ld=lld -Wl,--sysroot=/sysroot -Wl,--pic-veneer -Wl,-z,relro -Wl,-z,now"
+ENV LDFLAGS="-fPIC -fuse-ld=lld -Wl,--sysroot=/sysroot -Wl,--pic-veneer -Wl,--no-gnu-unique -Wl,--unique -Wl,-z,relro -Wl,-z,now"
 # musl is C but some of the clang_rt builtins are C++
 # Use -stdlib=libc++ to specify using LLVM's libc++ implementation (mostly just to be consistent)
 # Use -fPIC everywhere for position independent code
@@ -694,10 +695,11 @@ ENV CFLAGS="-D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -fPIC"
 # Key Linker Flags (for musl bootstraping)
 # Use -fPIC everywhere for position independent code (yes when linking too)
 # Also pass --pic-veneer to the linker whenever supported (e.g. lld)
+# Also use simple "--unique" rather than "--gnu-unique"
 # Use -fuse-ld=lld to prefer linking with LLVM's lld (simplifies cross-target linking)
 # Also pass -z relro to the linker whenever supported (helps prevent runtime GOT/PLT overwrites)
 # Also pass -z now to the linker whenever supported (helps prevent lazy-binding attacks)
-ENV LDFLAGS="-fPIC -fuse-ld=lld -Wl,--sysroot=/sysroot -Wl,--pic-veneer -Wl,-z,relro -Wl,-z,now"
+ENV LDFLAGS="-fPIC -fuse-ld=lld -Wl,--sysroot=/sysroot -Wl,--pic-veneer -Wl,--no-gnu-unique -Wl,--unique -Wl,-z,relro -Wl,-z,now"
 # musl is C but some of the clang_rt builtins are C++
 # Use -stdlib=libc++ to specify using LLVM's libc++ implementation (mostly just to be consistent)
 # Use -fPIC everywhere for position independent code
@@ -934,7 +936,7 @@ ENV TZ='UTC+0'
 
 # may need -Wl,--sysroot=/sysroot
 # may want to play around with -Wl,--allow-shlib-undefined to allow __eh_* undefs (see ehframe.ld)
-ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/sysroot/lib/${MUSL_LDLIB} -Wl,--pic-veneer -Wl,-z,relro -Wl,-z,now -fPIC -fuse-ld=lld --unwindlib=none"
+ENV LDFLAGS="-Wl,--sysroot=/sysroot -Wl,-L,/sysroot/usr/lib -Wl,-L,/sysroot/lib -Wl,-L,/sysroot/usr/lib/generic -Wl,--unique -Wl,--dynamic-linker=/sysroot/lib/${MUSL_LDLIB} -Wl,--pic-veneer -Wl,--no-gnu-unique -Wl,--unique -Wl,-z,relro -Wl,-z,now -fPIC -fuse-ld=lld --unwindlib=none"
 # does NOT require -D__linux__
 ENV CFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -Xlinker --pic-veneer -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT:-/sysroot}/usr/include"
 ENV CXXFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -Xlinker --pic-veneer -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
@@ -1065,7 +1067,7 @@ ENV TZ='UTC+0'
 # may need to play around with -Wl,--allow-shlib-undefined to allow __eh_* undefs
 # may want --unwindlib=none when building libunwind
 # may want -Xlinker --exclude-libs=libgcc_s.so.1
-ENV LDFLAGS="-fuse-ld=lld -Xlinker --verbose -Xlinker --sysroot=/sysroot -Xlinker -L -Xlinker /sysroot/usr/lib -Xlinker -L -Xlinker /sysroot/lib -Xlinker -L -Xlinker /sysroot/usr/lib/generic -Xlinker --unique -Xlinker --dynamic-linker=/sysroot/lib/${MUSL_LDLIB} -fPIC -Xlinker --pic-veneer -Xlinker -z -Xlinker relro -Xlinker -z -Xlinker now -Xlinker --script=/bootstrap/ehframe.ld --unwindlib=none"
+ENV LDFLAGS="-fuse-ld=lld -Xlinker --verbose -Xlinker --sysroot=/sysroot -Xlinker -L -Xlinker /sysroot/usr/lib -Xlinker -L -Xlinker /sysroot/lib -Xlinker -L -Xlinker /sysroot/usr/lib/generic -Xlinker --no-gnu-unique -Xlinker --unique -Xlinker --dynamic-linker=/sysroot/lib/${MUSL_LDLIB} -fPIC -Xlinker --pic-veneer -Xlinker -z -Xlinker relro -Xlinker -z -Xlinker now -Xlinker --script=/bootstrap/ehframe.ld --unwindlib=none"
 # may require -D__linux__
 ENV CFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -Xlinker --pic-veneer -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0 -I${SYSROOT:-/sysroot}/usr/include"
 ENV CXXFLAGS="--target=${TARGET_TRIPLE} -rtlib=compiler-rt -fPIC -Xlinker --pic-veneer -ffunction-sections -fdata-sections -D_ALL_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -D_LIBUNWIND_USE_DLADDR=0 -DSANITIZER_CAN_USE_PREINIT_ARRAY=0"
@@ -1871,7 +1873,7 @@ ENV CXXFLAGS="-ffunction-sections -fdata-sections --unwindlib=${SYSROOT:-/sysroo
 # force the correct libunwinder
 ENV CXX_UNWINDER_FLAGS="--unwindlib=${SYSROOT:-/sysroot}${MUSL_PREFIX:-/usr}/lib/libunwind.so.1.0"
 
-RUN "${HOST_CC}" $CFLAGS -fuse-ld=lld $LDFLAGS -O2 -Qunused-arguments -x c -c /work/__stack_chk_fail_local.c -o /work/__stack_chk_fail_local.lo && \
+RUN "${HOST_CC}" $CFLAGS -fuse-ld=lld $LDFLAGS -std=c11 -O2 -Qunused-arguments -x c -c /work/__stack_chk_fail_local.c -o /work/__stack_chk_fail_local.lo && \
     llvm-ar --format=bsd rcs ${SYSROOT:-/sysroot}/usr/lib/generic/libssp_nonshared.a /work/__stack_chk_fail_local.lo && \
     ln -svf generic/libssp_nonshared.a ${SYSROOT:-/sysroot}/usr/lib/libssp_nonshared.a
 
@@ -1891,7 +1893,6 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
       -DCMAKE_COLOR_DIAGNOSTICS=ON \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SYSTEM_NAME=Generic-Musl-Libcxxrt \
-      -DENABLE_CXX_EXTENSIONS=TRUE \
       -DCMAKE_C_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_CXX_COMPILER_TARGET=${TARGET_TRIPLE} \
       -DCMAKE_ASM_COMPILER_TARGET=${TARGET_TRIPLE} \
@@ -1935,19 +1936,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
           cp -vf ${SYS_INCLUDE}/c++/v1/cxxabi/${CXXABI_FILE_ARTIFACT} /work/build-libcxx-bootstrap0/private-abi-headers/${CXXABI_FILE_ARTIFACT} ; \
           touch -d "${SOME_DATE_EPOCH}" /work/build-libcxx-bootstrap0/private-abi-headers/${CXXABI_FILE_ARTIFACT} || true ; \
     done ;} && \
-    { cmake --build "/work/build-libcxx-bootstrap0" || \
-      { printf "%s\n" "ERROR: FAILED at build-libcxx-bs 28 again" && \
-        printf "%s\n" "looking at: llvm-project/libcxx/src/system_error.cpp" && \
-        { [[ -r /work/llvm-project/libcxx/src/system_error.cpp ]] || printf "%s\n" "Can't read /work/llvm-project/libcxx/src/system_error.cpp" ;} && \
-        head -n 200 /work/llvm-project/libcxx/src/system_error.cpp && \
-        printf "%s\n\n" "---Truncated (for brevity) ---" && \
-        printf "%s\n" "looking at: llvm-project/libcxx/src/verbose_abort.cpp" && \
-        { [[ -r /work/llvm-project/libcxx/src/verbose_abort.cpp ]] || printf "%s\n" "Can't read /work/llvm-project/libcxx/src/verbose_abort.cpp" ;} && \
-        head -n 75 /work/llvm-project/libcxx/src/verbose_abort.cpp && \
-        printf "%s\n\n" "---Truncated (for brevity) ---" && \
-        { printf "%s\n" "Looking at /work/build-libcxx-bootstrap0/private-abi-headers/" && \
-          ls -lap /work/build-libcxx-bootstrap0/private-abi-headers/ ;} && \
-       printf "Error: %s\n\n" "Aborting due to previous errors. See previous causes." ; exit 125 ;} ;} && \
+    cmake --build "/work/build-libcxx-bootstrap0' && \
     python3 ../llvm-project/libcxx/utils/generate_iwyu_mapping.py -o include/c++/v1/libcxx.imp || true ;\
     cmake --install /work/build-libcxx-bootstrap0 && \
     { if [ -f /work/builds/opt/libcxx-bootstrap0/bin/libc++.so ] ; then \

@@ -188,11 +188,11 @@ set(CMAKE_CXX_EXTENSIONS_DEFAULT OFF)
 option(ENABLE_C_EXTENSIONS "Enable C GNU extensions" ${C_EXTENSIONS})
 option(ENABLE_CXX_EXTENSIONS "Enable C++ GNU extensions" ${CXX_EXTENSIONS})
 if(ENABLE_C_EXTENSIONS)
-  add_compile_definitions(_GNU_SOURCE)
+  add_compile_definitions(_ALL_SOURCE)
 endif()
 if(ENABLE_CXX_EXTENSIONS)
   add_compile_definitions(_GNU_SOURCE)
-  # set(CMAKE_CXX_COMPILER_ID GNU) # and perhaps act like gcc
+  # set(CMAKE_CXX_COMPILER_FRONTEND_VARIANT GNU) # and perhaps act like gcc
 endif()
 
 # Infer C++ driver if plausible
@@ -317,34 +317,41 @@ message(VERBOSE "Search candidates selected: ${_libc_candidates}")
 # search must have set libc_path to the path of musl libc.so (or empty if not detecting musl)
 if(NOT DEFINED libc_path)
   set(libc_path "")
-  message(VERBOSE "No previous libc found yet.")
+  message(VERBOSE "No previous libc found yet. (will search)")
 endif()
 
 # musl implements it's dynamic loader within libc.sh when called via a symbolic link from ld-musl-*.so.1 (e.g., ld-musl-aarch64.ld.1)
 # search must have set MUSL_LOADER to the path of musl ld-musl-*.so.${CMAKE_SYSTEM_VERSION:-1} (or empty if not detecting musl's symbolic link)
 if(NOT DEFINED MUSL_LOADER)
   set(MUSL_LOADER "")
+  message(VERBOSE "No previous dynamic loader found for libc yet. (will search)")
 endif()
 
-# Detect libc and musl dynamic linker presence for shared support
-list(REMOVE_DUPLICATES _libc_candidates)
-foreach(_c IN LISTS _libc_candidates)
-  message(VERBOSE "Searching for a libc at '${_c}' ...")
-  if(EXISTS "${_c}")
-    set(libc_path "${_c}")
-    message(VERBOSE "Found a libc at '${libc_path}'")
-    # try to guess loader name in same dir: ld-musl-*.so.${CMAKE_SYSTEM_VERSION:-1}
-    get_filename_component(_c_dir "${_c}" DIRECTORY)
-    set(CMAKE_SYSTEM_LIBRARY_PATH "${_c_dir}")
-    # only support v1 for musl
-    file(GLOB _ldcandidates "${_c_dir}/ld-musl-*.so.1")
-    if(_ldcandidates)
-      list(GET _ldcandidates 0 _musl_loader)
-      set(MUSL_LOADER "${_musl_loader}")
+if(libc_path STREQUAL "" OR (MUSL_LOADER STREQUAL ""))
+  message(VERBOSE "Searching for a libc and compatible dynamic loader together")
+
+  # Detect libc and musl dynamic linker presence for shared support
+  list(REMOVE_DUPLICATES _libc_candidates)
+  foreach(_c IN LISTS _libc_candidates)
+    message(VERBOSE "Searching for a libc at '${_c}' ...")
+    if(EXISTS "${_c}")
+      set(libc_path "${_c}")
+      message(VERBOSE "Found a libc at '${libc_path}'")
+      # try to guess loader name in same dir: ld-musl-*.so.${CMAKE_SYSTEM_VERSION:-1}
+      get_filename_component(_c_dir "${_c}" DIRECTORY)
+      set(CMAKE_SYSTEM_LIBRARY_PATH "${_c_dir}")
+      # only support v1 for musl
+      file(GLOB _ldcandidates "${_c_dir}/ld-musl-*.so.1")
+      if(_ldcandidates)
+        list(GET _ldcandidates 0 _musl_loader)
+        set(MUSL_LOADER "${_musl_loader}")
+      endif()
+      break()
     endif()
-    break()
-  endif()
-endforeach()
+  endforeach()
+else()
+  message(VERBOSE "Skipped search for a libc and compatible dynamic loader. (already configured together)")
+endif()
 
 # optional debug
 message(DEBUG "libc_path='${libc_path}'\n CMAKE_SYSTEM_LIBRARY_PATH='${CMAKE_SYSTEM_LIBRARY_PATH}'\n _musl_loader='${MUSL_LOADER}'")
@@ -464,12 +471,12 @@ if(CMAKE_POSITION_INDEPENDENT_CODE)
 endif()
 
 # Detect libpthread / libm near libc
-set(CMAKE_PLATFORM_HAS_PTHREADS OFF)
+set(CMAKE_PLATFORM_HAS_PTHREAD OFF)
 set(CMAKE_PLATFORM_HAS_MATH_LIB OFF)
 set(CMAKE_PLATFORM_HAS_RT_LIB OFF)
 if(MUSL_LOADER)
   get_filename_component(_loader_dir "${MUSL_LOADER}" DIRECTORY)
-  # search sibling dirs (lib, lib64, usr/lib) for libpthread/libm
+  # search sibling dirs (lib, usr/lib) for libpthread/libm/librt
   set(_search_dirs
     "${loader_dir}"
     "${CMAKE_SYSROOT}/lib"
@@ -481,7 +488,7 @@ if(MUSL_LOADER)
     if(EXISTS "${_d}")
       file(GLOB _pthreads_candidates "${_d}/libpthread.*" "${_d}/libpthread.so" "${_d}/libpthread.a")
       if(_pthreads_candidates)
-        set(CMAKE_PLATFORM_HAS_PTHREADS ON CACHE BOOL "Does the platform provide libpthreads")
+        set(CMAKE_PLATFORM_HAS_PTHREAD ON CACHE BOOL "Does the platform provide libpthread")
       endif()
       file(GLOB _math_candidates "${_d}/libm.*" "${_d}/libm.so" "${_d}/libm.a")
       if(_math_candidates)
@@ -499,7 +506,7 @@ else()
     if(EXISTS "${_d}")
       file(GLOB _pthreads_candidates "${_d}/libpthread.*" "${_d}/libpthread.a")
       if(_pthreads_candidates)
-        set(CMAKE_PLATFORM_HAS_PTHREADS ON CACHE BOOL "Does the platform provide libpthreads")
+        set(CMAKE_PLATFORM_HAS_PTHREAD ON CACHE BOOL "Does the platform provide libpthreads")
       endif()
       file(GLOB _math_candidates "${_d}/libm.*" "${_d}/libm.a")
       if(_math_candidates)
@@ -582,7 +589,8 @@ if(MUSL_LOADER)
   set(CMAKE_C_LINKER_WRAPPER_FLAG "-Xlinker" " ")
   set(CMAKE_CXX_LINKER_WRAPPER_FLAG "-Xlinker" " ")
   set(CMAKE_ASM_LINKER_WRAPPER_FLAG "-Xlinker" " ")
-  set(_c_dir_flags "-Xlinker -L${CMAKE_SYSTEM_LIBRARY_PATH}")
+  set(CMAKE_LIBRARY_PATH_FLAG "-L")
+  set(_c_dir_flags "-Xlinker ${CMAKE_LIBRARY_PATH_FLAG}${CMAKE_SYSTEM_LIBRARY_PATH}")
   list(FIND _generic_musl_EXE_linker_flags "${_c_dir_flags}" _found_musl_lib)
   if(_found_musl_lib EQUAL -1)
     list(APPEND _generic_musl_EXE_linker_flags "${_c_dir_flags}")
@@ -620,6 +628,7 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
       set(CMAKE_${lang}_COMPILER_LINKER_FRONTEND_VARIANT LLD)
       set(CMAKE_${lang}_COMPILER_LINKER_ID LLD)
       set(CMAKE_${lang}_LINK_MODE DRIVER)
+      set(CMAKE_${lang}_LINK_WHAT_YOU_USE_FLAG "--no-as-needed")
       list(FIND CMAKE_${lang}_FLAGS_INIT "-fuse-ld=lld" _found_use_lld_${lang}_flag)
       if(_found_use_lld_${lang}_flag EQUAL -1)
         set(CMAKE_${lang}_FLAGS_INIT "-fuse-ld=lld ${CMAKE_${lang}_FLAGS_INIT}")
@@ -727,6 +736,12 @@ if(CMAKE_PLATFORM_SUPPORTS_SHARED_LIBS AND _GENERIC_MUSL_HAVE_CLANG)
   # Ensure shared lib variables don't advertise support
 endif()
 
+# ensure searches start at the linker directory by default for musl
+if(MUSL_LOADER AND EXISTS "${MUSL_LOADER}")
+  get_filename_component(_default_link_dir "${MUSL_LOADER}" DIRECTORY)
+  link_directories(BEFORE "${_default_link_dir}")
+endif()
+
 # TODO: handle adding excludes when linking clang_rt
 #-Xlinker --exclude-libs=libgcc_s.so.1 -Xlinker --exclude-libs=libgcc_s.so -Xlinker --exclude-libs=libgcc_s.a
 #-nobuiltininc
@@ -817,7 +832,7 @@ add_compile_definitions(_XOPEN_SOURCE=700)
 # POSIX -std=c99 -lm is supported with an empty archive by musl
 set(CMAKE_PLATFORM_HAS_MATH_LIB ${CMAKE_PLATFORM_HAS_MATH_LIB})
 # POSIX -std=c99 -lpthread is supported with an empty archive by musl
-set(CMAKE_PLATFORM_HAS_PTHREADS ${CMAKE_PLATFORM_HAS_PTHREADS})
+set(CMAKE_PLATFORM_HAS_PTHREAD ${CMAKE_PLATFORM_HAS_PTHREAD})
 
 message(STATUS "Configured Generic-Musl platform (musl libc, Clang/LLVM preferred).")
 if(_GENERIC_MUSL_HAVE_CLANG)
@@ -856,6 +871,54 @@ else()
   if(DEFINED CMAKE_C_COMPILER_ID)
     message(AUTHOR_WARNING "No Clang selected (or was detected but deemed unsupported); leaving most toolchain variables unchanged.")
     message(STATUS "No Clang detected and selected (or was detected but deemed unsupported); leaving most toolchain variables unchanged.")
+  endif()
+endif()
+
+# Compile flags
+
+foreach(lang C CXX)
+  # musl prefers using -fdata-sections
+  list(FIND CMAKE_${lang}_FLAGS "-fdata-sections" _found_data_sec_flag)
+  if(_found_data_sec_flag EQUAL -1)
+    if (CMAKE_${lang}_FLAGS STREQUAL "")
+      set(CMAKE_${lang}_FLAGS "-fdata-sections")
+    else()
+      set(CMAKE_${lang}_FLAGS "-fdata-sections ${CMAKE_${lang}_FLAGS}")
+    endif()
+  endif()
+  # musl prefers using -ffunction-sections
+  list(FIND CMAKE_${lang}_FLAGS "-ffunction-sections" _found_func_sec_flag)
+  if(_found_func_sec_flag EQUAL -1)
+    set(CMAKE_${lang}_FLAGS "-ffunction-sections ${CMAKE_${lang}_FLAGS}")
+  endif()
+  # musl prefers -fexcess-precision=standard
+  # musl prefers -frounding-math
+endforeach()
+
+foreach(lang C ASM)
+  # musl C does not support DWARF in loader
+  list(FIND CMAKE_${lang}_FLAGS "-fno-unwind-tables" _found_strict_debug_mode_flag)
+  if(_found_strict_debug_mode_flag EQUAL -1)
+    if (CMAKE_${lang}_FLAGS STREQUAL "")
+      set(CMAKE_${lang}_FLAGS "-fno-unwind-tables")
+    else()
+      set(CMAKE_${lang}_FLAGS "-fno-unwind-tables ${CMAKE_${lang}_FLAGS}")
+    endif()
+  endif()
+  # musl C does not support asynchronous unwind (use -fno-asynchronous-unwind-tables)
+  list(FIND CMAKE_${lang}_FLAGS "-fno-asynchronous-unwind-tables" _found_sync_debug_flag)
+  if(_found_sync_debug_flag EQUAL -1)
+    set(CMAKE_${lang}_FLAGS "-fno-asynchronous-unwind-tables ${CMAKE_${lang}_FLAGS}")
+  endif()
+endforeach()
+
+# musl needs assemblers to use --noexecstack
+list(FIND CMAKE_ASM_FLAGS "--noexecstack" _found_no_exec_stack_flag)
+if(_found_no_exec_stack_flag EQUAL -1)
+  if (CMAKE_ASM_FLAGS STREQUAL "")
+    set(CMAKE_ASM_FLAGS "--noexecstack")
+  else()
+    set(CMAKE_ASM_FLAGS "--noexecstack ${CMAKE_ASM_FLAGS}")
   endif()
 endif()
 
