@@ -1935,7 +1935,19 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
           cp -vf ${SYS_INCLUDE}/c++/v1/cxxabi/${CXXABI_FILE_ARTIFACT} /work/build-libcxx-bootstrap0/private-abi-headers/${CXXABI_FILE_ARTIFACT} ; \
           touch -d "${SOME_DATE_EPOCH}" /work/build-libcxx-bootstrap0/private-abi-headers/${CXXABI_FILE_ARTIFACT} || true ; \
     done ;} && \
-    cmake --build "/work/build-libcxx-bootstrap0" && \
+    { cmake --build "/work/build-libcxx-bootstrap0" || \
+      { printf "%s\n" "ERROR: FAILED at build-libcxx-bs 28 again" && \
+        printf "%s\n" "looking at: llvm-project/libcxx/src/system_error.cpp" && \
+        { [[ -r /work/llvm-project/libcxx/src/system_error.cpp ]] || printf "%s\n" "Can't read /work/llvm-project/libcxx/src/system_error.cpp" ;} && \
+        head -n 200 /work/llvm-project/libcxx/src/system_error.cpp && \
+        printf "%s\n\n" "---Truncated (for brevity) ---" && \
+        printf "%s\n" "looking at: llvm-project/libcxx/src/verbose_abort.cpp" && \
+        { [[ -r /work/llvm-project/libcxx/src/verbose_abort.cpp ]] || printf "%s\n" "Can't read /work/llvm-project/libcxx/src/verbose_abort.cpp" ;} && \
+        head -n 75 /work/llvm-project/libcxx/src/verbose_abort.cpp && \
+        printf "%s\n\n" "---Truncated (for brevity) ---" && \
+        { printf "%s\n" "Looking at /work/build-libcxx-bootstrap0/private-abi-headers/" && \
+          ls -lap /work/build-libcxx-bootstrap0/private-abi-headers/ ;} && \
+       printf "Error: %s\n\n" "Aborting due to previous errors. See previous causes." ; exit 125 ;} ;} && \
     python3 ../llvm-project/libcxx/utils/generate_iwyu_mapping.py -o include/c++/v1/libcxx.imp || true ;\
     cmake --install /work/build-libcxx-bootstrap0 && \
     { if [ -f /work/builds/opt/libcxx-bootstrap0/bin/libc++.so ] ; then \

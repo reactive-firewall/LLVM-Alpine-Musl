@@ -156,7 +156,7 @@
 
 /* 3. Otherwise warn of unsupported compile environment. */
 #if !defined(_Unwind_Reason_Code)
-#warning "Can not find an unwind reason-code map for C++ ABI - Build environment unsupported (best guess: __UNWIND_SHIM_H_ )"
+#warning "Can not find an unwind reason-code map for C++ ABI - Build environment unsupported (best guess:" __UNWIND_SHIM_H_ ")"
 #endif /* !_Unwind_Reason_Code */
 
 #if !defined(_Unwind_Exception)
@@ -166,6 +166,9 @@
 #else /* !defined(__has_include) */
 #if defined(_Unwind_Reason_Code) || defined(_Unwind_Exception)
 #define __UNWIND_SHIM_H_ 1
+#if defined(__clang__)
+#warning "Can not use '__has_include'; Yet _Unwind_Exception is defined; will attempt blind use of _Unwind_Exception implementation. This may break things."
+#endif /* !__clang__ */
 #else
 #warning "Can not use '__has_include'; will attempt blind include of an unwind implementation. This may break things."
 #define __UNWIND_SHIM_H_
