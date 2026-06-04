@@ -1883,6 +1883,9 @@ RUN "${HOST_CXX}" $CXXFLAGS $CFLAGS -fuse-ld=lld -Xlinker -Bdynamic -Xlinker --r
 
 # may want to play with LIBCXX_TARGET_SUBDIR
 
+# WORKAROUND for https://github.com/llvm/llvm-project/issues/201500
+# musl libc does not always export 'strto<num>_l' stuff so may need '-DLIBCXX_ENABLE_LOCALIZATION=OFF' here
+
 # Stage 1: Build libc++ (bootstrap0) but link against existing libcxxabi (libcxxrt) in sysroot
 RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 && \
     cmake -S "/work/llvm-project/libcxx" -B "/work/build-libcxx-bootstrap0" -Wno-dev \
@@ -1905,6 +1908,7 @@ RUN mkdir -p /work/build-libcxx-bootstrap0 && cd /work/build-libcxx-bootstrap0 &
       -DLIBCXX_USE_COMPILER_RT=ON \
       -DLIBCXX_ENABLE_EXCEPTIONS=ON \
       -DLIBCXX_ENABLE_RTTI=ON \
+      -DLIBCXX_ENABLE_LOCALIZATION=OFF \
       -DLIBCXX_HAS_MUSL_LIBC=ON \
       -DLIBCXX_ENABLE_THREADS=ON \
       -DLIBCXX_HAS_PTHREAD_API=ON \
