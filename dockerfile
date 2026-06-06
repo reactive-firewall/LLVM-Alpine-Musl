@@ -453,7 +453,6 @@ WORKDIR /build/llvm
 # cmd:clang++ - Apache-2.0 WITH LLVM-exception / Apache-2.0 - used to compile parts of clang_rt - (weak)
 # cmd:find - GPL-3.0-or-later - do not bundle - just need a tool to iterate over files and filter results - (weak)
 # cmd:perl - Artistic-1.0-Perl OR GPL-1.0 - do not bundle - used by llvm build automation (weak)
-# cmd:paxctl - GPL-2.0-only - might be used for testing hardened ELF stuff (UNUSED)
 # python3 - PSF-2.0 / Python Software Foundation license 2.0 - do not bundle (transient)
 # samurai - Apache-2.0 - do not bundle - just need a build-tool implementation (weak)
 # zlib-dev - Zlib / - see https://zlib.net/zlib_license.html - used by LLVM toolchain (transient)
@@ -537,9 +536,11 @@ RUN set -eux \
         samurai \
         cmake \
         python3 \
+        zlib-dev \
         pkgconfig \
-        perl \
-        paxctl 2>/dev/null || true ;
+        cmd:perl \
+        perl 2>/dev/null && \
+    { apk del --no-cache paxctl 2>/dev/null || true ;} ;
 
 # Ensure we have the clang builtins lib, and verify the archive:
 RUN ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ && \
@@ -547,8 +548,8 @@ RUN ls -lap ${SYSROOT}/lib/ && ls -lap ${SYSROOT}/lib/generic/ && \
     { llvm-ar t ${SYSROOT}${MUSL_PREFIX}/lib/generic/${LLVM_RTLIB} | head -5 ;} && \
     mkdir -p /tmp/rtlib-test && cd /tmp/rtlib-test && \
     llvm-ar x ${SYSROOT}${MUSL_PREFIX}/lib/generic/${LLVM_RTLIB} && \
-    { for obj in *.o; do file "$obj" || exit 1; done ;} && \
-    rm -rf /tmp/rtlib-test
+    { for OBJ in *.obj ; do file "$OBJ" || exit 1; done ;} && \
+    cd /build && rm -rf /tmp/rtlib-test
 
 
 # --- Prepare Stage 3 of 3: compile musl with compiler_rt ---
